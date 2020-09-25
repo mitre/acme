@@ -34,8 +34,20 @@ for (i in 1:num_subj){
 # overarching data ----
 
 # this includes specified cutoffs, etc.
+
+# BIVs
 ht_cutoff_low <- 100
 ht_cutoff_high <- 250
+
+# in a given range, the cutoff between the max and min height
+# NOTE: this should be customizable
+btwn_range_cutoff <- 3.5
+
+# age buckets
+age_ranges <- data.frame(
+  "low" = c(18, 25, 50),
+  "high" = c(25, 50, Inf)
+)
 
 # implement muthalgu, et al. ----
 
@@ -58,4 +70,20 @@ for (i in unique(subjid)){
   
   subj_df <- subj_df[!(too_low | too_high),]
   
+  # 2. Go through each age bucket
+  for (ab in 1:nrow(age_ranges)){
+    # 2a: if max - min height < 3.5, plausible
+    subj_df_age <- subj_df[subj_df$age_years >= age_ranges$low[ab] &
+                             subj_df$age_years < age_ranges$high[ab],]
+    
+    if (abs(max(subj_df_age$measurement) - min(subj_df_age$measurement)) >= 
+        btwn_range_cutoff){
+      # 2b: if not in range, calculate median height at each age. compare with 
+      # prior and next median. if height at current age differs by > 3.5 prior
+      # and next median, flag as potentially erroneous
+      # if only 2 valid medians and differ by >3.5, flag both as indeterminate
+      
+    }
+    
+  }
 }
