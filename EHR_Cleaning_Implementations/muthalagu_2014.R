@@ -4,6 +4,8 @@
 
 # paper: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3974252/
 
+# Note: will have to update to data table upon completion for speed
+
 # load data and libraries ----
 
 # fake data, for ease of coding purposes
@@ -32,3 +34,28 @@ for (i in 1:num_subj){
 # overarching data ----
 
 # this includes specified cutoffs, etc.
+ht_cutoff_low <- 100
+ht_cutoff_high <- 250
+
+# implement muthalgu, et al. ----
+
+# preallocate final designation
+out <- c()
+# go through each subject
+for (i in unique(subjid)){
+  # since we're going to do this a fair bit
+  slog <- df$subjid == i
+  
+  subj_keep <- rep("Include", sum(slog))
+  names(subj_keep) <- df$id[slog]
+  
+  subj_df <- df[slog,]
+  
+  # 1. remove biologically impossible height records
+  too_low <- subj_df$measurement < ht_cutoff_low
+  too_high <- subj_df$measurement > ht_cutoff_high
+  subj_keep[too_low | too_high] <- "Remove"
+  
+  subj_df <- subj_df[!(too_low | too_high),]
+  
+}
