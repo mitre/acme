@@ -5,6 +5,7 @@
 # paper: https://onlinelibrary.wiley.com/doi/full/10.1002/oby.21612
 
 # Note: will have to update to data table upon completion for speed
+# Note 2: must remove missing values before running method
 
 # load data ----
 
@@ -40,4 +41,66 @@ for (i in 1:num_subj){
   df$measurement[df$subjid == i & df$param == "WEIGHTKG"] <- 
     df$measurement[df$subjid == i & df$param == "WEIGHTKG"]+ 
     rnorm(sum(df$subjid == i & df$param == "WEIGHTKG"), 0, 5)
+}
+
+# supporting functions ----
+
+remove_biv <- function(subj_df, type, biv_df){
+  too_low <- subj_df$measurement < biv_df[type, "low"]
+  too_high <- subj_df$measurement > biv_df[type, "high"]
+  
+  return(too_low | too_high)
+}
+
+# implement cheng, et al. ----
+
+# method specific constants ----
+# this includes specified cutoffs, etc.
+
+# BIVs
+biv_df <- data.frame(
+  "low" = c(111.8,24.9),
+  "high" = c(228.6,453.6)
+)
+rownames(biv_df) <- c("height", "weight")
+
+# begin implementation ----
+
+# preallocate final designation
+out <- c()
+# go through each subject
+for (i in unique(df$subjid)){
+  # START WITH HEIGHT
+  h_df <- df[df$param == "HEIGHTCM",]
+  
+  # since we're going to do this a fair bit
+  slog <- h_df$subjid == i
+  
+  subj_keep <- rep("Include", sum(slog))
+  names(subj_keep) <- h_df$id[slog]
+  
+  subj_df <- h_df[slog,]
+  
+  # 1h ----
+  # 1h. remove biologically impossible height records
+  criteria <- remove_biv(subj_df, "height", biv_df)
+  subj_keep[criteria] <- "Implausible"
+  
+  subj_df <- subj_df[!criteria,]
+  
+  #2h ----
+  # 2h. Exclude height if a) absolute difference between that height and average
+  # height > standard deviation (SD) AND b) SD > 2.5% of average height.
+  
+  # calculate standard deviation of height for a given subject
+  st_dev <- sd(subj_df$measurement)
+  avg <- mean(subj_df$measurement)
+  
+  # if the standard deviation is less than 2.5%, we can say something about height
+  if (st_dev/avg <= .025){
+    # criteria (a)
+    excl_ht <- sapply(subj_df$measurement, function(x){abs(x-avg) > st_dev})
+    
+    subj_keep[as.character(subj_df$id[excl_ht])] <- "Implausible"
+  }
 }
