@@ -156,4 +156,10 @@ for (i in unique(df$subjid)){
       }
     }
   }
+  
+  # record results
+  out <- c(out, subj_keep)
 }
+
+# add results to overall data frame
+df <- cbind(df, "result" = out)
