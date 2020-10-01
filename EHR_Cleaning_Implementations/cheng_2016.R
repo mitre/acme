@@ -11,7 +11,7 @@
 # fake data, for ease of coding purposes
 set.seed(8)
 num_subj <- 5
-age_years <- seq(18, 68, by = 15)
+age_years <- seq(18, 68, by = .8)
 min_height <- 4*30.48 # 4 ft
 max_height <- 8*30.48 # 8 ft
 min_weight <- 55*.4535 # 55 lbs
