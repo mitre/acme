@@ -19,7 +19,8 @@
 #   measurement: height or weight measurement
 # outputs:
 #   df, with additional column result, which specifies whether the height measurement
-#     should be included, is erroneous, or indeterminate. "unknown" for weight measurements
+#     should be included, is erroneous, or indeterminate. "unknown" for weight 
+#     measurements.
 muthalagu_clean_ht <- function(df){
   # method specific constants ----
   # this includes specified cutoffs, etc.
@@ -41,6 +42,7 @@ muthalagu_clean_ht <- function(df){
   # begin implementation ----
   
   h_df <- df[df$param == "HEIGHTCM",]
+  h_df <- h_df[order(h_df$subjid),]
   
   # preallocate final designation
   out <- c()
