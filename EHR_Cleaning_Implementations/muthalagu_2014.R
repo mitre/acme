@@ -63,15 +63,18 @@ for (i in unique(df$subjid)){
   
   subj_df <- df[slog,]
   
+  # 1 ----
   # 1. remove biologically impossible height records
   too_low <- subj_df$measurement < ht_cutoff_low
   too_high <- subj_df$measurement > ht_cutoff_high
-  subj_keep[too_low | too_high] <- "Remove"
+  subj_keep[too_low | too_high] <- "Erroneous"
   
   subj_df <- subj_df[!(too_low | too_high),]
   
+  # 2 ----
   # 2. Go through each age bucket
   for (ab in 1:nrow(age_ranges)){
+    # 2a ----
     # 2a: if max - min height < 3.5, plausible
     subj_df_age <- subj_df[subj_df$age_years >= age_ranges$low[ab] &
                              subj_df$age_years < age_ranges$high[ab],]
@@ -84,6 +87,7 @@ for (i in unique(df$subjid)){
     
     if (abs(max(subj_df_age$measurement) - min(subj_df_age$measurement)) >= 
         btwn_range_cutoff){
+      # 2b ----
       # 2b: if not in range, calculate median height at each age. compare with 
       # prior and next median. if height at current age differs by > 3.5 prior
       # and next median, flag as potentially erroneous
@@ -111,6 +115,7 @@ for (i in unique(df$subjid)){
                          if(!all(mid_compare)){which(!mid_compare)+1}, 
                          length(med_hts))
         
+        # 2c ----
         # 2c: For erroneous and indeterminate medians, assign algorithms within
         # 3 year period. Then compare all other recorded heights to the median at 
         # that are. If the recorded height for any age differs  > 3.5 (for 
