@@ -70,16 +70,15 @@ rownames(biv_df) <- c("height", "weight")
 out <- c()
 # go through each subject
 for (i in unique(df$subjid)){
+  slog <- df$subjid == i
+  
   # START WITH HEIGHT
-  h_df <- df[df$param == "HEIGHTCM",]
+  h_df <- df[df$param == "HEIGHTCM" & slog,]
   
-  # since we're going to do this a fair bit
-  slog <- h_df$subjid == i
+  subj_keep <- rep("Include", nrow(h_df))
+  names(subj_keep) <- h_df$id
   
-  subj_keep <- rep("Include", sum(slog))
-  names(subj_keep) <- h_df$id[slog]
-  
-  subj_df <- h_df[slog,]
+  subj_df <- h_df
   
   # 1h ----
   # 1h. remove biologically impossible height records
@@ -97,10 +96,13 @@ for (i in unique(df$subjid)){
   avg <- mean(subj_df$measurement)
   
   # if the standard deviation is less than 2.5%, we can say something about height
-  if (st_dev/avg <= .025){
+  if (st_dev/avg > .025){
     # criteria (a)
     excl_ht <- sapply(subj_df$measurement, function(x){abs(x-avg) > st_dev})
     
     subj_keep[as.character(subj_df$id[excl_ht])] <- "Implausible"
   }
+  
+  h_df <- rbind(h_df, "result" = subj_keep)
+  
 }
