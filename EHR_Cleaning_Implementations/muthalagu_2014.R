@@ -124,6 +124,11 @@ muthalagu_clean_ht <- function(df){
                 med_hts[-err_hts_idx][sub_df$age_years <= (sub_df$age_years[x]+1.5) |
                                         sub_df$age_years >= (sub_df$age_years[x]-1.5)]
               
+              # nothing to compare to within 3 years: indeterminate
+              if (length(avail_med) == 0){
+                return("Indeterminate")
+              }
+              
               # assign nearest correct median
               new_med <- avail_med[which.min(abs(avail_med - med_hts[x]))]
               
@@ -164,7 +169,6 @@ muthalagu_clean_ht <- function(df){
   df <- cbind(df, "result" = "Unknown")
   rownames(df) <- df$id
   df[as.character(h_df$id), "result"] <- h_df$result
-  
   
   return(df)
 }
