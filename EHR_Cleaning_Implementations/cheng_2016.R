@@ -108,7 +108,7 @@ for (i in unique(df$subjid)){
   h_df$result <- subj_keep
   
   # add results to full dataframe
-  df[as.character(h_df$id), "result"] <- h_df$id
+  df[as.character(h_df$id), "result"] <- h_df$result
   
   # then do weight ----
   
@@ -163,4 +163,9 @@ for (i in unique(df$subjid)){
     }
   
   subj_keep[as.character(subj_df$id[criteria_a | criteria_b])] <- "Implausible"
+  
+  w_df$result <- subj_keep
+  
+  # add results to full dataframe
+  df[as.character(w_df$id), "result"] <- w_df$result
 }
