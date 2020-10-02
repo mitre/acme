@@ -74,6 +74,7 @@ for (i in unique(df$subjid)){
   slog <- df$subjid == i
   
   # start with height ----
+  
   h_df <- df[df$param == "HEIGHTCM" & slog,]
   
   subj_keep <- rep("Include", nrow(h_df))
@@ -111,4 +112,17 @@ for (i in unique(df$subjid)){
   
   # then do weight ----
   
+  w_df <- df[df$param == "WEIGHTKG" & slog,]
+  
+  subj_keep <- rep("Include", nrow(w_df))
+  names(subj_keep) <- w_df$id
+  
+  subj_df <- w_df
+  
+  # 1h ----
+  # 1h. remove biologically impossible weight records
+  criteria <- remove_biv(subj_df, "weight", biv_df)
+  subj_keep[criteria] <- "Implausible"
+  
+  subj_df <- subj_df[!criteria,]
 }
