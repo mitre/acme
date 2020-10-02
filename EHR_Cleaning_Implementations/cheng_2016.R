@@ -72,10 +72,10 @@ cheng_clean_both <- function(df){
   
   # BIVs
   biv_df <- data.frame(
-    "low" = c(111.8,24.9),
-    "high" = c(228.6,453.6)
+    "low" = c(111.8, 24.9, 12),
+    "high" = c(228.6, 453.6, 70)
   )
-  rownames(biv_df) <- c("height", "weight")
+  rownames(biv_df) <- c("height", "weight", "bmi")
   
   # begin implementation ----
   
@@ -185,6 +185,19 @@ cheng_clean_both <- function(df){
     
     # add results to full dataframe
     df[as.character(w_df$id), "result"] <- w_df$result
+    
+    # 3 ----
+    # 3. If BMI for a given set of height/weights is < 12 or > 70, deem implausible
+    
+    # possible removal of height/weights by bmi
+    comb_df <- data.frame(
+      "ht" = h_df$measurement,
+      "ht_res" = h_df$result,
+      "wt" = w_df$measurement,
+      "wt_res" = w_df$result
+    )
+    
+    
   }
   
   return(df)
