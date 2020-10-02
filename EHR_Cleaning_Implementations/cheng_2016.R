@@ -89,20 +89,22 @@ for (i in unique(df$subjid)){
   
   subj_df <- subj_df[!criteria,]
   
-  #2h ----
-  # 2h. Exclude height if a) absolute difference between that height and average
-  # height > standard deviation (SD) AND b) SD > 2.5% of average height.
-  
-  # calculate standard deviation of height for a given subject
-  st_dev <- sd(subj_df$measurement)
-  avg <- mean(subj_df$measurement)
-  
-  # if the standard deviation is > than 2.5%, we can say something about height
-  if (st_dev/avg > .025){
-    # criteria (a)
-    excl_ht <- sapply(subj_df$measurement, function(x){abs(x-avg) > st_dev})
+  if (nrow(subj_df) > 0){
+    #2h ----
+    # 2h. Exclude height if a) absolute difference between that height and average
+    # height > standard deviation (SD) AND b) SD > 2.5% of average height.
     
-    subj_keep[as.character(subj_df$id[excl_ht])] <- "Implausible"
+    # calculate standard deviation of height for a given subject
+    st_dev <- sd(subj_df$measurement)
+    avg <- mean(subj_df$measurement)
+    
+    # if the standard deviation is > than 2.5%, we can say something about height
+    if (st_dev/avg > .025){
+      # criteria (a)
+      excl_ht <- sapply(subj_df$measurement, function(x){abs(x-avg) > st_dev})
+      
+      subj_keep[as.character(subj_df$id[excl_ht])] <- "Implausible"
+    }
   }
   
   h_df$result <- subj_keep
@@ -126,43 +128,45 @@ for (i in unique(df$subjid)){
   
   subj_df <- subj_df[!criteria,]
   
-  # 2w ----
-  # 2w. weight inaccurate if:
-  # a) the range was > 22.7 kg AND absolute difference between recorded weight and
-  # avg weight was > 70% of range
-  # OR
-  # b) SD was >20% of the average weight AND absolute difference between that weight
-  # and average weight > the SD
-  
-  avg_w <- mean(subj_df$measurement)
-  
-  # first calculate criteria a)
-  w_range <- abs(max(subj_df$measurement) - min(subj_df$measurement))
-  # if range is > 22.7, we can possibly say something about weight
-  criteria_a <- 
-    if (w_range > 22.7){
-      # weight difference is more than 70% of range
-      sapply(subj_df$measurement, function(x){
-        abs(x - avg_w) > .7*w_range
-      })
-    } else {
-      rep(F, nrow(subj_df))
-    }
-  
-  # criteria b)
-  st_dev <- sd(subj_df$measurement)
-  # if sd was >20% of avg weight, we can possibly say something about weight
-  criteria_b <- 
-    if (st_dev/avg_w > .2){
-      # weight difference is > SD
-      sapply(subj_df$measurement, function(x){
-        abs(x - avg_w) > st_dev
-      })
-    } else {
-      rep(F, nrow(subj_df))
-    }
-  
-  subj_keep[as.character(subj_df$id[criteria_a | criteria_b])] <- "Implausible"
+  if (nrow(subj_df) > 0){
+    # 2w ----
+    # 2w. weight inaccurate if:
+    # a) the range was > 22.7 kg AND absolute difference between recorded weight 
+    # and avg weight was > 70% of range
+    # OR
+    # b) SD was >20% of the average weight AND absolute difference between that 
+    # weight and average weight > the SD
+    
+    avg_w <- mean(subj_df$measurement)
+    
+    # first calculate criteria a)
+    w_range <- abs(max(subj_df$measurement) - min(subj_df$measurement))
+    # if range is > 22.7, we can possibly say something about weight
+    criteria_a <- 
+      if (w_range > 22.7){
+        # weight difference is more than 70% of range
+        sapply(subj_df$measurement, function(x){
+          abs(x - avg_w) > .7*w_range
+        })
+      } else {
+        rep(F, nrow(subj_df))
+      }
+    
+    # criteria b)
+    st_dev <- sd(subj_df$measurement)
+    # if sd was >20% of avg weight, we can possibly say something about weight
+    criteria_b <- 
+      if (st_dev/avg_w > .2){
+        # weight difference is > SD
+        sapply(subj_df$measurement, function(x){
+          abs(x - avg_w) > st_dev
+        })
+      } else {
+        rep(F, nrow(subj_df))
+      }
+    
+    subj_keep[as.character(subj_df$id[criteria_a | criteria_b])] <- "Implausible"
+  }
   
   w_df$result <- subj_keep
   
