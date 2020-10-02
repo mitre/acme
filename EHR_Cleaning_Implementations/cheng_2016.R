@@ -119,10 +119,48 @@ for (i in unique(df$subjid)){
   
   subj_df <- w_df
   
-  # 1h ----
-  # 1h. remove biologically impossible weight records
+  # 1w ----
+  # 1w. remove biologically impossible weight records
   criteria <- remove_biv(subj_df, "weight", biv_df)
   subj_keep[criteria] <- "Implausible"
   
   subj_df <- subj_df[!criteria,]
+  
+  # 2w ----
+  # 2w. weight inaccurate if:
+  # a) the range was > 22.7 kg AND absolute difference between recorded weight and
+  # avg weight was > 70% of range
+  # OR
+  # b) SD was >20% of the average weight AND absolute difference between that weight
+  # and average weight > the SD
+  
+  avg_w <- mean(subj_df$measurement)
+  
+  # first calculate criteria a)
+  w_range <- abs(max(subj_df$measurement) - min(subj_df$measurement))
+  # if range is > 22.7, we can possibly say something about weight
+  criteria_a <- 
+    if (w_range > 22.7){
+      # weight difference is more than 70% of range
+      sapply(subj_df$measurement, function(x){
+        abs(x - avg_w) > .7*w_range
+      })
+    } else {
+      rep(F, nrow(subj_df))
+    }
+  
+  # criteria b)
+  st_dev <- sd(subj_df$measurement)
+  # if sd was >20% of avg weight, we can possibly say something about weight
+  criteria_b <- 
+    if (st_dev/avg_w > .2){
+      # weight difference is > SD
+      sapply(subj_df$measurement, function(x){
+        abs(x - avg_w) > st_dev
+      })
+    } else {
+      rep(F, nrow(subj_df))
+    }
+  
+  subj_keep[as.character(subj_df$id[criteria_a | criteria_b])] <- "Implausible"
 }
