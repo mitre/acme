@@ -67,12 +67,13 @@ rownames(biv_df) <- c("height", "weight")
 # begin implementation ----
 
 # preallocate final designation
-out <- c()
+df$result <- "Include"
+rownames(df) <- df$id
 # go through each subject
 for (i in unique(df$subjid)){
   slog <- df$subjid == i
   
-  # START WITH HEIGHT
+  # start with height ----
   h_df <- df[df$param == "HEIGHTCM" & slog,]
   
   subj_keep <- rep("Include", nrow(h_df))
@@ -95,7 +96,7 @@ for (i in unique(df$subjid)){
   st_dev <- sd(subj_df$measurement)
   avg <- mean(subj_df$measurement)
   
-  # if the standard deviation is less than 2.5%, we can say something about height
+  # if the standard deviation is > than 2.5%, we can say something about height
   if (st_dev/avg > .025){
     # criteria (a)
     excl_ht <- sapply(subj_df$measurement, function(x){abs(x-avg) > st_dev})
@@ -103,6 +104,11 @@ for (i in unique(df$subjid)){
     subj_keep[as.character(subj_df$id[excl_ht])] <- "Implausible"
   }
   
-  h_df <- rbind(h_df, "result" = subj_keep)
+  h_df$result <- subj_keep
+  
+  # add results to full dataframe
+  df[as.character(h_df$id), "result"] <- h_df$id
+  
+  # then do weight ----
   
 }
