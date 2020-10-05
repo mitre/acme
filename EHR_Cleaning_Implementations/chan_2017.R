@@ -89,5 +89,22 @@ for (i in unique(df$subjid)){
   
   subj_df <- subj_df[!criteria,]
   
+  # 2h ----
+  # 2h. Exclude heights that were greater than 3 standard deviations from the 
+  # mean.
+  
+  if (nrow(subj_df) > 0){
+    # calculate mean and standard deviation
+    avg_ht <- mean(subj_df$measurement)
+    st_dev_ht <- sd(subj_df$measurement)
+    
+    # calculate exclusion criteria
+    criteria <- abs(subj_df$measurement - avg_ht) > 3*st_dev_ht
+    
+    subj_keep[as.character(subj_df$id)][criteria] <- "Implausible"
+    
+    # add the full calculation
+    h_df$result <- subj_keep
+  }
   
 }
