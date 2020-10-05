@@ -81,7 +81,7 @@ rownames(df) <- df$id
 for (i in unique(df$subjid)){
   slog <- df$subjid == i
   
-  # start with height
+  # start with height ----
   h_df <- df[df$param == "HEIGHTCM" & slog,]
   
   subj_keep <- rep("Include", nrow(h_df))
@@ -114,7 +114,8 @@ for (i in unique(df$subjid)){
   # add the full calculation
   h_df$result <- subj_keep
   
-  # move to weight
+  # move to weight ----
+  
   w_df <- df[df$param == "WEIGHTKG" & slog,]
   
   subj_keep <- rep("Include", nrow(w_df))
@@ -146,5 +147,22 @@ for (i in unique(df$subjid)){
     
     subj_df <- subj_df[!criteria,]
   }
+  
+  # 3w ----
+  # 3w. Exclude weights that were greater than 3 standard deviations from the mean.
+  
+  if (nrow(subj_df) > 0){
+    # calculate mean and standard deviation
+    avg_wt <- mean(subj_df$measurement)
+    st_dev_wt <- sd(subj_df$measurement)
+    
+    # calculate exclusion criteria
+    criteria <- abs(subj_df$measurement - avg_wt) > 3*st_dev_wt
+    
+    subj_keep[as.character(subj_df$id)][criteria] <- "Implausible"
+  }
+  
+  # add the full calculation
+  w_df$result <- subj_keep
   
 }
