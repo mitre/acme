@@ -114,6 +114,9 @@ for (i in unique(df$subjid)){
   # add the full calculation
   h_df$result <- subj_keep
   
+  # add results to full dataframe
+  df[as.character(h_df$id), "result"] <- h_df$result
+  
   # move to weight ----
   
   w_df <- df[df$param == "WEIGHTKG" & slog,]
@@ -165,4 +168,6 @@ for (i in unique(df$subjid)){
   # add the full calculation
   w_df$result <- subj_keep
   
+  # add results to full dataframe
+  df[as.character(w_df$id), "result"] <- w_df$result
 }
