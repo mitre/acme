@@ -45,9 +45,16 @@ for (i in 1:num_subj){
 
 # supporting functions ----
 
-remove_biv <- function(subj_df, type, biv_df){
-  too_low <- subj_df$measurement < biv_df[type, "low"]
-  too_high <- subj_df$measurement > biv_df[type, "high"]
+# note this is slightly different from the previous versions -- adds a variable
+# for saying whether to include the cutoff in the cutoff
+remove_biv <- function(subj_df, type, biv_df, include = F){
+  if (!include){
+    too_low <- subj_df$measurement < biv_df[type, "low"]
+    too_high <- subj_df$measurement > biv_df[type, "high"]
+  } else {
+    too_low <- subj_df$measurement <= biv_df[type, "low"]
+    too_high <- subj_df$measurement >= biv_df[type, "high"]
+  }
   
   return(too_low | too_high)
 }
@@ -122,6 +129,22 @@ for (i in unique(df$subjid)){
   
   subj_df <- subj_df[!criteria,]
   
+  # 2w ----
+  # 2w. Calculate BMI based on average height, then remove BMI bivs.
   
+  if (sum(h_df$result == "Include") > 0 & nrow(subj_df) > 0){
+    # calculate avg height for subject
+    avg_ht <- mean(h_df$measurement[h_df$result == "Include"])
+    
+    # calulate bmi
+    bmi_df <- data.frame(
+      "measurement" = w_df$measurement/((avg_ht/100)^2)
+    )
+    
+    criteria <- remove_biv(bmi_df, "bmi", biv_df, include = T)
+    subj_keep[as.character(w_df$id[criteria])] <- "Implausible"
+    
+    subj_df <- subj_df[!criteria,]
+  }
   
 }
