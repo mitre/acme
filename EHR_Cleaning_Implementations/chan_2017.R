@@ -102,9 +102,17 @@ for (i in unique(df$subjid)){
     criteria <- abs(subj_df$measurement - avg_ht) > 3*st_dev_ht
     
     subj_keep[as.character(subj_df$id)][criteria] <- "Implausible"
-    
-    # add the full calculation
-    h_df$result <- subj_keep
   }
+  
+  # add the full calculation
+  h_df$result <- subj_keep
+  
+  # move to weight
+  w_df <- df[df$param == "WEIGHTKG" & slog,]
+  
+  subj_keep <- rep("Include", nrow(w_df))
+  names(subj_keep) <- h_df$id
+  
+  subj_df <- h_df
   
 }
