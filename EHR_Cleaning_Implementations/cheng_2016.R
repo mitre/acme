@@ -6,6 +6,7 @@
 
 # Note: will have to update to data table upon completion for speed
 # Note 2: must remove missing values before running method
+# Note 3: how to deal with duplicated recordings?
 
 # load data ----
 
@@ -188,16 +189,37 @@ cheng_clean_both <- function(df){
     
     # 3 ----
     # 3. If BMI for a given set of height/weights is < 12 or > 70, deem implausible
+    rownames(h_df) <- as.character(h_df$age_years)
     
     # possible removal of height/weights by bmi
     comb_df <- data.frame(
-      "ht" = h_df$measurement,
-      "ht_res" = h_df$result,
+      "age_years" = w_df$age_years,
+      "ht_id" = h_df[as.character(w_df$age_years), "id"],
+      "ht" = h_df[as.character(w_df$age_years), "measurement"],
+      "ht_res" = h_df[as.character(w_df$age_years), "result"],
+      "wt_id" = w_df$id,
       "wt" = w_df$measurement,
       "wt_res" = w_df$result
     )
+    # remove ones that don't match
+    comb_df <- comb_df[complete.cases(comb_df),]
+    # also remove ones that are not plausible
+    comb_df <- comb_df[comb_df$ht_res == "Include" & comb_df$wt_res == "Include",]
     
-    
+    if (nrow(comb_df) > 0){
+      # calculate bmi
+      comb_df$measurement <- comb_df$wt/((comb_df$ht/100)^2)
+      
+      bmi_biv <- remove_biv(comb_df, "bmi", biv_df)
+      
+      # add result to interim df
+      comb_df$tot_res <- "Include"
+      comb_df$tot_res[bmi_biv] <- "Implausible"
+      
+      # add result to full dataframe
+      df[as.character(comb_df$wt_id), "result"] <- comb_df$tot_res
+      df[as.character(comb_df$ht_id), "result"] <- comb_df$tot_res
+    }
   }
   
   return(df)
