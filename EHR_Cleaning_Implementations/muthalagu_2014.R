@@ -48,6 +48,7 @@ muthalagu_clean_ht <- function(df){
   
   # preallocate final designation
   out <- c()
+  out_reason <- c()
   # go through each subject
   for (i in unique(h_df$subjid)){
     # since we're going to do this a fair bit
@@ -65,7 +66,8 @@ muthalagu_clean_ht <- function(df){
     
     too_low <- subj_df$measurement < ht_cutoff_low
     too_high <- subj_df$measurement > ht_cutoff_high
-    subj_keep[too_low | too_high] <- "Erroneous"
+    subj_keep[too_low | too_high] <- "Implausible"
+    subj_reason[too_low | too_high] <- paste0("Erroneous, Step ",step)
     
     subj_df <- subj_df[!(too_low | too_high),]
     
@@ -97,6 +99,8 @@ muthalagu_clean_ht <- function(df){
         # if there are only two values, everything will be indeterminate
         if (nrow(subj_df_age) <= 2){
           subj_keep[as.character(subj_df_age$id)] <- "Indeterminate"
+          subj_reason[as.character(subj_df_age$id)] <- 
+            paste0("Indeterminate, Step ", step)
         } else {
           # calculate median heights per age (rounded to nearest year) in bucket
           med_hts <- sapply(round(unique(subj_df_age$age_years)), function(x){
@@ -127,6 +131,8 @@ muthalagu_clean_ht <- function(df){
           # if there's no correct median height for comparison, it's all indeterminate
           if (sum(mid_compare) == 0){
             subj_keep[as.character(subj_df_age$id[err_hts_idx])] <- "Indeterminate"
+            subj_reason[as.character(subj_df_age$id[err_hts_idx])] <- 
+              paste0("Indeterminate, Step ", step)
           } else {
             chg_err_med <- sapply(err_hts_idx, function(x){
               # get all the correct medians within a 3 year window
@@ -163,7 +169,13 @@ muthalagu_clean_ht <- function(df){
             })
             
             # adjust the errored/indeterminate heights accordingly
-            subj_keep[as.character(subj_df_age$id[err_hts_idx])] <- chg_err_med
+            # make the names consistent across different methods
+            err_consistent <- chg_err_med
+            err_consistent[err_consistent != "Include"] <- "Implausible"
+            subj_keep[as.character(subj_df_age$id[err_hts_idx])] <- err_consistent
+            subj_reason[as.character(subj_df_age$id[err_hts_idx]
+                                     [chg_err_med != "Include"])] <- 
+              paste0(chg_err_med[chg_err_med != "Include"], ", Step ", step)
           }
         }
       }
@@ -171,15 +183,17 @@ muthalagu_clean_ht <- function(df){
     
     # record results
     out <- c(out, subj_keep)
+    out_reason <- c(out_reason, subj_reason)
   }
   
   # add results to overall data frame
-  h_df <- cbind(h_df, "result" = out)
+  h_df <- cbind(h_df, "result" = out, "reason" = out_reason)
   
   # default to unknown for weight values
-  df <- cbind(df, "result" = "Unknown")
+  df <- cbind(df, "result" = "Unknown", "reason" = "")
   rownames(df) <- df$id
   df[as.character(h_df$id), "result"] <- h_df$result
+  df[as.character(h_df$id), "reason"] <- h_df$reason
   
   return(df)
 }
