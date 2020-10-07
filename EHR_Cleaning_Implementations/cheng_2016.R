@@ -60,8 +60,8 @@ cheng_clean_both <- function(df){
     h_df <- df[df$param == "HEIGHTCM" & slog,]
     
     subj_keep <- rep("Include", nrow(h_df))
-    subj_reason <- rep("", sum(slog))
-    names(subj_keep) <- names(subj_reason) <- h_df$id[slog]
+    subj_reason <- rep("", nrow(h_df))
+    names(subj_keep) <- names(subj_reason) <- h_df$id
     
     subj_df <- h_df
     
@@ -71,6 +71,7 @@ cheng_clean_both <- function(df){
     
     criteria <- remove_biv(subj_df, "height", biv_df)
     subj_keep[criteria] <- "Implausible"
+    subj_reason[criteria] <- paste0("Implausible, Step ",step)
     
     subj_df <- subj_df[!criteria,]
     
@@ -90,20 +91,25 @@ cheng_clean_both <- function(df){
         excl_ht <- sapply(subj_df$measurement, function(x){abs(x-avg) > st_dev})
         
         subj_keep[as.character(subj_df$id[excl_ht])] <- "Implausible"
+        subj_reason[as.character(subj_df$id[excl_ht])] <- 
+          paste0("Implausible, Step ",step)
       }
     }
     
     h_df$result <- subj_keep
+    h_df$reason <- subj_reason
     
     # add results to full dataframe
     df[as.character(h_df$id), "result"] <- h_df$result
+    df[as.character(h_df$id), "reason"] <- h_df$reason
     
     # then do weight ----
     
     w_df <- df[df$param == "WEIGHTKG" & slog,]
     
     subj_keep <- rep("Include", nrow(w_df))
-    names(subj_keep) <- w_df$id
+    subj_reason <- rep("", nrow(w_df))
+    names(subj_keep) <- names(subj_reason) <- w_df$id
     
     subj_df <- w_df
     
@@ -113,6 +119,7 @@ cheng_clean_both <- function(df){
     
     criteria <- remove_biv(subj_df, "weight", biv_df)
     subj_keep[criteria] <- "Implausible"
+    subj_reason[criteria] <- paste0("Implausible, Step ",step)
     
     subj_df <- subj_df[!criteria,]
     
@@ -155,12 +162,16 @@ cheng_clean_both <- function(df){
         }
       
       subj_keep[as.character(subj_df$id[criteria_a | criteria_b])] <- "Implausible"
+      subj_reason[as.character(subj_df$id[criteria_a | criteria_b])] <- 
+        paste0("Implausible, Step ",step)
     }
     
     w_df$result <- subj_keep
+    w_df$reason <- subj_reason
     
     # add results to full dataframe
     df[as.character(w_df$id), "result"] <- w_df$result
+    df[as.character(w_df$id), "reason"] <- w_df$reason
     
     # 3, BMI BIV ----
     # 3. If BMI for a given set of height/weights is < 12 or > 70, deem implausible
@@ -192,10 +203,14 @@ cheng_clean_both <- function(df){
       # add result to interim df
       comb_df$tot_res <- "Include"
       comb_df$tot_res[bmi_biv] <- "Implausible"
+      comb_df$tot_reason <- ""
+      comb_df$tot_reason[bmi_biv] <- paste0("Implausible, Step ",step)
       
       # add result to full dataframe
       df[as.character(comb_df$wt_id), "result"] <- comb_df$tot_res
       df[as.character(comb_df$ht_id), "result"] <- comb_df$tot_res
+      df[as.character(comb_df$wt_id), "reason"] <- comb_df$tot_reason
+      df[as.character(comb_df$ht_id), "reason"] <- comb_df$tot_reason
     }
   }
   
