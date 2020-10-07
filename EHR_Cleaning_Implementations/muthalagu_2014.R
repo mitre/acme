@@ -54,12 +54,15 @@ muthalagu_clean_ht <- function(df){
     slog <- h_df$subjid == i
     
     subj_keep <- rep("Include", sum(slog))
-    names(subj_keep) <- h_df$id[slog]
+    subj_reason <- rep("", sum(slog))
+    names(subj_keep) <- names(subj_reason) <- h_df$id[slog]
     
     subj_df <- h_df[slog,]
     
-    # 1 ----
+    # 1, H BIV ----
     # 1. remove biologically impossible height records
+    step <- "1, H BIV"
+    
     too_low <- subj_df$measurement < ht_cutoff_low
     too_high <- subj_df$measurement > ht_cutoff_high
     subj_keep[too_low | too_high] <- "Erroneous"
@@ -69,8 +72,10 @@ muthalagu_clean_ht <- function(df){
     # 2 ----
     # 2. Go through each age bucket
     for (ab in 1:nrow(age_ranges)){
-      # 2a ----
+      # 2a, H age range check ----
       # 2a: if max - min height < 3.5, plausible
+      step <- "2a, H age range check"
+      
       subj_df_age <- subj_df[subj_df$age_years >= age_ranges$low[ab] &
                                subj_df$age_years < age_ranges$high[ab],]
       
@@ -82,11 +87,12 @@ muthalagu_clean_ht <- function(df){
       
       if (abs(max(subj_df_age$measurement) - min(subj_df_age$measurement)) >= 
           btwn_range_cutoff){
-        # 2b ----
+        # 2b, H median check ----
         # 2b: if not in range, calculate median height at each age. compare with 
         # prior and next median. if height at current age differs by > 3.5 prior
         # and next median, flag as potentially erroneous
         # if only 2 valid medians and differ by >3.5, flag both as indeterminate
+        step <- "2b, H median check"
         
         # if there are only two values, everything will be indeterminate
         if (nrow(subj_df_age) <= 2){
@@ -110,12 +116,13 @@ muthalagu_clean_ht <- function(df){
                            if(!all(mid_compare)){which(!mid_compare)+1}, 
                            length(med_hts))
           
-          # 2c ----
+          # 2c, H erroneous and indeterminate median check ----
           # 2c: For erroneous and indeterminate medians, assign algorithms within
           # 3 year period. Then compare all other recorded heights to the median at 
           # that are. If the recorded height for any age differs  > 3.5 (for 
           # erroneous) or > 6 (for indeterminate) from cleaned median height for 
           # that age, the value is erroneous.
+          step <- "2c, H erroneous and indeterminate median check"
           
           # if there's no correct median height for comparison, it's all indeterminate
           if (sum(mid_compare) == 0){
