@@ -18,9 +18,11 @@
 #   param: HEIGHTCM or WEIGHTKG
 #   measurement: height or weight measurement
 # outputs:
-#   df, with additional column result, which specifies whether the height measurement
-#     should be included, is erroneous, or indeterminate. "unknown" for weight 
-#     measurements.
+#   df, with additional columns:
+#     result, which specifies whether the height measurement should be included,
+#       or is implausible. "unknown" for weight measurements.
+#     reason, which specifies, for implausible values, the reason for exclusion,
+#       and the step at which exclusion occurred.
 muthalagu_clean_ht <- function(df){
   # method specific constants ----
   # this includes specified cutoffs, etc.

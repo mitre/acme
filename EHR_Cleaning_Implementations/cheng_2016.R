@@ -29,8 +29,11 @@ remove_biv <- function(subj_df, type, biv_df){
 #   param: HEIGHTCM or WEIGHTKG
 #   measurement: height or weight measurement
 # outputs:
-#   df, with additional column "result", which specifies whether the height 
-#     measurement should be included or implausible.
+#   df, with additional columns:
+#     result, which specifies whether the height measurement should be included,
+#       or is implausible.
+#     reason, which specifies, for implausible values, the reason for exclusion,
+#       and the step at which exclusion occurred.
 cheng_clean_both <- function(df){
   # method specific constants ----
   # this includes specified cutoffs, etc.
