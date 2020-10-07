@@ -2,10 +2,18 @@
 # By Hannah De los Santos
 # Originated on: 10/7/2020
 
+# set libraries ----
+
+#https://stackoverflow.com/questions/3452086/getting-path-of-an-r-script/35842176#35842176
+# set working directory - only works in RStudio (with rstudioapi)
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+
 # create data ----
 
 # fake data, for ease of coding purposes
-set.seed(8)
+seed <- 8
+set.seed(seed)
+
 num_subj <- 5
 age_years <- seq(18, 68, by = .8)
 min_height <- 4*30.48 # 4 ft
@@ -39,3 +47,8 @@ for (i in 1:num_subj){
 }
 
 # write out data ----
+
+write.csv(df, 
+          file = paste0("adult_synthetic_data_seed_", seed, ".csv"),
+          row.names = F,
+          na = "")
