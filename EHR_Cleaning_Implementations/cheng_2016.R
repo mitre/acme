@@ -49,6 +49,7 @@ cheng_clean_both <- function(df){
   
   # preallocate final designation
   df$result <- "Include"
+  df$reason <- ""
   rownames(df) <- df$id
   # go through each subject
   for (i in unique(df$subjid)){
@@ -59,21 +60,25 @@ cheng_clean_both <- function(df){
     h_df <- df[df$param == "HEIGHTCM" & slog,]
     
     subj_keep <- rep("Include", nrow(h_df))
-    names(subj_keep) <- h_df$id
+    subj_reason <- rep("", sum(slog))
+    names(subj_keep) <- names(subj_reason) <- h_df$id[slog]
     
     subj_df <- h_df
     
-    # 1h ----
+    # 1h, H BIV ----
     # 1h. remove biologically impossible height records
+    step <- "1h, H BIV"
+    
     criteria <- remove_biv(subj_df, "height", biv_df)
     subj_keep[criteria] <- "Implausible"
     
     subj_df <- subj_df[!criteria,]
     
     if (nrow(subj_df) > 0){
-      #2h ----
+      # 2h, H compare difference from average to SD ----
       # 2h. Exclude height if a) absolute difference between that height and average
       # height > standard deviation (SD) AND b) SD > 2.5% of average height.
+      step <- "2h, H compare difference from average to SD"
       
       # calculate standard deviation of height for a given subject
       st_dev <- sd(subj_df$measurement)
@@ -102,21 +107,24 @@ cheng_clean_both <- function(df){
     
     subj_df <- w_df
     
-    # 1w ----
+    # 1w, W BIV ----
     # 1w. remove biologically impossible weight records
+    step <- "1w, W BIV"
+    
     criteria <- remove_biv(subj_df, "weight", biv_df)
     subj_keep[criteria] <- "Implausible"
     
     subj_df <- subj_df[!criteria,]
     
     if (nrow(subj_df) > 0){
-      # 2w ----
+      # 2w, W compare difference from average to range or SD ----
       # 2w. weight inaccurate if:
       # a) the range was > 22.7 kg AND absolute difference between recorded weight 
       # and avg weight was > 70% of range
       # OR
       # b) SD was >20% of the average weight AND absolute difference between that 
       # weight and average weight > the SD
+      step <- "2w, W compare difference from average to range or SD"
       
       avg_w <- mean(subj_df$measurement)
       
@@ -154,8 +162,10 @@ cheng_clean_both <- function(df){
     # add results to full dataframe
     df[as.character(w_df$id), "result"] <- w_df$result
     
-    # 3 ----
+    # 3, BMI BIV ----
     # 3. If BMI for a given set of height/weights is < 12 or > 70, deem implausible
+    step <- "3, BMI BIV"
+    
     rownames(h_df) <- as.character(h_df$age_years)
     
     # possible removal of height/weights by bmi
