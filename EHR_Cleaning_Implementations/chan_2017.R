@@ -76,6 +76,7 @@ chan_clean_both <- function(df){
     
     criteria <- remove_biv(subj_df, "height", biv_df)
     subj_keep[criteria] <- "Implausible"
+    subj_reason[criteria] <- paste0("Implausible, Step ",step)
     
     subj_df <- subj_df[!criteria,]
     
@@ -93,20 +94,25 @@ chan_clean_both <- function(df){
       criteria <- abs(subj_df$measurement - avg_ht) > 3*st_dev_ht
       
       subj_keep[as.character(subj_df$id)][criteria] <- "Implausible"
+      subj_reason[as.character(subj_df$id)][criteria] <- 
+        paste0("Implausible, Step ",step)
     }
     
     # add the full calculation
     h_df$result <- subj_keep
+    h_df$reason <- subj_reason
     
     # add results to full dataframe
     df[as.character(h_df$id), "result"] <- h_df$result
+    df[as.character(h_df$id), "reason"] <- h_df$reason
     
     # move to weight ----
     
     w_df <- df[df$param == "WEIGHTKG" & slog,]
     
     subj_keep <- rep("Include", nrow(w_df))
-    names(subj_keep) <- w_df$id
+    subj_reason <- rep("", nrow(w_df))
+    names(subj_keep) <- names(subj_reason) <- w_df$id
     
     subj_df <- w_df
     
@@ -116,6 +122,7 @@ chan_clean_both <- function(df){
     
     criteria <- remove_biv(subj_df, "weight", biv_df)
     subj_keep[criteria] <- "Implausible"
+    subj_reason[criteria] <- paste0("Implausible, Step ",step)
     
     subj_df <- subj_df[!criteria,]
     
@@ -134,6 +141,8 @@ chan_clean_both <- function(df){
       
       criteria <- remove_biv(bmi_df, "bmi", biv_df, include = T)
       subj_keep[as.character(w_df$id[criteria])] <- "Implausible"
+      subj_reason[as.character(w_df$id[criteria])] <- 
+        paste0("Implausible, Step ",step)
       
       subj_df <- subj_df[!criteria,]
     }
@@ -151,13 +160,17 @@ chan_clean_both <- function(df){
       criteria <- abs(subj_df$measurement - avg_wt) > 3*st_dev_wt
       
       subj_keep[as.character(subj_df$id)][criteria] <- "Implausible"
+      subj_reason[as.character(subj_df$id)][criteria] <- 
+        paste0("Implausible, Step ",step)
     }
     
     # add the full calculation
     w_df$result <- subj_keep
+    w_df$reason <- subj_reason
     
     # add results to full dataframe
     df[as.character(w_df$id), "result"] <- w_df$result
+    df[as.character(w_df$id), "reason"] <- w_df$reason
   }
   
   return(df)
