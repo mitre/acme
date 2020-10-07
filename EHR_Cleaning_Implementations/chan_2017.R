@@ -55,6 +55,7 @@ chan_clean_both <- function(df){
 
   # preallocate final designation
   df$result <- "Include"
+  df$reason <- ""
   rownames(df) <- df$id
   # go through each subject
   for (i in unique(df$subjid)){
@@ -64,20 +65,24 @@ chan_clean_both <- function(df){
     h_df <- df[df$param == "HEIGHTCM" & slog,]
     
     subj_keep <- rep("Include", nrow(h_df))
-    names(subj_keep) <- h_df$id
+    subj_reason <- rep("", nrow(h_df))
+    names(subj_keep) <- names(subj_reason) <- h_df$id
     
     subj_df <- h_df
     
-    # 1h ----
+    # 1h, H BIV ----
     # 1h. remove biologically impossible height records
+    step <- "1h, H BIV"
+    
     criteria <- remove_biv(subj_df, "height", biv_df)
     subj_keep[criteria] <- "Implausible"
     
     subj_df <- subj_df[!criteria,]
     
-    # 2h ----
+    # 2h, H check SD away from mean ----
     # 2h. Exclude heights that were greater than 3 standard deviations from the 
     # mean.
+    step <- "2h, H check SD away from mean"
     
     if (nrow(subj_df) > 0){
       # calculate mean and standard deviation
@@ -105,15 +110,18 @@ chan_clean_both <- function(df){
     
     subj_df <- w_df
     
-    # 1w ----
+    # 1w, W BIV ----
     # 1w. remove biologically impossible weight records
+    step <- "1w, W BIV"
+    
     criteria <- remove_biv(subj_df, "weight", biv_df)
     subj_keep[criteria] <- "Implausible"
     
     subj_df <- subj_df[!criteria,]
     
-    # 2w ----
+    # 2w, W BMI BIV ----
     # 2w. Calculate BMI based on average height, then remove BMI bivs.
+    step <- "2w, W BMI BIV"
     
     if (sum(h_df$result == "Include") > 0 & nrow(subj_df) > 0){
       # calculate avg height for subject
@@ -130,8 +138,9 @@ chan_clean_both <- function(df){
       subj_df <- subj_df[!criteria,]
     }
     
-    # 3w ----
+    # 3w, W check SD away from mean ----
     # 3w. Exclude weights that were greater than 3 standard deviations from the mean.
+    step <- "3w, W check SD away from mean"
     
     if (nrow(subj_df) > 0){
       # calculate mean and standard deviation
