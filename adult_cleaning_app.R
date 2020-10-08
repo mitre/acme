@@ -10,6 +10,7 @@
 library(shiny)
 library(ggplot2)
 library(rstudioapi)
+library(colorspace)
 
 #https://stackoverflow.com/questions/3452086/getting-path-of-an-r-script/35842176#35842176
 # set working directory - only works in RStudio (with rstudioapi)
@@ -31,6 +32,13 @@ sourceDir <- function(path, trace = TRUE, ...) {
 sourceDir("EHR_Cleaning_Implementations")
 
 methods_avail <- c("muthalagu", "cheng", "chan")
+
+# types cleaned for each method
+m_types <- list(
+  "HEIGHTCM" = methods_avail,
+  "WEIGHTKG" = methods_avail[-1]
+)
+
 methods_func <- list(muthalagu_clean_ht,
                      cheng_clean_both,
                      chan_clean_both)
@@ -38,11 +46,43 @@ names(methods_func) <- methods_avail
 
 # supporting functions ----
 
-# capitalize first letter of words, from ?toupper
-simpleCap <- function(x) {
-  s <- strsplit(x, " ")[[1]]
-  paste(toupper(substring(s, 1, 1)), substring(s, 2),
-        sep = "", collapse = " ")
+# capitalize first letter of words, from ?toupper, edited to handle vector
+simpleCap <- function(y) {
+  sapply(y, function(x){
+    s <- strsplit(x, " ")[[1]]
+    paste(toupper(substring(s, 1, 1)), substring(s, 2),
+          sep = "", collapse = " ")
+  }, USE.NAMES = F)
+}
+
+# function to tabulate results of a given height or weight
+tab_clean_res <- function(cleaned_df, type){
+  m_for_type <- m_types[[type]]
+  
+  # preallocate final data frame
+  t_tab <- data.frame(matrix(0, 
+                             nrow = length(m_for_type),
+                             ncol = 3))
+  colnames(t_tab) <- c("Method","Implausible","Include")
+  t_tab$Method <- simpleCap(m_for_type)
+  
+  # tabulate results
+  rownames(t_tab) <- m_for_type
+  for (m in m_for_type){
+    tab <- table(cleaned_df[cleaned_df$param == type, paste0(m, "_result")])
+    t_tab[m,names(tab)] <- tab
+  }
+  
+  return(t_tab)
+}
+
+# function to plot overall hist
+plot_hist <- function(t_tab){
+  ggplot(t_tab, aes(Method, Implausible, fill = Method))+
+    geom_bar(stat = "identity")+
+    theme_bw()+
+    scale_fill_discrete_qualitative(palette = "Dark 3")+
+    theme(legend.position = "none")
 }
 
 # UI ----
@@ -59,7 +99,19 @@ ui <- navbarPage(
         actionButton("go", "Run data!"),
         hr()
       ),
-      mainPanel()
+      mainPanel(tabsetPanel(
+        tabPanel(
+          "Overall",
+          fluidRow(
+            column(width = 6, {
+              plotOutput("overall_ht")
+            }),
+            column(width = 6, {
+              plotOutput("overall_wt")
+            })
+          )
+        )
+      ))
     )
   ),
   tabPanel(
@@ -100,7 +152,23 @@ server <- function(input, output, session) {
         cleaned_df[,paste0(m, "_reason")] <- clean_df$reason
       }
     })
+    
+    withProgress(message = "Plotting cleaned data!", value = 1/2, {
+      ht_tab <- tab_clean_res(cleaned_df, "HEIGHTCM")
+      wt_tab <- tab_clean_res(cleaned_df, "WEIGHTKG")
+      
+      output$overall_ht <- renderPlot({
+        plot_hist(ht_tab)
+      })
+      
+      output$overall_wt <- renderPlot({
+        plot_hist(wt_tab)
+      })
+      
+    })
   })
+  
+  
 }
 
 # RUN ----
