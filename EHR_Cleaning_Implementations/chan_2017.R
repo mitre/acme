@@ -7,22 +7,6 @@
 # Note: will have to update to data table upon completion for speed
 # Note 2: must remove missing values before running method
 
-# supporting functions ----
-
-# note this is slightly different from the previous versions -- adds a variable
-# for saying whether to include the cutoff in the cutoff
-remove_biv <- function(subj_df, type, biv_df, include = F){
-  if (!include){
-    too_low <- subj_df$measurement < biv_df[type, "low"]
-    too_high <- subj_df$measurement > biv_df[type, "high"]
-  } else {
-    too_low <- subj_df$measurement <= biv_df[type, "low"]
-    too_high <- subj_df$measurement >= biv_df[type, "high"]
-  }
-  
-  return(too_low | too_high)
-}
-
 # implement chan, et al. ----
 
 # function to clean height and weight data by chan, et al.

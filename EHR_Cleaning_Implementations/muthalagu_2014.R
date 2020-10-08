@@ -31,6 +31,13 @@ muthalagu_clean_ht <- function(df){
   ht_cutoff_low <- 100
   ht_cutoff_high <- 250
   
+  # BIVs
+  biv_df <- data.frame(
+    "low" = c(100),
+    "high" = c(250)
+  )
+  rownames(biv_df) <- c("height")
+  
   # in a given range, the cutoff between the max and min height
   # NOTE: this should be customizable
   btwn_range_cutoff <- 3.5
@@ -64,12 +71,11 @@ muthalagu_clean_ht <- function(df){
     # 1. remove biologically impossible height records
     step <- "1, H BIV"
     
-    too_low <- subj_df$measurement < ht_cutoff_low
-    too_high <- subj_df$measurement > ht_cutoff_high
-    subj_keep[too_low | too_high] <- "Implausible"
-    subj_reason[too_low | too_high] <- paste0("Erroneous, Step ",step)
+    criteria <- remove_biv(subj_df, "height", biv_df)
+    subj_keep[criteria] <- "Implausible"
+    subj_reason[criteria] <- paste0("Erroneous, Step ",step)
     
-    subj_df <- subj_df[!(too_low | too_high),]
+    subj_df <- subj_df[!criteria,]
     
     # 2 ----
     # 2. Go through each age bucket

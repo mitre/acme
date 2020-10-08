@@ -8,15 +8,6 @@
 # Note 2: must remove missing values before running method
 # Note 3: how to deal with duplicated recordings?
 
-# supporting functions ----
-
-remove_biv <- function(subj_df, type, biv_df){
-  too_low <- subj_df$measurement < biv_df[type, "low"]
-  too_high <- subj_df$measurement > biv_df[type, "high"]
-  
-  return(too_low | too_high)
-}
-
 # implement cheng, et al. ----
 
 # function to clean height and weight data by cheng, et al.
