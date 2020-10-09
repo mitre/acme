@@ -107,7 +107,7 @@ ui <- navbarPage(
         hr(),
         HTML("<b>Settings for all plots:</b><p>"),
         textAreaInput("subj_focus", 
-                      "Enter Subjects to focus on (line separated):",
+                      "Enter subjects to focus on (line separated):",
                       width = "200px",
                       height = "100px"),
         div(style="display:inline-block",
@@ -118,6 +118,10 @@ ui <- navbarPage(
       mainPanel(tabsetPanel(
         tabPanel(
           "Overall",
+          fluidRow(
+            width = 12,
+            uiOutput("subj_title")
+          ),
           fluidRow(
             column(width = 6, {
               plotlyOutput("overall_ht")
@@ -176,23 +180,38 @@ server <- function(input, output, session) {
       cleaned_df$full <- cleaned_df$sub <- c_df
     })
     
-    withProgress(message = "Plotting cleaned data!", value = 1/2, {
-      ht_tab <- tab_clean_res(cleaned_df$sub, "HEIGHTCM")
-      wt_tab <- tab_clean_res(cleaned_df$sub, "WEIGHTKG")
-      
-      output$overall_ht <- renderPlotly({
-        plot_hist(ht_tab)
-      })
-      
-      output$overall_wt <- renderPlotly({
-        plot_hist(wt_tab)
-      })
-      
-    })
   })
   
+  # update output to only focus on specified subjects
   observeEvent(input$update_subj, {
-    print(nrow(cleaned_df$sub))
+    subj <- strsplit(input$subj_focus, "\n")[[1]]
+    cleaned_df$sub <-
+      cleaned_df$full[as.character(cleaned_df$full$subj) %in% subj,]
+  })
+  
+  # reset output to include all subjects
+  observeEvent(input$reset_subj, {
+    cleaned_df$sub <- cleaned_df$full
+  })
+  
+  # plot results ----
+  
+  output$subj_title <- renderUI({
+    if (nrow(cleaned_df$full) == nrow(cleaned_df$sub)){
+      HTML("<center><h3>Overall Results: Full Data</center></h3>")
+    } else {
+      HTML("<center><h3>Overall Results: Subset Data</center></h3>")
+    }
+  })
+  
+  output$overall_ht <- renderPlotly({
+    ht_tab <- tab_clean_res(cleaned_df$sub, "HEIGHTCM")
+    plot_hist(ht_tab)
+  })
+  
+  output$overall_wt <- renderPlotly({
+    wt_tab <- tab_clean_res(cleaned_df$sub, "WEIGHTKG")
+    plot_hist(wt_tab)
   })
 }
 
