@@ -11,6 +11,7 @@ library(shiny)
 library(ggplot2)
 library(rstudioapi)
 library(colorspace)
+library(plotly)
 
 #https://stackoverflow.com/questions/3452086/getting-path-of-an-r-script/35842176#35842176
 # set working directory - only works in RStudio (with rstudioapi)
@@ -78,11 +79,17 @@ tab_clean_res <- function(cleaned_df, type){
 
 # function to plot overall hist
 plot_hist <- function(t_tab){
-  ggplot(t_tab, aes(Method, Implausible, fill = Method))+
-    geom_bar(stat = "identity")+
-    theme_bw()+
-    scale_fill_discrete_qualitative(palette = "Dark 3")+
-    theme(legend.position = "none")
+  ggplotly(
+    ggplot(t_tab, aes(Method, Implausible, fill = Method))+
+      geom_bar(stat = "identity")+
+      theme_bw()+
+      # scale_fill_discrete_qualitative(palette = "Dark 3")+
+      scale_fill_viridis_d()+
+      theme(legend.position = "none")+
+      scale_y_continuous(expand = expansion(mult = c(0,.05))) +
+      NULL,
+    tooltip = c("x","y")
+  )
 }
 
 # UI ----
@@ -104,10 +111,10 @@ ui <- navbarPage(
           "Overall",
           fluidRow(
             column(width = 6, {
-              plotOutput("overall_ht")
+              plotlyOutput("overall_ht")
             }),
             column(width = 6, {
-              plotOutput("overall_wt")
+              plotlyOutput("overall_wt")
             })
           )
         )
@@ -157,11 +164,11 @@ server <- function(input, output, session) {
       ht_tab <- tab_clean_res(cleaned_df, "HEIGHTCM")
       wt_tab <- tab_clean_res(cleaned_df, "WEIGHTKG")
       
-      output$overall_ht <- renderPlot({
+      output$overall_ht <- renderPlotly({
         plot_hist(ht_tab)
       })
       
-      output$overall_wt <- renderPlot({
+      output$overall_wt <- renderPlotly({
         plot_hist(wt_tab)
       })
       
