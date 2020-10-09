@@ -103,8 +103,17 @@ ui <- navbarPage(
         HTML("<b>Upload adult EHR data and click the button below to get started!</b> If no data is input, default synthetic data will be used. More information on data format can be found in the \"About\" tab.<p>"),
         fileInput("dat_file", "Upload Data CSV",
                   accept = c(".csv", ".CSV")),
-        actionButton("go", "Run data!"),
-        hr()
+        actionButton("run_data", "Run data!"),
+        hr(),
+        HTML("<b>Settings for all plots:</b><p>"),
+        textAreaInput("subj_focus", 
+                      "Enter Subjects to focus on (line separated):",
+                      width = "200px",
+                      height = "100px"),
+        div(style="display:inline-block",
+          actionButton("update_subj", "Update Subjects"),
+          actionButton("reset_subj", "Reset")
+        )
       ),
       mainPanel(tabsetPanel(
         tabPanel(
@@ -182,7 +191,9 @@ server <- function(input, output, session) {
     })
   })
   
-  
+  observeEvent(input$update_subj, {
+    print(nrow(cleaned_df$sub))
+  })
 }
 
 # RUN ----
