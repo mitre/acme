@@ -131,8 +131,12 @@ ui <- navbarPage(
 
 server <- function(input, output, session) {
   
-  cleaned_df <- data.frame()
-  observeEvent(input$go, {
+  cleaned_df <- reactiveValues(
+    "full" = data.frame(),
+    "sub" = data.frame()
+  )
+  
+  observeEvent(input$run_data, {
     withProgress(message = "Cleaning data!", value = 0, {
       tot_increments <- 1+1+length(methods_avail)
       
@@ -146,8 +150,8 @@ server <- function(input, output, session) {
           read.csv(input$dat_file$datapath)
         }
       
-      # run each method
-      cleaned_df <- df
+      # run each method and save the results
+      c_df <- df
       for (m in methods_avail){
         incProgress(1/tot_increments, message = paste("Running", simpleCap(m)))
         
@@ -155,14 +159,17 @@ server <- function(input, output, session) {
         clean_df <- methods_func[[m]](df)
         
         # add the results to the overall dataframe
-        cleaned_df[,paste0(m, "_result")] <- clean_df$result
-        cleaned_df[,paste0(m, "_reason")] <- clean_df$reason
+        c_df[,paste0(m, "_result")] <- clean_df$result
+        c_df[,paste0(m, "_reason")] <- clean_df$reason
       }
+      
+      # initialize subset (cleaned_df holds all subjects)
+      cleaned_df$full <- cleaned_df$sub <- c_df
     })
     
     withProgress(message = "Plotting cleaned data!", value = 1/2, {
-      ht_tab <- tab_clean_res(cleaned_df, "HEIGHTCM")
-      wt_tab <- tab_clean_res(cleaned_df, "WEIGHTKG")
+      ht_tab <- tab_clean_res(cleaned_df$sub, "HEIGHTCM")
+      wt_tab <- tab_clean_res(cleaned_df$sub, "WEIGHTKG")
       
       output$overall_ht <- renderPlotly({
         plot_hist(ht_tab)
