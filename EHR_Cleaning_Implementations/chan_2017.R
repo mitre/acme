@@ -12,7 +12,7 @@
 # function to clean height and weight data by chan, et al.
 # inputs:
 # df: data frame with 7 columns:
-#   id: row id
+#   id: row id, must be unique
 #   subjid: subject id
 #   sex: sex of subject
 #   age_years: age, in years
