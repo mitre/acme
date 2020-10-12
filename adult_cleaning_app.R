@@ -108,6 +108,45 @@ gen_title <- function(criteria, tab_titl){
   )
 }
 
+# function to tabulate reasons for a given height or weight
+tab_clean_reason <- function(cleaned_df, type, show_count = F){
+  if (nrow(cleaned_df) == 0 | all(cleaned_df != "Implausible")){
+    return(data.frame())
+  }
+  
+  m_for_type <- m_types[[type]]
+  
+  tot_tab <- data.frame()
+  for (m in m_for_type){
+    # subsetting the result reasons
+    criteria <- cleaned_df[paste0(m, "_reason")] != "" & 
+      cleaned_df$param == type
+    
+    tmp_tab <- as.data.frame(
+      table(cleaned_df[criteria, paste0(m, "_reason")])
+      )
+    tmp_tab <- tmp_tab[order(tmp_tab$Freq, decreasing = T),]
+    colnames(tmp_tab) <- paste0(simpleCap(m),
+                                c("_Reason", "_Count"))
+    tmp_tab$row <- 1:nrow(tmp_tab)
+    
+    # merge the reasons together, with padding
+    tot_tab <- 
+      if (nrow(tot_tab) == 0){
+        tmp_tab
+      } else {
+        merge(tot_tab, tmp_tab, by = "row", all = T)
+      }
+  }
+  # remove the row column
+  colnames(tot_tab)[1] <- "Rank"
+  
+  if (!show_count){
+    tot_tab <- tot_tab[,!grepl("Count", colnames(tot_tab))]
+  }
+  return(tot_tab)
+}
+
 # UI ----
 
 ui <- navbarPage(
@@ -127,7 +166,7 @@ ui <- navbarPage(
         HTML("<b>Settings for all plots:</b><p>"),
         textAreaInput("subj_focus", 
                       "Enter subjects to focus on (line separated):",
-                      width = "200px",
+                      width = "300px",
                       height = "100px"),
         div(style="display:inline-block",
           actionButton("update_subj", "Update Subjects"),
@@ -140,6 +179,11 @@ ui <- navbarPage(
           label = "Which result would you like to see counted in bar graphs?",
           choices = c("Implausible", "Include"),
           selected = "Implausible"
+        ),
+        checkboxInput(
+          "show_reason_count", 
+          label = HTML("<b>Show counts in reasons for implausible values?</b>"),
+          value = F
         )
       ),
       mainPanel(tabsetPanel(
@@ -152,11 +196,17 @@ ui <- navbarPage(
           fluidRow(
             column(width = 6, style='border-right: 1px solid black', 
               HTML("<h3><center>Height Results</center></h3>"),
-              plotlyOutput("overall_ht")
+              plotlyOutput("overall_ht"),
+              hr(),
+              HTML("<h4><center><b>Top Reasons for Implausible Values</center></b></h4>"),
+              dataTableOutput("overall_ht_top_reasons")
             ),
             column(width = 6, 
               HTML("<h3><center>Weight Results</center></h3>"),
-              plotlyOutput("overall_wt")
+              plotlyOutput("overall_wt"),
+              hr(),
+              HTML("<h4><center><b>Top Reasons for Implausible Values</center></b></h4>"),
+              dataTableOutput("overall_wt_top_reasons")
             )
           )
         ),
@@ -266,6 +316,20 @@ server <- function(input, output, session) {
     wt_tab <- tab_clean_res(cleaned_df$sub, "WEIGHTKG")
     plot_hist(wt_tab, input$togg_res_count)
   })
+  
+  output$overall_ht_top_reasons <- renderDataTable({
+    tab_clean_reason(cleaned_df$sub, "HEIGHTCM", input$show_reason_count) 
+  }, 
+  options = list(scrollX = TRUE,
+                 pageLength = 5)
+  )
+  
+  output$overall_wt_top_reasons <- renderDataTable({
+    tab_clean_reason(cleaned_df$sub, "WEIGHTKG", input$show_reason_count) 
+  }, 
+  options = list(scrollX = TRUE,
+                 pageLength = 5)
+  )
   
   # output run results ----
   
