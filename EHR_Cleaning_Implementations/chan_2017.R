@@ -120,12 +120,12 @@ chan_clean_both <- function(df){
       
       # calulate bmi
       bmi_df <- data.frame(
-        "measurement" = w_df$measurement/((avg_ht/100)^2)
+        "measurement" = subj_df$measurement/((avg_ht/100)^2)
       )
       
       criteria <- remove_biv(bmi_df, "bmi", biv_df, include = T)
-      subj_keep[as.character(w_df$id[criteria])] <- "Implausible"
-      subj_reason[as.character(w_df$id[criteria])] <- 
+      subj_keep[as.character(subj_df$id[criteria])] <- "Implausible"
+      subj_reason[as.character(subj_df$id[criteria])] <- 
         paste0("Implausible, Step ",step)
       
       subj_df <- subj_df[!criteria,]
