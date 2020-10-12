@@ -93,6 +93,21 @@ plot_hist <- function(t_tab){
   )
 }
 
+# function to generate tab title
+gen_title <- function(criteria, tab_titl){
+  return(
+    if (criteria){
+      HTML(paste0("<center><h3>",
+                  tab_titl, 
+                  " Results: Full Data</center></h3>"))
+    } else {
+      HTML(paste0("<center><h3>", 
+                  tab_titl, 
+                  " Results: Subset Data</center></h3>"))
+    }
+  )
+}
+
 # UI ----
 
 ui <- navbarPage(
@@ -121,7 +136,7 @@ ui <- navbarPage(
           "Overall",
           fluidRow(
             width = 12,
-            uiOutput("subj_title")
+            uiOutput("overall_subj_title")
           ),
           fluidRow(
             column(width = 6, {
@@ -130,6 +145,16 @@ ui <- navbarPage(
             column(width = 6, {
               plotlyOutput("overall_wt")
             })
+          )
+        ),
+        tabPanel(
+          "View Results",
+          uiOutput("res_subj_title"),
+          fluidRow(
+            column(
+              width = 12,
+              dataTableOutput("run_output")
+            )
           )
         )
       ))
@@ -199,14 +224,10 @@ server <- function(input, output, session) {
     cleaned_df$sub <- cleaned_df$full
   })
   
-  # plot results ----
+  # plot overall results ----
   
-  output$subj_title <- renderUI({
-    if (nrow(cleaned_df$full) == nrow(cleaned_df$sub)){
-      HTML("<center><h3>Overall Results: Full Data</center></h3>")
-    } else {
-      HTML("<center><h3>Overall Results: Subset Data</center></h3>")
-    }
+  output$overall_subj_title <- renderUI({
+    gen_title(nrow(cleaned_df$full) == nrow(cleaned_df$sub), "Overall")
   })
   
   output$overall_ht <- renderPlotly({
@@ -218,6 +239,19 @@ server <- function(input, output, session) {
     wt_tab <- tab_clean_res(cleaned_df$sub, "WEIGHTKG")
     plot_hist(wt_tab)
   })
+  
+  # output run results ----
+  
+  output$res_subj_title <- renderUI({
+    gen_title(nrow(cleaned_df$full) == nrow(cleaned_df$sub), "Run")
+  })
+  
+  output$run_output <- renderDataTable({
+    cleaned_df$sub
+  }, 
+  options = list(scrollX = TRUE,
+                 pageLength = 10)
+  )
 }
 
 # RUN ----
