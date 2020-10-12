@@ -119,7 +119,10 @@ ui <- navbarPage(
         HTML("<b>Upload adult EHR data and click the button below to get started!</b> If no data is input, default synthetic data will be used. More information on data format can be found in the \"About\" tab.<p>"),
         fileInput("dat_file", "Upload Data CSV",
                   accept = c(".csv", ".CSV")),
-        actionButton("run_data", "Run data!"),
+        div(style="display:inline-block",
+            actionButton("run_data", "Run data!"),
+            downloadButton("download_results", label = "Download Results")
+        ),
         hr(),
         HTML("<b>Settings for all plots:</b><p>"),
         textAreaInput("subj_focus", 
@@ -211,6 +214,20 @@ server <- function(input, output, session) {
     })
     
   })
+  
+  # download data results
+  output$download_results <- downloadHandler(
+    filename = function() {
+      if (is.null(input$dat_file)){
+        "Adult_EHR_Cleaning_Results_data_example.csv"
+      } else {
+        paste0("Adult_EHR_Cleaning_Results_", input$dat_file$name)
+      }
+    },
+    content = function(file) {
+      write.csv(cleaned_df$full, file, row.names = FALSE, na = "")
+    }
+  )
   
   # update output to only focus on specified subjects
   observeEvent(input$update_subj, {
