@@ -154,7 +154,9 @@ server <- function(input, output, session) {
     withProgress(message = "Cleaning data!", value = 0, {
       tot_increments <- 1+1+length(methods_avail)
       
-      incProgress(1/tot_increments, message = "Uploading data!")
+      incProgress(1/tot_increments, 
+                  message = "Uploading data!",
+                  detail = Sys.time())
       
       df <-
         if (is.null(input$dat_file)){
@@ -167,7 +169,9 @@ server <- function(input, output, session) {
       # run each method and save the results
       c_df <- df
       for (m in methods_avail){
-        incProgress(1/tot_increments, message = paste("Running", simpleCap(m)))
+        incProgress(1/tot_increments, 
+                    message = paste("Running", simpleCap(m)),
+                    detail = Sys.time())
         
         # clean data
         clean_df <- methods_func[[m]](df)
