@@ -109,14 +109,16 @@ muthalagu_clean_ht <- function(df){
             paste0("Indeterminate, Step ", step)
         } else {
           # calculate median heights per age (rounded to nearest year) in bucket
-          med_hts <- sapply(round(unique(subj_df_age$age_years)), function(x){
+          # note: for duplicate rounded ages, this will propagate the same median to
+          # both records
+          med_hts <- sapply(round(subj_df_age$age_years), function(x){
             median(subj_df_age$measurement[round(subj_df_age$age_years) == x])
           })
           
           # compare only for middle values -- end values are indeterminate
           # results in true if both are under the cutoff
           mid_compare <- sapply(2:(length(med_hts)-1), function(x){
-            !all(c(abs(med_hts[x] - med_hts[x-1]), abs(med_hts[x] - med_hts[x+1])) >= 
+            all(c(abs(med_hts[x] - med_hts[x-1]), abs(med_hts[x] - med_hts[x+1])) <= 
                    btwn_range_cutoff)
           })
           
@@ -127,7 +129,7 @@ muthalagu_clean_ht <- function(df){
                            length(med_hts))
           
           # 2c, H erroneous and indeterminate median check ----
-          # 2c: For erroneous and indeterminate medians, assign algorithms within
+          # 2c: For erroneous and indeterminate medians, assign correct medians within
           # 3 year period. Then compare all other recorded heights to the median at 
           # that are. If the recorded height for any age differs  > 3.5 (for 
           # erroneous) or > 6 (for indeterminate) from cleaned median height for 
