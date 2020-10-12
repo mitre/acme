@@ -168,26 +168,17 @@ cheng_clean_both <- function(df){
     # 3. If BMI for a given set of height/weights is < 12 or > 70, deem implausible
     step <- "3, BMI BIV"
     
-    rownames(h_df) <- as.character(h_df$age_years)
-    
     # possible removal of height/weights by bmi
-    comb_df <- data.frame(
-      "age_years" = w_df$age_years,
-      "ht_id" = h_df[as.character(w_df$age_years), "id"],
-      "ht" = h_df[as.character(w_df$age_years), "measurement"],
-      "ht_res" = h_df[as.character(w_df$age_years), "result"],
-      "wt_id" = w_df$id,
-      "wt" = w_df$measurement,
-      "wt_res" = w_df$result
-    )
+    # x = height, y = weight
+    comb_df <- merge(h_df, w_df, by = "age_years", all = T)
     # remove ones that don't match
     comb_df <- comb_df[complete.cases(comb_df),]
     # also remove ones that are not plausible
-    comb_df <- comb_df[comb_df$ht_res == "Include" & comb_df$wt_res == "Include",]
+    comb_df <- comb_df[comb_df$result.x == "Include" & comb_df$result.y == "Include",]
     
     if (nrow(comb_df) > 0){
       # calculate bmi
-      comb_df$measurement <- comb_df$wt/((comb_df$ht/100)^2)
+      comb_df$measurement <- comb_df$measurement.y/((comb_df$measurement.x/100)^2)
       
       bmi_biv <- remove_biv(comb_df, "bmi", biv_df)
       
@@ -198,10 +189,10 @@ cheng_clean_both <- function(df){
       comb_df$tot_reason[bmi_biv] <- paste0("Implausible, Step ",step)
       
       # add result to full dataframe
-      df[as.character(comb_df$wt_id), "result"] <- comb_df$tot_res
-      df[as.character(comb_df$ht_id), "result"] <- comb_df$tot_res
-      df[as.character(comb_df$wt_id), "reason"] <- comb_df$tot_reason
-      df[as.character(comb_df$ht_id), "reason"] <- comb_df$tot_reason
+      df[as.character(comb_df$id.y), "result"] <- 
+        df[as.character(comb_df$id.x), "result"] <- comb_df$tot_res
+      df[as.character(comb_df$id.y), "reason"] <- 
+        df[as.character(comb_df$id.x), "reason"] <- comb_df$tot_reason
     }
   }
   
