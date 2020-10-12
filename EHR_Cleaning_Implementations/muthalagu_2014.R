@@ -104,7 +104,7 @@ muthalagu_clean_ht <- function(df){
         
         # if there are only two values, everything will be indeterminate
         if (nrow(subj_df_age) <= 2){
-          subj_keep[as.character(subj_df_age$id)] <- "Indeterminate"
+          subj_keep[as.character(subj_df_age$id)] <- "Implausible"
           subj_reason[as.character(subj_df_age$id)] <- 
             paste0("Indeterminate, Step ", step)
         } else {
@@ -138,7 +138,7 @@ muthalagu_clean_ht <- function(df){
           
           # if there's no correct median height for comparison, it's all indeterminate
           if (sum(mid_compare) == 0){
-            subj_keep[as.character(subj_df_age$id[err_hts_idx])] <- "Indeterminate"
+            subj_keep[as.character(subj_df_age$id[err_hts_idx])] <- "Implausible"
             subj_reason[as.character(subj_df_age$id[err_hts_idx])] <- 
               paste0("Indeterminate, Step ", step)
           } else {
