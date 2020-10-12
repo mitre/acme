@@ -79,9 +79,9 @@ tab_clean_res <- function(cleaned_df, type){
 }
 
 # function to plot overall hist
-plot_hist <- function(t_tab){
+plot_hist <- function(t_tab, yval = "Implausible"){
   ggplotly(
-    ggplot(t_tab, aes(Method, Implausible, fill = Method))+
+    ggplot(t_tab, aes_string("Method", yval, fill = "Method"))+
       geom_bar(stat = "identity")+
       theme_bw()+
       # scale_fill_discrete_qualitative(palette = "Dark 3")+
@@ -132,6 +132,14 @@ ui <- navbarPage(
         div(style="display:inline-block",
           actionButton("update_subj", "Update Subjects"),
           actionButton("reset_subj", "Reset")
+        ),
+        hr(),
+        HTML("<b>Settings for all plots:</b><p>"),
+        selectInput(
+          "togg_res_count",
+          label = "Which result would you like to see counted in bar graphs?",
+          choices = c("Implausible", "Include"),
+          selected = "Implausible"
         )
       ),
       mainPanel(tabsetPanel(
@@ -142,12 +150,14 @@ ui <- navbarPage(
             uiOutput("overall_subj_title")
           ),
           fluidRow(
-            column(width = 6, {
+            column(width = 6, style='border-right: 1px solid black', 
+              HTML("<h3><center>Height Results</center></h3>"),
               plotlyOutput("overall_ht")
-            }),
-            column(width = 6, {
+            ),
+            column(width = 6, 
+              HTML("<h3><center>Weight Results</center></h3>"),
               plotlyOutput("overall_wt")
-            })
+            )
           )
         ),
         tabPanel(
@@ -249,12 +259,12 @@ server <- function(input, output, session) {
   
   output$overall_ht <- renderPlotly({
     ht_tab <- tab_clean_res(cleaned_df$sub, "HEIGHTCM")
-    plot_hist(ht_tab)
+    plot_hist(ht_tab, input$togg_res_count)
   })
   
   output$overall_wt <- renderPlotly({
     wt_tab <- tab_clean_res(cleaned_df$sub, "WEIGHTKG")
-    plot_hist(wt_tab)
+    plot_hist(wt_tab, input$togg_res_count)
   })
   
   # output run results ----
