@@ -17,8 +17,9 @@ library(plotly)
 # set working directory - only works in RStudio (with rstudioapi)
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
-# load data - fake for now, will get a better
-dat <- read.csv(file.path("Data", "adult_synthetic_data_seed_8.csv"))
+# load default data - fake 
+# dat <- read.csv(file.path("Data", "adult_synthetic_data_seed_8.csv"))
+dat <- read.csv(file.path("Data", "synthea-adults-sub-100subj.csv"))
 
 # load requisite functions
 # function below from ?source
