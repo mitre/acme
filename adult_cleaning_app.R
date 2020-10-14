@@ -148,7 +148,9 @@ tab_clean_reason <- function(cleaned_df, type, show_count = F){
 }
 
 # function to plot individual heights and weights
-plot_cleaned <- function(cleaned_df, type, subj){
+plot_cleaned <- function(cleaned_df, type, subj, 
+                         show_fit_line = T, show_sd_shade = T, 
+                         calc_fit_w_impl = T){
   color_map <- c(
     "Include" = "#000000",
     "Implausible" = "#e62315"
@@ -175,6 +177,8 @@ plot_cleaned <- function(cleaned_df, type, subj){
       (colnames(clean_df) %in% paste0(m_types[[type]], "_reason") |
       colnames(clean_df) %in% paste0(m_types[[type]], "_result"))
   ]
+  
+  # create counts for plotting
   clean_df$num_implausible <- clean_df$sum_implausible <-
     rowSums((clean_df[,paste0(m_types[[type]], "_result")] != "Include"))
   clean_df$sum_include <-
@@ -203,59 +207,105 @@ plot_cleaned <- function(cleaned_df, type, subj){
             collapse = ", ")
     })
   
-  # add best fit line
-  bf_df <- data.frame(
-    "age_years" = c(clean_df$age_years,
-                    min(clean_df$age_years)-(diff(range(clean_df$measurement))*.05),
-                    max(clean_df$age_years)+(diff(range(clean_df$measurement))*.05)
-                    )
-  )
+  # if user wants to show the line fit
+  bf_df <- data.frame()
+  if (show_fit_line | show_sd_shade){
+    # add best fit line (padded slightly for plotting prettiness)
+    bf_df <- data.frame(
+      "age_years" = c(
+        clean_df$age_years,
+        min(clean_df$age_years)-(diff(range(clean_df$measurement))*.05),
+        max(clean_df$age_years)+(diff(range(clean_df$measurement))*.05)
+      ),
+      "measurement_orig" = c(
+        clean_df$measurement,
+        rep(NA,2)
+      )
+    )
+    
+    if (show_fit_line){
+      bf_df$best_fit <- 
+        if (calc_fit_w_impl){
+          predict(lm(measurement ~ age_years, clean_df), bf_df)
+        } else {
+          predict(lm(measurement ~ age_years, clean_df, 
+                     subset = clean_df$all_result == "Include"), 
+                  bf_df)
+        }
+    }
+    
+    if (show_sd_shade){
+      st_dev <- sd(clean_df$measurement)
+      
+      if (show_fit_line){
+        bf_df$min_sd1 <- bf_df$best_fit-st_dev
+        bf_df$max_sd1 <- bf_df$best_fit+st_dev
+        bf_df$min_sd2 <- bf_df$best_fit-(2*st_dev)
+        bf_df$max_sd2 <- bf_df$best_fit+(2*st_dev)
+      } else {
+        bf_df$min_sd1 <- bf_df$measurement_orig-st_dev
+        bf_df$max_sd1 <- bf_df$measurement_orig+st_dev
+        bf_df$min_sd2 <- bf_df$measurement_orig-(2*st_dev)
+        bf_df$max_sd2 <- bf_df$measurement_orig+(2*st_dev)
+        
+        bf_df <- bf_df[complete.cases(bf_df),]
+      }
+    }
+  }
   
-  bf_df$best_fit <- predict(lm(measurement ~ age_years, clean_df), bf_df)
-  st_dev <- sd(clean_df$measurement)
-  
-  ggplotly(
+  p <- suppressWarnings(
     ggplot()+
-      geom_ribbon(
-        data = bf_df, 
-        aes(x = age_years, ymin = best_fit-st_dev, ymax = best_fit + st_dev),
-        fill = "grey70", alpha = .5)+
-      geom_ribbon(
-        data = bf_df, 
-        aes(x = age_years, 
-            ymin = best_fit-(2*st_dev), 
-            ymax = best_fit + (2*st_dev)), 
-        fill = "grey70", alpha = .2)+
-      geom_point(data = clean_df, 
-                 aes(age_years, measurement,
-                     color = all_result, size = num_implausible,
-                     text = paste0(
-                       "Subject: ", subjid, "\n",
-                       "Result: ", all_result,"\n",
-                       "Include Methods (", sum_include, "): ", all_include, "\n",
-                       "Implausible Methods (", sum_implausible, "): ", all_implausible, "\n"
-                     )))+
-      geom_line(data = bf_df, 
-                aes(x = age_years, y = best_fit), 
-                size = 1, linetype = "longdash")+
-      # geom_smooth(method = "lm", formula = y ~ x)+
+      geom_point(
+        data = clean_df, 
+        aes(
+          age_years, measurement,
+          color = all_result, size = num_implausible,
+          text = paste0(
+            "Subject: ", subjid, "\n",
+            "Result: ", all_result,"\n",
+            "Include Methods (", sum_include, "): ", all_include, "\n",
+            "Implausible Methods (", sum_implausible, "): ", all_implausible, "\n"
+          )
+        )
+      )+
       theme_bw()+
       scale_color_manual("Result", values = color_map, breaks = names(color_map))+
-      scale_size("Methods Count Implausible", range = c(1,3), limits = c(1,3), breaks = c(1:3))+
+      scale_size(
+        "Methods Count Implausible", 
+        range = c(1,3), limits = c(1,3), breaks = c(1:3)
+      )+
       # theme(legend.position = "bottom",
-            # legend.direction = "horizontal")+
+      # legend.direction = "horizontal")+
       theme(legend.position = "none",
             plot.title = element_text(hjust = .5))+
       xlab("Age (Years)")+
       ylab(type_map[type])+
-      scale_x_continuous(expand = expansion(mult = c(0,0)))+
       ggtitle(paste0("Subject: ", subj))+
-      NULL,
-    tooltip = c("text")
+      NULL
   )
   
-  # plot_ly(clean_df, x = ~age_years, y = ~measurement, colors = ~all_result, type = "scatter")
-    
+  if (show_fit_line){
+    p <- p +
+      geom_line(data = bf_df, 
+                aes(x = age_years, y = best_fit), 
+                size = 1, linetype = "longdash")+
+      scale_x_continuous(expand = expansion(mult = c(0,0)))
+      
+  }
+  
+  if (show_sd_shade){
+    p <- p +
+      geom_ribbon(
+        data = bf_df, 
+        aes(x = age_years, ymin = min_sd1, ymax = max_sd1),
+        fill = "grey70", alpha = .5)+
+      geom_ribbon(
+        data = bf_df, 
+        aes(x = age_years,  ymin = min_sd2, ymax = max_sd2), 
+        fill = "grey70", alpha = .2)
+  }
+  
+  return(ggplotly(p, tooltip = c("text")))
 }
 
 # UI ----
@@ -298,7 +348,22 @@ ui <- navbarPage(
         ),
         hr(),
         HTML("<b>Settings for individual plots:</b><p>"),
-        uiOutput("indiv_choose")
+        uiOutput("indiv_choose"),
+        checkboxInput(
+          "show_fit_line",
+          label = HTML("<b>Show linear fit?</b>"),
+          value = T
+        ),
+        checkboxInput(
+          "show_sd_shade",
+          label = HTML("<b>Show standard deviation shading?</b> If fit included, this will be around the fit. Otherwise, this will be added around the points."),
+          value = T
+        ),
+        checkboxInput(
+          "calc_fit_w_impl",
+          label = HTML("<b>Calculate fit with implausible values?</b> If unchecked, records with at least one implausible determination are excluded."),
+          value = F
+        )
       ),
       mainPanel(tabsetPanel(
         tabPanel(
@@ -477,14 +542,14 @@ server <- function(input, output, session) {
   })
   
   output$subj_ht <- renderPlotly({
-    plot_cleaned(cleaned_df$sub, "HEIGHTCM", input$subj)
+    plot_cleaned(cleaned_df$sub, "HEIGHTCM", input$subj, 
+                 input$show_fit_line, input$show_sd_shade, input$calc_fit_w_impl)
   })
   
   output$subj_wt <- renderPlotly({
-    plot_cleaned(cleaned_df$sub, "WEIGHTKG", input$subj)
+    plot_cleaned(cleaned_df$sub, "WEIGHTKG", input$subj, 
+                 input$show_fit_line, input$show_sd_shade, input$calc_fit_w_impl)
   })
-  
-  
   
   # output run results ----
   
