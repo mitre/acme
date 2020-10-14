@@ -147,25 +147,8 @@ tab_clean_reason <- function(cleaned_df, type, show_count = F){
   return(tot_tab)
 }
 
-# function to plot individual heights and weights
-plot_cleaned <- function(cleaned_df, type, subj, 
-                         show_fit_line = T, show_sd_shade = T, 
-                         calc_fit_w_impl = T){
-  color_map <- c(
-    "Include" = "#000000",
-    "Implausible" = "#e62315"
-  )
-  
-  result_map <- c(
-    "TRUE" = "Include",
-    "FALSE" = "Implausible"
-  )
-  
-  type_map <- c(
-    "HEIGHTCM" = "Height (cm)",
-    "WEIGHTKG" = "Weight (kg)"
-  )
-  
+# function to subset based on subject and type
+sub_subj_type <- function(cleaned_df, type, subj){
   # subset the data to the things we care about
   clean_df <- cleaned_df[cleaned_df$subjid == subj & 
                            cleaned_df$param == type,]
@@ -173,9 +156,9 @@ plot_cleaned <- function(cleaned_df, type, subj,
   clean_df <- clean_df[
     ,
     (!grepl("_result", colnames(clean_df)) &
-      !grepl("_reason", colnames(clean_df))) |
+       !grepl("_reason", colnames(clean_df))) |
       (colnames(clean_df) %in% paste0(m_types[[type]], "_reason") |
-      colnames(clean_df) %in% paste0(m_types[[type]], "_result"))
+         colnames(clean_df) %in% paste0(m_types[[type]], "_result"))
   ]
   
   # create counts for plotting
@@ -196,7 +179,7 @@ plot_cleaned <- function(cleaned_df, type, subj,
     1,
     function(x){
       paste(simpleCap(m_types[[type]][x == "Include"]), 
-                collapse = ", ")
+            collapse = ", ")
     })
   
   clean_df$all_implausible <- apply(
@@ -206,6 +189,34 @@ plot_cleaned <- function(cleaned_df, type, subj,
       paste(simpleCap(m_types[[type]][x == "Implausible"]), 
             collapse = ", ")
     })
+  
+  return(clean_df)
+}
+
+# function to plot individual heights and weights
+plot_cleaned <- function(cleaned_df, type, subj, 
+                         show_fit_line = T, show_sd_shade = T, 
+                         calc_fit_w_impl = T){
+  color_map <- c(
+    "Include" = "#000000",
+    "Implausible" = "#e62315"
+  )
+  
+  result_map <- c(
+    "TRUE" = "Include",
+    "FALSE" = "Implausible"
+  )
+  
+  type_map <- c(
+    "HEIGHTCM" = "Height (cm)",
+    "WEIGHTKG" = "Weight (kg)"
+  )
+  
+  # subset the data to the subject, type, and methods we care about
+  # also create necessary counts for plotting and such
+  clean_df <- sub_subj_type(cleaned_df, type, subj)
+  
+  
   
   # if user wants to show the line fit
   bf_df <- data.frame()
@@ -308,6 +319,46 @@ plot_cleaned <- function(cleaned_df, type, subj,
   return(ggplotly(p, tooltip = c("text")))
 }
 
+gen_subj_text <- function(cleaned_df, type, subj){
+  # subset the data to the subject, type, and methods we care about
+  clean_df <- sub_subj_type(cleaned_df, type, subj)
+  
+  impl_by_method <- sapply(m_types[[type]], function(x){
+    paste0("<li><b>Total Implausible by ", simpleCap(x),": </b>",
+           sum(clean_df[,paste0(x,"_result")] == "Implausible"), "</li><br>")
+  })
+  impl_by_method <- paste0(
+    "<ul>",
+    paste(impl_by_method, collapse = ""),
+    "</ul>"
+  )
+  
+  incl_by_method <- sapply(m_types[[type]], function(x){
+    paste0("<li><b>Total Include by ", simpleCap(x),": </b>",
+           sum(clean_df[,paste0(x,"_result")] == "Include"), "</li><br>")
+  })
+  incl_by_method <- paste0(
+    "<ul>",
+    paste(incl_by_method, collapse = ""),
+    "</ul>"
+  )s
+  
+  # TODO: INCLUDE REASON
+  
+  return(
+    HTML(paste0(
+      "<b>Subject: </b>", subj,"<br>",
+      "<b>Number of Records: </b>", nrow(clean_df),"<br>",
+      "<b>Total Include (by all methods): </b>",
+      sum(clean_df$all_result == "Include"),"<br>",
+      incl_by_method,
+      "<b>Total Implausible (by any method): </b>",
+      sum(clean_df$all_result == "Implausible"),"<br>",
+      impl_by_method
+    ))
+  )
+}
+
 # UI ----
 
 ui <- navbarPage(
@@ -398,11 +449,21 @@ ui <- navbarPage(
           fluidRow(
             column(width = 6, style='border-right: 1px solid black',
                    HTML("<h3><center>Height Results</center></h3>"),
-                   plotlyOutput("subj_ht")
+                   plotlyOutput("subj_ht"),
+                   hr(),
+                   fluidRow(
+                     style = "border: 1px #e3e3e3; border-style: solid; border-radius: 10px; background: #f5f5f5; padding: 10px;",
+                     uiOutput("about_subj_ht")
+                   )
             ),
             column(width = 6,
                    HTML("<h3><center>Weight Results</center></h3>"),
-                   plotlyOutput("subj_wt")
+                   plotlyOutput("subj_wt"),
+                   hr(),
+                   fluidRow(
+                     style = "border: 1px #e3e3e3; border-style: solid; border-radius: 10px; background: #f5f5f5; padding: 10px;",
+                     uiOutput("about_subj_wt")
+                   )
             )
           )
         ),
@@ -549,6 +610,14 @@ server <- function(input, output, session) {
   output$subj_wt <- renderPlotly({
     plot_cleaned(cleaned_df$sub, "WEIGHTKG", input$subj, 
                  input$show_fit_line, input$show_sd_shade, input$calc_fit_w_impl)
+  })
+  
+  output$about_subj_ht <- renderUI({
+    gen_subj_text(cleaned_df$sub, "HEIGHTCM", input$subj)
+  })
+  
+  output$about_subj_wt <- renderUI({
+    gen_subj_text(cleaned_df$sub, "WEIGHTKG", input$subj)
   })
   
   # output run results ----
