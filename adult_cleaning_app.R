@@ -163,7 +163,7 @@ ui <- navbarPage(
             downloadButton("download_results", label = "Download Results")
         ),
         hr(),
-        HTML("<b>Settings for all plots:</b><p>"),
+        HTML("<b>Settings for overall plots:</b><p>"),
         textAreaInput("subj_focus", 
                       "Enter subjects to focus on (line separated):",
                       width = "300px",
@@ -209,6 +209,23 @@ ui <- navbarPage(
               dataTableOutput("overall_wt_top_reasons")
             )
           )
+        ),
+        tabPanel(
+          "Individual",
+          fluidRow(
+            width = 12,
+            uiOutput("indiv_subj_title")
+          )#,
+          # fluidRow(
+          #   column(width = 6, style='border-right: 1px solid black', 
+          #          HTML("<h3><center>Height Results</center></h3>"),
+          #          plotlyOutput("subj_ht")
+          #   ),
+          #   column(width = 6, 
+          #          HTML("<h3><center>Weight Results</center></h3>"),
+          #          plotlyOutput("subj_wt")
+          #   )
+          # )
         ),
         tabPanel(
           "View Results",
@@ -330,6 +347,12 @@ server <- function(input, output, session) {
   options = list(scrollX = TRUE,
                  pageLength = 5)
   )
+  
+  # plot individual results ----
+  
+  output$indiv_subj_title <- renderUI({
+    gen_title(nrow(cleaned_df$full) == nrow(cleaned_df$sub), "Individual")
+  })
   
   # output run results ----
   
