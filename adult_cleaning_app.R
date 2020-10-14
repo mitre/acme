@@ -58,7 +58,7 @@ simpleCap <- function(y) {
 }
 
 # function to tabulate results of a given height or weight
-tab_clean_res <- function(cleaned_df, type){
+tab_clean_res <- function(clean_df, type){
   m_for_type <- m_types[[type]]
   
   # preallocate final data frame
@@ -147,6 +147,117 @@ tab_clean_reason <- function(cleaned_df, type, show_count = F){
   return(tot_tab)
 }
 
+# function to plot individual heights and weights
+plot_cleaned <- function(cleaned_df, type, subj){
+  color_map <- c(
+    "Include" = "#000000",
+    "Implausible" = "#e62315"
+  )
+  
+  result_map <- c(
+    "TRUE" = "Include",
+    "FALSE" = "Implausible"
+  )
+  
+  type_map <- c(
+    "HEIGHTCM" = "Height (cm)",
+    "WEIGHTKG" = "Weight (kg)"
+  )
+  
+  # subset the data to the things we care about
+  clean_df <- cleaned_df[cleaned_df$subjid == subj & 
+                           cleaned_df$param == type,]
+  # subset to only the methods included
+  clean_df <- clean_df[
+    ,
+    (!grepl("_result", colnames(clean_df)) &
+      !grepl("_reason", colnames(clean_df))) |
+      (colnames(clean_df) %in% paste0(m_types[[type]], "_reason") |
+      colnames(clean_df) %in% paste0(m_types[[type]], "_result"))
+  ]
+  clean_df$num_implausible <- clean_df$sum_implausible <-
+    rowSums((clean_df[,paste0(m_types[[type]], "_result")] != "Include"))
+  clean_df$sum_include <-
+    rowSums((clean_df[,paste0(m_types[[type]], "_result")] != "Implausible"))
+  # for all include, make 0 -> 1 for plotting
+  clean_df$num_implausible[clean_df$num_implausible == 0] <- 1
+  # aggregate all the results
+  clean_df$all_result <- 
+    result_map[as.character(
+      apply(clean_df[,paste0(m_types[[type]], "_result")] == "Include", 1, all)
+    )]
+  # aggregate all the methods
+  clean_df$all_include <- apply(
+    clean_df[,paste0(m_types[[type]], "_result")],
+    1,
+    function(x){
+      paste(simpleCap(m_types[[type]][x == "Include"]), 
+                collapse = ", ")
+    })
+  
+  clean_df$all_implausible <- apply(
+    clean_df[,paste0(m_types[[type]], "_result")],
+    1,
+    function(x){
+      paste(simpleCap(m_types[[type]][x == "Implausible"]), 
+            collapse = ", ")
+    })
+  
+  # add best fit line
+  bf_df <- data.frame(
+    "age_years" = c(clean_df$age_years,
+                    min(clean_df$age_years)-(diff(range(clean_df$measurement))*.05),
+                    max(clean_df$age_years)+(diff(range(clean_df$measurement))*.05)
+                    )
+  )
+  
+  bf_df$best_fit <- predict(lm(measurement ~ age_years, clean_df), bf_df)
+  st_dev <- sd(clean_df$measurement)
+  
+  ggplotly(
+    ggplot()+
+      geom_ribbon(
+        data = bf_df, 
+        aes(x = age_years, ymin = best_fit-st_dev, ymax = best_fit + st_dev),
+        fill = "grey70", alpha = .5)+
+      geom_ribbon(
+        data = bf_df, 
+        aes(x = age_years, 
+            ymin = best_fit-(2*st_dev), 
+            ymax = best_fit + (2*st_dev)), 
+        fill = "grey70", alpha = .2)+
+      geom_point(data = clean_df, 
+                 aes(age_years, measurement,
+                     color = all_result, size = num_implausible,
+                     text = paste0(
+                       "Subject: ", subjid, "\n",
+                       "Result: ", all_result,"\n",
+                       "Include Methods (", sum_include, "): ", all_include, "\n",
+                       "Implausible Methods (", sum_implausible, "): ", all_implausible, "\n"
+                     )))+
+      geom_line(data = bf_df, 
+                aes(x = age_years, y = best_fit), 
+                size = 1, linetype = "longdash")+
+      # geom_smooth(method = "lm", formula = y ~ x)+
+      theme_bw()+
+      scale_color_manual("Result", values = color_map, breaks = names(color_map))+
+      scale_size("Methods Count Implausible", range = c(1,3), limits = c(1,3), breaks = c(1:3))+
+      # theme(legend.position = "bottom",
+            # legend.direction = "horizontal")+
+      theme(legend.position = "none",
+            plot.title = element_text(hjust = .5))+
+      xlab("Age (Years)")+
+      ylab(type_map[type])+
+      scale_x_continuous(expand = expansion(mult = c(0,0)))+
+      ggtitle(paste0("Subject: ", subj))+
+      NULL,
+    tooltip = c("text")
+  )
+  
+  # plot_ly(clean_df, x = ~age_years, y = ~measurement, colors = ~all_result, type = "scatter")
+    
+}
+
 # UI ----
 
 ui <- navbarPage(
@@ -163,7 +274,7 @@ ui <- navbarPage(
             downloadButton("download_results", label = "Download Results")
         ),
         hr(),
-        HTML("<b>Settings for overall plots:</b><p>"),
+        HTML("<b>Settings for all plots:</b><p>"),
         textAreaInput("subj_focus", 
                       "Enter subjects to focus on (line separated):",
                       width = "300px",
@@ -173,7 +284,7 @@ ui <- navbarPage(
           actionButton("reset_subj", "Reset")
         ),
         hr(),
-        HTML("<b>Settings for all plots:</b><p>"),
+        HTML("<b>Settings for overall plots:</b><p>"),
         selectInput(
           "togg_res_count",
           label = "Which result would you like to see counted in bar graphs?",
@@ -184,7 +295,10 @@ ui <- navbarPage(
           "show_reason_count", 
           label = HTML("<b>Show counts in reasons for implausible values?</b>"),
           value = F
-        )
+        ),
+        hr(),
+        HTML("<b>Settings for individual plots:</b><p>"),
+        uiOutput("indiv_choose")
       ),
       mainPanel(tabsetPanel(
         tabPanel(
@@ -215,17 +329,17 @@ ui <- navbarPage(
           fluidRow(
             width = 12,
             uiOutput("indiv_subj_title")
-          )#,
-          # fluidRow(
-          #   column(width = 6, style='border-right: 1px solid black', 
-          #          HTML("<h3><center>Height Results</center></h3>"),
-          #          plotlyOutput("subj_ht")
-          #   ),
-          #   column(width = 6, 
-          #          HTML("<h3><center>Weight Results</center></h3>"),
-          #          plotlyOutput("subj_wt")
-          #   )
-          # )
+          ),
+          fluidRow(
+            column(width = 6, style='border-right: 1px solid black',
+                   HTML("<h3><center>Height Results</center></h3>"),
+                   plotlyOutput("subj_ht")
+            ),
+            column(width = 6,
+                   HTML("<h3><center>Weight Results</center></h3>"),
+                   plotlyOutput("subj_wt")
+            )
+          )
         ),
         tabPanel(
           "View Results",
@@ -289,7 +403,6 @@ server <- function(input, output, session) {
       # initialize subset (cleaned_df holds all subjects)
       cleaned_df$full <- cleaned_df$sub <- c_df
     })
-    
   })
   
   # download data results
@@ -350,9 +463,28 @@ server <- function(input, output, session) {
   
   # plot individual results ----
   
+  output$indiv_choose <- renderUI({
+    selectInput(
+      "subj",
+      label = "Which subject's cleaned data would you like to visualize?",
+      choices = 
+        if (nrow(cleaned_df$sub) == 0){c()} else {unique(cleaned_df$sub$subjid)}
+    )
+  })
+  
   output$indiv_subj_title <- renderUI({
     gen_title(nrow(cleaned_df$full) == nrow(cleaned_df$sub), "Individual")
   })
+  
+  output$subj_ht <- renderPlotly({
+    plot_cleaned(cleaned_df$sub, "HEIGHTCM", input$subj)
+  })
+  
+  output$subj_wt <- renderPlotly({
+    plot_cleaned(cleaned_df$sub, "WEIGHTKG", input$subj)
+  })
+  
+  
   
   # output run results ----
   
