@@ -5,6 +5,8 @@
 # This implements a prototype application to explore adult EHR cleaning 
 # implementations.
 
+vers_adult_ehr <- "0.1.0"
+
 # load libraries, scripts, and data ----
 
 library(shiny)
@@ -32,6 +34,8 @@ sourceDir <- function(path, trace = TRUE, ...) {
 }
 
 sourceDir("EHR_Cleaning_Implementations")
+
+# supporting data ----
 
 methods_avail <- c("muthalagu", "cheng", "chan")
 
@@ -508,7 +512,53 @@ ui <- navbarPage(
   ),
   tabPanel(
     "About",
-    "put some stuff about data here"
+    mainPanel(
+      width = 12,
+      tabsetPanel(
+        tabPanel(
+          "About Adult EHR Cleaning and Data Format",
+          fluidRow(
+            column(width = 3),
+            column(
+              width = 6,
+              HTML(
+                "<center><h3>Welcome to the Adult EHR Cleaning Application!</h3></center><p>",
+                "This application seeks to compare different methods of cleaning adult EHR data, implementing a variety of methods. This currently includes Muthalagu, et al., Cheng, et al., and Chan, et al. To find out more about these methods, please click on their respective tabs. More to come soon!<p>",
+                "To start, you'll begin by uploading your data in the sidebar under the 'Compare' tab. This data should be a CSV in the following format:"
+              ),
+              dataTableOutput("dat_example"),
+              HTML(  
+                "where columns are as follows (names must be exact):<br><ul>",
+                "<li><b>id:</b> number for each row, must be unique</li>",
+                "<li><b>subjid:</b> subject ID</li>",
+                "<li><b>param:</b> parameter for each measurement. must be either HEIGHTCM (height in centimeters) or WEIGHTKG (weight in kilograms)</li>",
+                "<li><b>measurement:</b> measurement of height or weight, corresponding to the parameter</li>",
+                "<li><b>age_years:</b> age in years</li>",
+                "<li><b>sex:</b> 0 (male) or 1 (female)</li>",
+                "</ul><p>",
+                "If no data is input, the app will use synthetic data (to find out more about this example data, click on the 'Synthetic Data' tab). Then click run to get started!"
+              ),
+              column(width = 3)
+            )
+          )
+        ),
+        tabPanel(
+          "Muthalagu, et al. (2014)"
+        ),
+        tabPanel(
+          "Cheng, et al. (2016)"
+        ),
+        tabPanel(
+          "Chan, et al. (2017)"
+        ),
+        tabPanel(
+          "About Synthetic Data",
+          HTML(
+            "<h3>Welcome to the Adult EHR Cleaning Application!</h3></center><p>"
+          )
+        )
+      )
+    )
   )
 )
 
@@ -658,6 +708,15 @@ server <- function(input, output, session) {
   options = list(scrollX = TRUE,
                  pageLength = 10)
   )
+  
+  # output for 'about' tab ----
+  
+  output$dat_example <- renderDataTable({
+    head(dat)
+  }, 
+  options = list(scrollX = TRUE)
+  )
+  
 }
 
 # RUN ----
