@@ -14,6 +14,8 @@ library(ggplot2)
 library(rstudioapi)
 library(colorspace)
 library(plotly)
+library(viridisLite)
+library(ggplotify)
 
 #https://stackoverflow.com/questions/3452086/getting-path-of-an-r-script/35842176#35842176
 # set working directory - only works in RStudio (with rstudioapi)
@@ -50,8 +52,6 @@ methods_func <- list(muthalagu_clean_ht,
                      chan_clean_both)
 names(methods_func) <- methods_avail
 
-# supporting functions ----
-
 # capitalize first letter of words, from ?toupper, edited to handle vector
 simpleCap <- function(y) {
   sapply(y, function(x){
@@ -60,6 +60,21 @@ simpleCap <- function(y) {
           sep = "", collapse = " ")
   }, USE.NAMES = F)
 }
+
+# method colors
+m_colors <- viridisLite::viridis(length(methods_avail))
+names(m_colors) <- simpleCap(methods_avail)
+
+# supporting functions ----
+
+# Function to extract legend
+# https://stackoverflow.com/questions/12041042/how-to-plot-just-the-legends-in-ggplot2
+g_legend <- function(a.gplot){ 
+  tmp <- ggplot_gtable(ggplot_build(a.gplot)) 
+  leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box") 
+  legend <- tmp$grobs[[leg]] 
+  legend
+} 
 
 # function to tabulate results of a given height or weight
 tab_clean_res <- function(clean_df, type){
@@ -89,7 +104,7 @@ plot_hist <- function(t_tab, yval = "Implausible"){
       geom_bar(stat = "identity")+
       theme_bw()+
       # scale_fill_discrete_qualitative(palette = "Dark 3")+
-      scale_fill_viridis_d()+
+      scale_fill_manual(values = m_colors)+
       theme(legend.position = "none")+
       scale_y_continuous(expand = expansion(mult = c(0,.05))) +
       NULL,
@@ -210,7 +225,7 @@ sub_subj_type <- function(cleaned_df, type, subj){
 # function to plot individual heights and weights
 plot_cleaned <- function(cleaned_df, type, subj, 
                          show_fit_line = T, show_sd_shade = T, 
-                         calc_fit_w_impl = T){
+                         calc_fit_w_impl = T, legn = F){
   color_map <- c(
     "Include" = "#000000",
     "Implausible" = "#e62315"
@@ -296,13 +311,12 @@ plot_cleaned <- function(cleaned_df, type, subj,
       theme_bw()+
       scale_color_manual("Result", values = color_map, breaks = names(color_map))+
       scale_size(
-        "Methods Count Implausible", 
+        "Count Implausible", 
         range = c(1,3), limits = c(1,3), breaks = c(1:3)
       )+
       # theme(legend.position = "bottom",
       # legend.direction = "horizontal")+
-      theme(legend.position = "none",
-            plot.title = element_text(hjust = .5))+
+      theme(plot.title = element_text(hjust = .5))+
       xlab("Age (Years)")+
       ylab(type_map[type])+
       ggtitle(paste0("Subject: ", subj))+
@@ -330,7 +344,18 @@ plot_cleaned <- function(cleaned_df, type, subj,
         fill = "grey70", alpha = .2)
   }
   
-  return(ggplotly(p, tooltip = c("text")))
+  if (legn){
+    p <- p +
+      theme(legend.position = "bottom",
+            text = element_text(size = 15))
+    
+    return(as.ggplot(g_legend(p)))
+  } else {
+    p <- p +
+      theme(legend.position = "none")
+    
+    return(ggplotly(p, tooltip = c("text")))
+  }
 }
 
 gen_subj_text <- function(cleaned_df, type, subj){
@@ -392,6 +417,9 @@ gen_subj_text <- function(cleaned_df, type, subj){
 # TODO: LOOK INTO MODULES
 
 ui <- navbarPage(
+  
+  # UI: compute and compare results ----
+  
   "Adult EHR Cleaning",
   tabPanel(
     "Compare",
@@ -477,18 +505,20 @@ ui <- navbarPage(
             uiOutput("indiv_subj_title")
           ),
           fluidRow(
-            column(width = 6, style='padding: 20px; border-right: 1px solid black',
+            column(width = 6, style='padding-right: 20px; border-right: 1px solid black',
                    HTML("<h3><center>Height Results</center></h3>"),
                    plotlyOutput("subj_ht"),
+                   plotOutput("subj_legn_ht", height = "20px"),
                    hr(),
                    fluidRow(
                      style = "border: 1px #e3e3e3; border-style: solid; border-radius: 10px; background: #f5f5f5; padding: 10px;",
                      uiOutput("about_subj_ht")
                    )
             ),
-            column(width = 6, style = "padding: 20px;",
+            column(width = 6, style = "padding-left: 20px;",
                    HTML("<h3><center>Weight Results</center></h3>"),
                    plotlyOutput("subj_wt"),
+                   plotOutput("subj_legn_wt", height = "20px"),
                    hr(),
                    fluidRow(
                      style = "border: 1px #e3e3e3; border-style: solid; border-radius: 10px; background: #f5f5f5; padding: 10px;",
@@ -510,6 +540,9 @@ ui <- navbarPage(
       ))
     )
   ),
+  
+  # UI: documentation ----
+  
   tabPanel(
     "About",
     mainPanel(
@@ -783,6 +816,14 @@ server <- function(input, output, session) {
   
   output$indiv_subj_title <- renderUI({
     gen_title(nrow(cleaned_df$full) == nrow(cleaned_df$sub), "Individual")
+  })
+  
+  output$subj_legn_ht <- renderPlot({
+    plot_cleaned(cleaned_df$sub, "HEIGHTCM", input$subj, legn = T)
+  })
+  
+  output$subj_legn_wt <- renderPlot({
+    plot_cleaned(cleaned_df$sub, "WEIGHTKG", input$subj, legn = T)
   })
   
   output$subj_ht <- renderPlotly({
