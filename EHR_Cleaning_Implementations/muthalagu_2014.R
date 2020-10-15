@@ -131,7 +131,7 @@ muthalagu_clean_ht <- function(df){
           # 2c, H erroneous and indeterminate median check ----
           # 2c: For erroneous and indeterminate medians, assign correct medians within
           # 3 year period. Then compare all other recorded heights to the median at 
-          # that are. If the recorded height for any age differs  > 3.5 (for 
+          # that age. If the recorded height for any age differs  > 3.5 (for 
           # erroneous) or > 6 (for indeterminate) from cleaned median height for 
           # that age, the value is erroneous.
           step <- "2c, H erroneous and indeterminate median check"

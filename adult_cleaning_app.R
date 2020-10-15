@@ -543,13 +543,55 @@ ui <- navbarPage(
           )
         ),
         tabPanel(
-          "Muthalagu, et al. (2014)"
+          "Muthalagu, et al. (2014)",
+          fluidRow(
+            column(width = 3),
+            column(
+              width = 6,
+              HTML(
+                "<h3>Muthalagu, et al. (2014)</h3>",
+                "<h4>Cleans: Height Records</h4><p>",
+                "Muthalagu, et al. aims to transform EHR adult height data into \"research-ready\" values using age and height values, deciding implausible values based on median comparisons within age ranges. More information on this method can be found <a href='https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3974252/' target = 'blank'>here</a>. Steps for this method, along with their titles (used in output) and descriptions, are below.<p>"
+                ),
+              hr(),
+              HTML(
+                "<h4>Steps:</h4>",
+                "<b>Step 1, H BIV</b><br>",
+                "<ul><li>Remove biologically impossible height records. Heights are biologically impossible if less than 100 cm or greater than 250 cm.</li></ul>",
+                "<b>Step 2, Go through each age bucket</b><br>",
+                "<ul><li>Age bucket are defined to be 18 - 25, 25 - 50, and 50 and above.</li></ul>",
+                "<b>Step 2a, H age range check</b><br>",
+                "<ul><li>If height range < 3.5 cm, all heights in that bucket are plausible.</li></ul>",
+                "<b>Step 2b, H median check</b><br>",
+                "<ul><li>If the height range is > 3.5 cm, calculate median height at each age. Compare with prior and next median. If height at current age differs by > 3.5 cm compared to prior and next median, flag as potentially erroneous. If only two valid medians and differ by > 3.5 cm, flag both as indeterminate. First and last records by age in bucket are indeterminate.</li></ul>",
+                "<b>Step 2c, H erroneous and indeterminate median check</b><br>",
+                "<ul><li>For erroneous and indeterminate medians, assign correct medians within 3 year period. Then compare all other recorded heights to the median at that age. If the recorded height for any age differs  > 3.5 cm (for erroneous) or > 6 cm (for indeterminate) from cleaned median height for that age, the value is erroneous.</li></ul>"
+              )
+            ),
+            column(width = 3)
+          )
         ),
         tabPanel(
-          "Cheng, et al. (2016)"
+          "Cheng, et al. (2016)",
+          fluidRow(
+            column(width = 3),
+            column(
+              width = 6,
+              ""
+            ),
+            column(width = 3)
+          )
         ),
         tabPanel(
-          "Chan, et al. (2017)"
+          "Chan, et al. (2017)",
+          fluidRow(
+            column(width = 3),
+            column(
+              width = 6,
+              ""
+            ),
+            column(width = 3)
+          )
         ),
         tabPanel(
           "About Synthetic Data",
