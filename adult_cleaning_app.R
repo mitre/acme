@@ -93,7 +93,7 @@ plot_hist <- function(t_tab, yval = "Implausible"){
   )
 }
 
-# function to generate tab title
+# function to generate shiny tab title
 gen_title <- function(criteria, tab_titl){
   return(
     if (criteria){
@@ -190,6 +190,16 @@ sub_subj_type <- function(cleaned_df, type, subj){
             collapse = ", ")
     })
   
+  # gather all the reasons for implausibility
+  clean_df$all_reason <-
+    apply(clean_df[,paste0(m_types[[type]], "_reason")], 1, function(x){
+      nam <- simpleCap(m_types[[type]])[x != ""]
+      x_wo <- paste0(nam,": ", x[x != ""])
+      x_wo <- paste(x_wo, collapse = "\n")
+      return(if (x_wo == ": "){""} else {x_wo})
+    })
+    
+  
   return(clean_df)
 }
 
@@ -215,8 +225,6 @@ plot_cleaned <- function(cleaned_df, type, subj,
   # subset the data to the subject, type, and methods we care about
   # also create necessary counts for plotting and such
   clean_df <- sub_subj_type(cleaned_df, type, subj)
-  
-  
   
   # if user wants to show the line fit
   bf_df <- data.frame()
@@ -264,6 +272,7 @@ plot_cleaned <- function(cleaned_df, type, subj,
     }
   }
   
+  # make the scatter plot (applies in all situations)
   p <- suppressWarnings(
     ggplot()+
       geom_point(
@@ -275,7 +284,8 @@ plot_cleaned <- function(cleaned_df, type, subj,
             "Subject: ", subjid, "\n",
             "Result: ", all_result,"\n",
             "Include Methods (", sum_include, "): ", all_include, "\n",
-            "Implausible Methods (", sum_implausible, "): ", all_implausible, "\n"
+            "Implausible Methods (", sum_implausible, "): ", all_implausible, "\n",
+            paste0("If Implausible, Reasons:\n", all_reason)
           )
         )
       )+
@@ -325,7 +335,7 @@ gen_subj_text <- function(cleaned_df, type, subj){
   
   impl_by_method <- sapply(m_types[[type]], function(x){
     paste0("<li><b>Total Implausible by ", simpleCap(x),": </b>",
-           sum(clean_df[,paste0(x,"_result")] == "Implausible"), "</li><br>")
+           sum(clean_df[,paste0(x,"_result")] == "Implausible"), "</li>")
   })
   impl_by_method <- paste0(
     "<ul>",
@@ -335,15 +345,27 @@ gen_subj_text <- function(cleaned_df, type, subj){
   
   incl_by_method <- sapply(m_types[[type]], function(x){
     paste0("<li><b>Total Include by ", simpleCap(x),": </b>",
-           sum(clean_df[,paste0(x,"_result")] == "Include"), "</li><br>")
+           sum(clean_df[,paste0(x,"_result")] == "Include"), "</li>")
   })
   incl_by_method <- paste0(
     "<ul>",
     paste(incl_by_method, collapse = ""),
     "</ul>"
-  )s
+  )
   
-  # TODO: INCLUDE REASON
+  # compile all the reasons for implausibility
+  count_reasons <- table(unlist(strsplit(clean_df$all_reason, "\n")))
+  reason_text <- ""
+  if (length(count_reasons) > 0){
+    reason_text <- "<ul>"
+    for (i in 1:length(count_reasons)){
+      reason_text <- paste0(
+        reason_text, 
+        "<li>", names(count_reasons)[i], " (", count_reasons[i], ")</li>"
+      )
+    }
+    reason_text <- paste0(reason_text,"</ul>")
+  }
   
   return(
     HTML(paste0(
@@ -354,12 +376,16 @@ gen_subj_text <- function(cleaned_df, type, subj){
       incl_by_method,
       "<b>Total Implausible (by any method): </b>",
       sum(clean_df$all_result == "Implausible"),"<br>",
-      impl_by_method
+      impl_by_method,
+      "<b>Reasons for Implausibility: </b><br>",
+      reason_text
     ))
   )
 }
 
 # UI ----
+
+# TODO: LOOK INTO MODULES
 
 ui <- navbarPage(
   "Adult EHR Cleaning",
@@ -447,7 +473,7 @@ ui <- navbarPage(
             uiOutput("indiv_subj_title")
           ),
           fluidRow(
-            column(width = 6, style='border-right: 1px solid black',
+            column(width = 6, style='padding: 20px; border-right: 1px solid black',
                    HTML("<h3><center>Height Results</center></h3>"),
                    plotlyOutput("subj_ht"),
                    hr(),
@@ -456,7 +482,7 @@ ui <- navbarPage(
                      uiOutput("about_subj_ht")
                    )
             ),
-            column(width = 6,
+            column(width = 6, style = "padding: 20px;",
                    HTML("<h3><center>Weight Results</center></h3>"),
                    plotlyOutput("subj_wt"),
                    hr(),
