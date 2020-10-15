@@ -557,7 +557,7 @@ ui <- navbarPage(
               HTML(
                 "<h4>Steps:</h4>",
                 "<b>Step 1, H BIV</b><br>",
-                "<ul><li>Remove biologically impossible height records. Heights are biologically impossible if less than 100 cm or greater than 250 cm.</li></ul>",
+                "<ul><li>Remove biologically implausible height records. Heights are biologically implausible if less than 100 cm or greater than 250 cm.</li></ul>",
                 "<b>Step 2, Go through each age bucket</b><br>",
                 "<ul><li>Age bucket are defined to be 18 - 25, 25 - 50, and 50 and above.</li></ul>",
                 "<b>Step 2a, H age range check</b><br>",
@@ -586,15 +586,15 @@ ui <- navbarPage(
               HTML(
                 "<h4>Steps:</h4>",
                 "<b>Step 1h, H BIV</b><br>",
-                "<ul><li>Remove biologically impossible height records. Heights are biologically impossible if less than 111.8 cm or greater than 228.6 cm.</li></ul>",
+                "<ul><li>Remove biologically implausible height records. Heights are biologically implausible if less than 111.8 cm or greater than 228.6 cm.</li></ul>",
                 "<b>Step 2h, H compare difference from average to SD</b><br>",
                 "<ul><li>Exclude height if a) absolute difference between that height and average height > standard deviation (SD) AND b) SD > 2.5% of average height.</li></ul>",
                 "<b>Step 1w, W BIV</b><br>",
-                "<ul><li>Remove biologically impossible weight records. Heights are biologically impossible if less than 24.9 kg or greater than 453.6 kg.</li></ul>",
+                "<ul><li>Remove biologically implausible weight records. Heights are biologically implausible if less than 24.9 kg or greater than 453.6 kg.</li></ul>",
                 "<b>Step 2w, W compare difference from average to range or SD</b><br>",
                 "<ul><li>Weight was determined to be inaccurate if: a) the range was > 22.7 kg AND absolute difference between recorded weight and avg weight was > 70% of range OR b) SD was >20% of the average weight AND absolute difference between that weight and average weight > the SD.</li></ul>",
                 "<b>Step 3, BMI BIV</b><br>",
-                "<ul><li>Remove biologically impossible BMI records. If BMI for a given set of height/weights is < 12 or > 70, deem implausible.</li></ul>"
+                "<ul><li>Remove biologically implausible BMI records. If BMI for a given set of height/weights is < 12 or > 70, deem implausible.</li></ul>"
               )
             ),
             column(width = 3)
@@ -615,13 +615,13 @@ ui <- navbarPage(
               HTML(
                 "<h4>Steps:</h4>",
                 "<b>Step 1h, H BIV</b><br>",
-                "<ul><li>Remove biologically impossible height records. Heights are biologically impossible if less than 121.92 cm (48 in) or greater than 213 cm (84 in).</li></ul>",
+                "<ul><li>Remove biologically implausible height records. Heights are biologically implausible if less than 121.92 cm (48 in) or greater than 213 cm (84 in).</li></ul>",
                 "<b>Step 2h, H check SD away from mean</b><br>",
                 "<ul><li>Exclude heights that were greater than 3 standard deviations from the mean.</li></ul>",
                 "<b>Step 1w, W BIV</b><br>",
-                "<ul><li>Remove biologically impossible weight records. Heights are biologically impossible if less than 22.7 kg or greater than 340.2 kg.</li></ul>",
+                "<ul><li>Remove biologically implausible weight records. Heights are biologically implausible if less than 22.7 kg or greater than 340.2 kg.</li></ul>",
                 "<b>Step 2w, W BMI BIV</b><br>",
-                "<ul><li>Calculate BMI based on average height for all weight records, then remove biologically impossible weights. BMIs are biologically impossible if less than 10 or greater than 100.</li></ul>",
+                "<ul><li>Calculate BMI based on average height for all weight records, then remove biologically implausible weights. BMIs are biologically implausible if less than 10 or greater than 100.</li></ul>",
                 "<b>Step 3w, W check SD away from mean</b><br>",
                 "<ul><li>Exclude weights that were greater than 3 standard deviations from the mean.</li></ul>"
               )
