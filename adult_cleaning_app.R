@@ -77,7 +77,7 @@ g_legend <- function(a.gplot){
 } 
 
 # function to tabulate results of a given height or weight
-tab_clean_res <- function(clean_df, type){
+tab_clean_res <- function(cleaned_df, type){
   m_for_type <- m_types[[type]]
   
   # preallocate final data frame
@@ -129,7 +129,7 @@ gen_title <- function(criteria, tab_titl){
 
 # function to tabulate reasons for a given height or weight
 tab_clean_reason <- function(cleaned_df, type, show_count = F){
-  if (nrow(cleaned_df) == 0 | all(cleaned_df != "Implausible")){
+  if (nrow(cleaned_df) == 0 | all(cleaned_df[cleaned_df$param == type,] != "Implausible")){
     return(data.frame())
   }
   
@@ -168,6 +168,11 @@ tab_clean_reason <- function(cleaned_df, type, show_count = F){
 
 # function to subset based on subject and type
 sub_subj_type <- function(cleaned_df, type, subj){
+  result_map <- c(
+    "TRUE" = "Include",
+    "FALSE" = "Implausible"
+  )
+  
   # subset the data to the things we care about
   clean_df <- cleaned_df[cleaned_df$subjid == subj & 
                            cleaned_df$param == type,]
@@ -231,11 +236,6 @@ plot_cleaned <- function(cleaned_df, type, subj,
     "Implausible" = "#e62315"
   )
   
-  result_map <- c(
-    "TRUE" = "Include",
-    "FALSE" = "Implausible"
-  )
-  
   type_map <- c(
     "HEIGHTCM" = "Height (cm)",
     "WEIGHTKG" = "Weight (kg)"
@@ -244,6 +244,14 @@ plot_cleaned <- function(cleaned_df, type, subj,
   # subset the data to the subject, type, and methods we care about
   # also create necessary counts for plotting and such
   clean_df <- sub_subj_type(cleaned_df, type, subj)
+  
+  if (nrow(clean_df) == 0){
+    if (legn){
+      return(ggplot()+theme_bw())
+    } else {
+      return(ggplotly(ggplot()+theme_bw()))
+    }
+  }
   
   # if user wants to show the line fit
   bf_df <- data.frame()
@@ -273,7 +281,13 @@ plot_cleaned <- function(cleaned_df, type, subj,
     }
     
     if (show_sd_shade){
-      st_dev <- sd(clean_df$measurement)
+      st_dev <- 
+      if (calc_fit_w_impl){
+        sd(clean_df$measurement)
+      } else {
+        sd(clean_df$measurement[clean_df$all_result == "Include"])
+      }
+     
       
       if (show_fit_line){
         bf_df$min_sd1 <- bf_df$best_fit-st_dev
@@ -470,7 +484,7 @@ ui <- navbarPage(
         ),
         checkboxInput(
           "calc_fit_w_impl",
-          label = HTML("<b>Calculate fit with implausible values?</b> If unchecked, records with at least one implausible determination are excluded."),
+          label = HTML("<b>Calculate fit/standard deviation with implausible values?</b> If unchecked, records with at least one implausible determination are excluded."),
           value = F
         )
       ),
@@ -828,12 +842,14 @@ server <- function(input, output, session) {
   
   output$subj_ht <- renderPlotly({
     plot_cleaned(cleaned_df$sub, "HEIGHTCM", input$subj, 
-                 input$show_fit_line, input$show_sd_shade, input$calc_fit_w_impl)
+                 input$show_fit_line, input$show_sd_shade, 
+                 input$calc_fit_w_impl)
   })
   
   output$subj_wt <- renderPlotly({
     plot_cleaned(cleaned_df$sub, "WEIGHTKG", input$subj, 
-                 input$show_fit_line, input$show_sd_shade, input$calc_fit_w_impl)
+                 input$show_fit_line, input$show_sd_shade, 
+                 input$calc_fit_w_impl)
   })
   
   output$about_subj_ht <- renderUI({
