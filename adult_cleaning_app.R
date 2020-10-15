@@ -236,6 +236,11 @@ plot_cleaned <- function(cleaned_df, type, subj,
     "Implausible" = "#e62315"
   )
   
+  shape_map <- c(
+    "Include" = 16,
+    "Implausible" = 15
+  )
+  
   type_map <- c(
     "HEIGHTCM" = "Height (cm)",
     "WEIGHTKG" = "Weight (kg)"
@@ -312,7 +317,8 @@ plot_cleaned <- function(cleaned_df, type, subj,
         data = clean_df, 
         aes(
           age_years, measurement,
-          color = all_result, size = num_implausible,
+          color = all_result, shape = all_result,
+          size = num_implausible,
           text = paste0(
             "Subject: ", subjid, "\n",
             "Result: ", all_result,"\n",
@@ -324,6 +330,7 @@ plot_cleaned <- function(cleaned_df, type, subj,
       )+
       theme_bw()+
       scale_color_manual("Result", values = color_map, breaks = names(color_map))+
+      scale_shape_manual("Result", values = shape_map, breaks = names(shape_map))+
       scale_size(
         "Count Implausible", 
         range = c(1,3), limits = c(1,3), breaks = c(1:3)
