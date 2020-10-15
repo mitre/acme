@@ -606,7 +606,25 @@ ui <- navbarPage(
             column(width = 3),
             column(
               width = 6,
-              ""
+              HTML(
+                "<h3>Chan, et al. (2017)</h3>",
+                "<h4>Cleans: Height and Weight Records</h4><p>",
+                "Chan, et al. aims to examine the relationship between MOVE! and weight outcomes (odds of achieving clinically relevant weight loss at 12 months), deciding implausible values based on comparing standard deviations to means. More information on this method can be found <a href='https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5359164/' target = 'blank'>here</a>. Steps for this method, along with their titles (used in output) and descriptions, are below.<p>"
+              ),
+              hr(),
+              HTML(
+                "<h4>Steps:</h4>",
+                "<b>Step 1h, H BIV</b><br>",
+                "<ul><li>Remove biologically impossible height records. Heights are biologically impossible if less than 121.92 cm (48 in) or greater than 213 cm (84 in).</li></ul>",
+                "<b>Step 2h, H check SD away from mean</b><br>",
+                "<ul><li>Exclude heights that were greater than 3 standard deviations from the mean.</li></ul>",
+                "<b>Step 1w, W BIV</b><br>",
+                "<ul><li>Remove biologically impossible weight records. Heights are biologically impossible if less than 22.7 kg or greater than 340.2 kg.</li></ul>",
+                "<b>Step 2w, W BMI BIV</b><br>",
+                "<ul><li>Calculate BMI based on average height for all weight records, then remove biologically impossible weights. BMIs are biologically impossible if less than 10 or greater than 100.</li></ul>",
+                "<b>Step 3w, W check SD away from mean</b><br>",
+                "<ul><li>Exclude weights that were greater than 3 standard deviations from the mean.</li></ul>"
+              )
             ),
             column(width = 3)
           )
