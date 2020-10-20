@@ -77,8 +77,12 @@ g_legend <- function(a.gplot){
 } 
 
 # function to tabulate results of a given height or weight
-tab_clean_res <- function(cleaned_df, type){
-  m_for_type <- m_types[[type]]
+tab_clean_res <- function(cleaned_df, type, methods_chosen = methods_avail){
+  m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
+  
+  if (length(m_for_type) == 0){
+    return(data.frame())
+  }
   
   # preallocate final data frame
   t_tab <- data.frame(matrix(0, 
@@ -99,17 +103,21 @@ tab_clean_res <- function(cleaned_df, type){
 
 # function to plot overall hist
 plot_hist <- function(t_tab, yval = "Implausible"){
-  ggplotly(
-    ggplot(t_tab, aes_string("Method", yval, fill = "Method"))+
-      geom_bar(stat = "identity")+
-      theme_bw()+
-      # scale_fill_discrete_qualitative(palette = "Dark 3")+
-      scale_fill_manual(values = m_colors)+
-      theme(legend.position = "none")+
-      scale_y_continuous(expand = expansion(mult = c(0,.05))) +
-      NULL,
-    tooltip = c("x","y")
-  )
+  if (nrow(t_tab) > 0){
+    ggplotly(
+      ggplot(t_tab, aes_string("Method", yval, fill = "Method"))+
+        geom_bar(stat = "identity")+
+        theme_bw()+
+        # scale_fill_discrete_qualitative(palette = "Dark 3")+
+        scale_fill_manual(values = m_colors)+
+        theme(legend.position = "none")+
+        scale_y_continuous(expand = expansion(mult = c(0,.05))) +
+        NULL,
+      tooltip = c("x","y")
+    )
+  } else {
+    ggplotly(ggplot()+theme_bw())
+  }
 }
 
 # function to generate shiny tab title
@@ -128,12 +136,16 @@ gen_title <- function(criteria, tab_titl){
 }
 
 # function to tabulate reasons for a given height or weight
-tab_clean_reason <- function(cleaned_df, type, show_count = F){
-  if (nrow(cleaned_df) == 0 | all(cleaned_df[cleaned_df$param == type,] != "Implausible")){
+tab_clean_reason <- function(cleaned_df, type, 
+                             show_count = F, 
+                             methods_chosen = methods_avail){
+  m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
+  
+  if (nrow(cleaned_df) == 0 | 
+      all(cleaned_df[cleaned_df$param == type,] != "Implausible") |
+      length(m_for_type) == 0){
     return(data.frame())
   }
-  
-  m_for_type <- m_types[[type]]
   
   tot_tab <- data.frame()
   for (m in m_for_type){
@@ -152,7 +164,8 @@ tab_clean_reason <- function(cleaned_df, type, show_count = F){
     # merge the reasons together, with padding
     tot_tab <- 
       if (nrow(tot_tab) == 0){
-        tmp_tab
+        # rearrange by default
+        tmp_tab[,c(3, 1, 2)]
       } else {
         merge(tot_tab, tmp_tab, by = "row", all = T)
       }
@@ -167,11 +180,18 @@ tab_clean_reason <- function(cleaned_df, type, show_count = F){
 }
 
 # function to subset based on subject and type
-sub_subj_type <- function(cleaned_df, type, subj){
+sub_subj_type <- function(cleaned_df, type, subj,
+                          methods_chosen = methods_avail){
   result_map <- c(
     "TRUE" = "Include",
     "FALSE" = "Implausible"
   )
+  
+  m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
+  
+  if (length(m_for_type) == 0){
+    return(data.frame())
+  }
   
   # subset the data to the things we care about
   clean_df <- cleaned_df[cleaned_df$subjid == subj & 
@@ -181,43 +201,43 @@ sub_subj_type <- function(cleaned_df, type, subj){
     ,
     (!grepl("_result", colnames(clean_df)) &
        !grepl("_reason", colnames(clean_df))) |
-      (colnames(clean_df) %in% paste0(m_types[[type]], "_reason") |
-         colnames(clean_df) %in% paste0(m_types[[type]], "_result"))
+      (colnames(clean_df) %in% paste0(m_for_type, "_reason") |
+         colnames(clean_df) %in% paste0(m_for_type, "_result"))
   ]
   
   # create counts for plotting
   clean_df$num_implausible <- clean_df$sum_implausible <-
-    rowSums((clean_df[,paste0(m_types[[type]], "_result")] != "Include"))
+    rowSums((clean_df[,paste0(m_for_type, "_result"), drop = F] != "Include"))
   clean_df$sum_include <-
-    rowSums((clean_df[,paste0(m_types[[type]], "_result")] != "Implausible"))
+    rowSums((clean_df[,paste0(m_for_type, "_result"), drop = F] != "Implausible"))
   # for all include, make 0 -> 1 for plotting
   clean_df$num_implausible[clean_df$num_implausible == 0] <- 1
   # aggregate all the results
   clean_df$all_result <- 
     result_map[as.character(
-      apply(clean_df[,paste0(m_types[[type]], "_result")] == "Include", 1, all)
+      apply(clean_df[,paste0(m_for_type, "_result"), drop = F] == "Include", 1, all)
     )]
   # aggregate all the methods
   clean_df$all_include <- apply(
-    clean_df[,paste0(m_types[[type]], "_result")],
+    clean_df[,paste0(m_for_type, "_result"), drop = F],
     1,
     function(x){
-      paste(simpleCap(m_types[[type]][x == "Include"]), 
+      paste(simpleCap(m_for_type[x == "Include"]), 
             collapse = ", ")
     })
   
   clean_df$all_implausible <- apply(
-    clean_df[,paste0(m_types[[type]], "_result")],
+    clean_df[,paste0(m_for_type, "_result"), drop = F],
     1,
     function(x){
-      paste(simpleCap(m_types[[type]][x == "Implausible"]), 
+      paste(simpleCap(m_for_type[x == "Implausible"]), 
             collapse = ", ")
     })
   
   # gather all the reasons for implausibility
   clean_df$all_reason <-
-    apply(clean_df[,paste0(m_types[[type]], "_reason")], 1, function(x){
-      nam <- simpleCap(m_types[[type]])[x != ""]
+    apply(clean_df[,paste0(m_for_type, "_reason"), drop = F], 1, function(x){
+      nam <- simpleCap(m_for_type)[x != ""]
       x_wo <- paste0(nam,": ", x[x != ""])
       x_wo <- paste(x_wo, collapse = "\n")
       return(if (x_wo == ": "){""} else {x_wo})
@@ -229,6 +249,7 @@ sub_subj_type <- function(cleaned_df, type, subj){
 
 # function to plot individual heights and weights
 plot_cleaned <- function(cleaned_df, type, subj, 
+                         methods_chosen = methods_avail,
                          show_fit_line = T, show_sd_shade = T, 
                          calc_fit_w_impl = F, legn = F){
   # the minimum +/- value around the mean for the y axis to show
@@ -255,7 +276,7 @@ plot_cleaned <- function(cleaned_df, type, subj,
   
   # subset the data to the subject, type, and methods we care about
   # also create necessary counts for plotting and such
-  clean_df <- sub_subj_type(cleaned_df, type, subj)
+  clean_df <- sub_subj_type(cleaned_df, type, subj, methods_chosen)
   
   if (nrow(clean_df) == 0){
     if (legn){
@@ -401,11 +422,18 @@ plot_cleaned <- function(cleaned_df, type, subj,
   }
 }
 
-gen_subj_text <- function(cleaned_df, type, subj){
+gen_subj_text <- function(cleaned_df, type, subj,
+                          methods_chosen = methods_avail){
   # subset the data to the subject, type, and methods we care about
-  clean_df <- sub_subj_type(cleaned_df, type, subj)
+  clean_df <- sub_subj_type(cleaned_df, type, subj, methods_chosen)
   
-  impl_by_method <- sapply(m_types[[type]], function(x){
+  if (nrow(clean_df) == 0){
+    return(HTML(""))
+  }
+  
+  m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
+  
+  impl_by_method <- sapply(m_for_type, function(x){
     paste0("<li><b>Total Implausible by ", simpleCap(x),": </b>",
            sum(clean_df[,paste0(x,"_result")] == "Implausible"), "</li>")
   })
@@ -415,7 +443,7 @@ gen_subj_text <- function(cleaned_df, type, subj){
     "</ul>"
   )
   
-  incl_by_method <- sapply(m_types[[type]], function(x){
+  incl_by_method <- sapply(m_for_type, function(x){
     paste0("<li><b>Total Include by ", simpleCap(x),": </b>",
            sum(clean_df[,paste0(x,"_result")] == "Include"), "</li>")
   })
@@ -484,6 +512,15 @@ ui <- navbarPage(
           actionButton("update_subj", "Update Subjects"),
           actionButton("reset_subj", "Reset")
         ),
+        HTML("<p>"),
+        checkboxGroupInput("togg_methods",
+                           "Choose methods to compare:",
+                           choices = 
+                             setNames(methods_avail, simpleCap(methods_avail)),
+                           selected = methods_avail,
+                           inline = T
+                           ),
+        actionButton("update_methods", "Update Methods"),
         hr(),
         HTML("<b>Settings for overall plots:</b><p>"),
         selectInput(
@@ -750,10 +787,18 @@ ui <- navbarPage(
 
 server <- function(input, output, session) {
   
+  # preallocate reactive values ----
+  
   cleaned_df <- reactiveValues(
     "full" = data.frame(),
     "sub" = data.frame()
   )
+  
+  methods_chosen <- reactiveValues(
+    "m" = methods_avail
+  )
+  
+  # observe button inputs ----
   
   observeEvent(input$run_data, {
     withProgress(message = "Cleaning data!", value = 0, {
@@ -817,6 +862,11 @@ server <- function(input, output, session) {
     cleaned_df$sub <- cleaned_df$full
   })
   
+  # update output to only focus on specified methods
+  observeEvent(input$update_methods, {
+    methods_chosen$m <- input$togg_methods
+  })
+  
   # plot overall results ----
   
   output$overall_subj_title <- renderUI({
@@ -824,24 +874,26 @@ server <- function(input, output, session) {
   })
   
   output$overall_ht <- renderPlotly({
-    ht_tab <- tab_clean_res(cleaned_df$sub, "HEIGHTCM")
+    ht_tab <- tab_clean_res(cleaned_df$sub, "HEIGHTCM", methods_chosen$m)
     plot_hist(ht_tab, input$togg_res_count)
   })
   
   output$overall_wt <- renderPlotly({
-    wt_tab <- tab_clean_res(cleaned_df$sub, "WEIGHTKG")
+    wt_tab <- tab_clean_res(cleaned_df$sub, "WEIGHTKG", methods_chosen$m)
     plot_hist(wt_tab, input$togg_res_count)
   })
   
   output$overall_ht_top_reasons <- renderDataTable({
-    tab_clean_reason(cleaned_df$sub, "HEIGHTCM", input$show_reason_count) 
+    tab_clean_reason(cleaned_df$sub, "HEIGHTCM", 
+                     input$show_reason_count, methods_chosen$m) 
   }, 
   options = list(scrollX = TRUE,
                  pageLength = 5)
   )
   
   output$overall_wt_top_reasons <- renderDataTable({
-    tab_clean_reason(cleaned_df$sub, "WEIGHTKG", input$show_reason_count) 
+    tab_clean_reason(cleaned_df$sub, "WEIGHTKG", 
+                     input$show_reason_count, methods_chosen$m) 
   }, 
   options = list(scrollX = TRUE,
                  pageLength = 5)
@@ -863,31 +915,35 @@ server <- function(input, output, session) {
   })
   
   output$subj_legn_ht <- renderPlot({
-    plot_cleaned(cleaned_df$sub, "HEIGHTCM", input$subj, legn = T)
+    plot_cleaned(cleaned_df$sub, "HEIGHTCM", input$subj,
+                 methods_chosen$m, legn = T)
   })
   
   output$subj_legn_wt <- renderPlot({
-    plot_cleaned(cleaned_df$sub, "WEIGHTKG", input$subj, legn = T)
+    plot_cleaned(cleaned_df$sub, "WEIGHTKG", input$subj, 
+                 methods_chosen$m, legn = T)
   })
   
   output$subj_ht <- renderPlotly({
     plot_cleaned(cleaned_df$sub, "HEIGHTCM", input$subj, 
+                 methods_chosen$m,
                  input$show_fit_line, input$show_sd_shade, 
                  input$calc_fit_w_impl)
   })
   
   output$subj_wt <- renderPlotly({
     plot_cleaned(cleaned_df$sub, "WEIGHTKG", input$subj, 
+                 methods_chosen$m,
                  input$show_fit_line, input$show_sd_shade, 
                  input$calc_fit_w_impl)
   })
   
   output$about_subj_ht <- renderUI({
-    gen_subj_text(cleaned_df$sub, "HEIGHTCM", input$subj)
+    gen_subj_text(cleaned_df$sub, "HEIGHTCM", input$subj, methods_chosen$m)
   })
   
   output$about_subj_wt <- renderUI({
-    gen_subj_text(cleaned_df$sub, "WEIGHTKG", input$subj)
+    gen_subj_text(cleaned_df$sub, "WEIGHTKG", input$subj, methods_chosen$m)
   })
   
   # output run results ----
