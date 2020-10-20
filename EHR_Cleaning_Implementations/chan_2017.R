@@ -7,28 +7,12 @@
 # Note: will have to update to data table upon completion for speed
 # Note 2: must remove missing values before running method
 
-# supporting functions ----
-
-# note this is slightly different from the previous versions -- adds a variable
-# for saying whether to include the cutoff in the cutoff
-remove_biv <- function(subj_df, type, biv_df, include = F){
-  if (!include){
-    too_low <- subj_df$measurement < biv_df[type, "low"]
-    too_high <- subj_df$measurement > biv_df[type, "high"]
-  } else {
-    too_low <- subj_df$measurement <= biv_df[type, "low"]
-    too_high <- subj_df$measurement >= biv_df[type, "high"]
-  }
-  
-  return(too_low | too_high)
-}
-
 # implement chan, et al. ----
 
 # function to clean height and weight data by chan, et al.
 # inputs:
 # df: data frame with 7 columns:
-#   id: row id
+#   id: row id, must be unique
 #   subjid: subject id
 #   sex: sex of subject
 #   age_years: age, in years
@@ -136,12 +120,12 @@ chan_clean_both <- function(df){
       
       # calulate bmi
       bmi_df <- data.frame(
-        "measurement" = w_df$measurement/((avg_ht/100)^2)
+        "measurement" = subj_df$measurement/((avg_ht/100)^2)
       )
       
       criteria <- remove_biv(bmi_df, "bmi", biv_df, include = T)
-      subj_keep[as.character(w_df$id[criteria])] <- "Implausible"
-      subj_reason[as.character(w_df$id[criteria])] <- 
+      subj_keep[as.character(subj_df$id[criteria])] <- "Implausible"
+      subj_reason[as.character(subj_df$id[criteria])] <- 
         paste0("Implausible, Step ",step)
       
       subj_df <- subj_df[!criteria,]

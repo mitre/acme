@@ -11,7 +11,7 @@
 # function to clean height data by muthalagu, et al.
 # inputs:
 # df: data frame with 7 columns:
-#   id: row id
+#   id: row id, must be unique
 #   subjid: subject id
 #   sex: sex of subject
 #   age_years: age, in years
@@ -30,6 +30,13 @@ muthalagu_clean_ht <- function(df){
   # BIVs
   ht_cutoff_low <- 100
   ht_cutoff_high <- 250
+  
+  # BIVs
+  biv_df <- data.frame(
+    "low" = c(100),
+    "high" = c(250)
+  )
+  rownames(biv_df) <- c("height")
   
   # in a given range, the cutoff between the max and min height
   # NOTE: this should be customizable
@@ -64,12 +71,11 @@ muthalagu_clean_ht <- function(df){
     # 1. remove biologically impossible height records
     step <- "1, H BIV"
     
-    too_low <- subj_df$measurement < ht_cutoff_low
-    too_high <- subj_df$measurement > ht_cutoff_high
-    subj_keep[too_low | too_high] <- "Implausible"
-    subj_reason[too_low | too_high] <- paste0("Erroneous, Step ",step)
+    criteria <- remove_biv(subj_df, "height", biv_df)
+    subj_keep[criteria] <- "Implausible"
+    subj_reason[criteria] <- paste0("Erroneous, Step ",step)
     
-    subj_df <- subj_df[!(too_low | too_high),]
+    subj_df <- subj_df[!criteria,]
     
     # 2 ----
     # 2. Go through each age bucket
@@ -98,19 +104,21 @@ muthalagu_clean_ht <- function(df){
         
         # if there are only two values, everything will be indeterminate
         if (nrow(subj_df_age) <= 2){
-          subj_keep[as.character(subj_df_age$id)] <- "Indeterminate"
+          subj_keep[as.character(subj_df_age$id)] <- "Implausible"
           subj_reason[as.character(subj_df_age$id)] <- 
             paste0("Indeterminate, Step ", step)
         } else {
           # calculate median heights per age (rounded to nearest year) in bucket
-          med_hts <- sapply(round(unique(subj_df_age$age_years)), function(x){
+          # note: for duplicate rounded ages, this will propagate the same median to
+          # both records
+          med_hts <- sapply(round(subj_df_age$age_years), function(x){
             median(subj_df_age$measurement[round(subj_df_age$age_years) == x])
           })
           
           # compare only for middle values -- end values are indeterminate
           # results in true if both are under the cutoff
           mid_compare <- sapply(2:(length(med_hts)-1), function(x){
-            !all(c(abs(med_hts[x] - med_hts[x-1]), abs(med_hts[x] - med_hts[x+1])) >= 
+            all(c(abs(med_hts[x] - med_hts[x-1]), abs(med_hts[x] - med_hts[x+1])) <= 
                    btwn_range_cutoff)
           })
           
@@ -121,16 +129,16 @@ muthalagu_clean_ht <- function(df){
                            length(med_hts))
           
           # 2c, H erroneous and indeterminate median check ----
-          # 2c: For erroneous and indeterminate medians, assign algorithms within
+          # 2c: For erroneous and indeterminate medians, assign correct medians within
           # 3 year period. Then compare all other recorded heights to the median at 
-          # that are. If the recorded height for any age differs  > 3.5 (for 
+          # that age. If the recorded height for any age differs  > 3.5 (for 
           # erroneous) or > 6 (for indeterminate) from cleaned median height for 
           # that age, the value is erroneous.
           step <- "2c, H erroneous and indeterminate median check"
           
           # if there's no correct median height for comparison, it's all indeterminate
           if (sum(mid_compare) == 0){
-            subj_keep[as.character(subj_df_age$id[err_hts_idx])] <- "Indeterminate"
+            subj_keep[as.character(subj_df_age$id[err_hts_idx])] <- "Implausible"
             subj_reason[as.character(subj_df_age$id[err_hts_idx])] <- 
               paste0("Indeterminate, Step ", step)
           } else {
