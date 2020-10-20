@@ -551,6 +551,7 @@ ui <- navbarPage(
                    HTML("<h3><center>Height Results</center></h3>"),
                    plotlyOutput("subj_ht"),
                    plotOutput("subj_legn_ht", height = "20px"),
+                   HTML("<br>Note: shading indicates standard deviations (SD) away from fit/data (darker for 1 SD, lighter for 2 SD)."),
                    hr(),
                    fluidRow(
                      style = "border: 1px #e3e3e3; border-style: solid; border-radius: 10px; background: #f5f5f5; padding: 10px;",
@@ -561,6 +562,7 @@ ui <- navbarPage(
                    HTML("<h3><center>Weight Results</center></h3>"),
                    plotlyOutput("subj_wt"),
                    plotOutput("subj_legn_wt", height = "20px"),
+                   HTML("<br>Note: shading indicates standard deviations (SD) away from fit/data (darker for 1 SD, lighter for 2 SD)."),
                    hr(),
                    fluidRow(
                      style = "border: 1px #e3e3e3; border-style: solid; border-radius: 10px; background: #f5f5f5; padding: 10px;",
