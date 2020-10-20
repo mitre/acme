@@ -251,7 +251,8 @@ sub_subj_type <- function(cleaned_df, type, subj,
 plot_cleaned <- function(cleaned_df, type, subj, 
                          methods_chosen = methods_avail,
                          show_fit_line = T, show_sd_shade = T, 
-                         calc_fit_w_impl = F, legn = F){
+                         calc_fit_w_impl = F, legn = F, 
+                         single = F){
   # the minimum +/- value around the mean for the y axis to show
   min_range_band <- c(
     "HEIGHTCM" = 3.5,
@@ -286,22 +287,21 @@ plot_cleaned <- function(cleaned_df, type, subj,
     }
   }
   
+  bf_df <- data.frame(
+    "age_years" = c(
+      clean_df$age_years,
+      min(clean_df$age_years)-(diff(range(clean_df$measurement))*.05),
+      max(clean_df$age_years)+(diff(range(clean_df$measurement))*.05)
+    ),
+    "measurement_orig" = c(
+      clean_df$measurement,
+      rep(NA,2)
+    )
+  )
+  
   # if user wants to show the line fit
-  bf_df <- data.frame()
   if (show_fit_line | show_sd_shade){
     # add best fit line (padded slightly for plotting prettiness)
-    bf_df <- data.frame(
-      "age_years" = c(
-        clean_df$age_years,
-        min(clean_df$age_years)-(diff(range(clean_df$measurement))*.05),
-        max(clean_df$age_years)+(diff(range(clean_df$measurement))*.05)
-      ),
-      "measurement_orig" = c(
-        clean_df$measurement,
-        rep(NA,2)
-      )
-    )
-    
     if (show_fit_line){
       bf_df$best_fit <- 
         if (calc_fit_w_impl){
@@ -383,9 +383,15 @@ plot_cleaned <- function(cleaned_df, type, subj,
       theme(plot.title = element_text(hjust = .5))+
       xlab("Age (Years)")+
       ylab(type_map[type])+
-      ggtitle(paste0("Subject: ", subj))+
       NULL
   )
+  
+  p <- p +
+    if (single){
+      ggtitle(paste0("Method: ", simpleCap(methods_chosen)))
+    } else {
+      ggtitle(paste0("Subject: ", subj))
+    }
   
   if (show_fit_line){
     p <- p +
@@ -422,6 +428,7 @@ plot_cleaned <- function(cleaned_df, type, subj,
   }
 }
 
+# generate the text that appears below individual subject plots
 gen_subj_text <- function(cleaned_df, type, subj,
                           methods_chosen = methods_avail){
   # subset the data to the subject, type, and methods we care about
@@ -535,8 +542,13 @@ ui <- navbarPage(
           value = F
         ),
         hr(),
-        HTML("<b>Settings for individual plots:</b><p>"),
+        HTML("<b>Settings for individual/individual by method plots:</b><p>"),
         uiOutput("indiv_choose"),
+        selectInput(
+          "method_indiv_type",
+          "Choose which parameter to display in individual by method plots:",
+          choices = c("Height (cm)" = "HEIGHTCM", "Weight (kg)" = "WEIGHTKG")
+        ),
         checkboxInput(
           "show_fit_line",
           label = HTML("<b>Show linear fit?</b>"),
@@ -606,6 +618,17 @@ ui <- navbarPage(
                      uiOutput("about_subj_wt")
                    )
             )
+          )
+        ),
+        tabPanel(
+          "Individual by Method",
+          fluidRow(
+            width = 12,
+            uiOutput("method_subj_title")
+          ),
+          fluidRow(
+            width = 12,
+            uiOutput("method_subj_plots")
           )
         ),
         tabPanel(
@@ -945,6 +968,72 @@ server <- function(input, output, session) {
   output$about_subj_wt <- renderUI({
     gen_subj_text(cleaned_df$sub, "WEIGHTKG", input$subj, methods_chosen$m)
   })
+  
+  # plot individual results by method ----
+  
+  # give the overall title
+  output$method_subj_title <- renderUI({
+    type_map <- c(
+      "HEIGHTCM" = "Height (cm)",
+      "WEIGHTKG" = "Weight (kg)"
+    )
+    
+    HTML(paste0("<center><h3>Individual ",
+                type_map[input$method_indiv_type],
+                " for Subject: ",
+                input$subj, 
+                "</center></h3>"))
+  })
+  
+  # set up a grid to plot each individual
+  output$method_subj_plots <- renderUI({
+    nc <- 2
+    nr <- ceiling(length(methods_chosen)/2)
+    
+    vert_list <- lapply(1:nr, function(r){
+      fluidRow(
+        width = 12,
+        column(
+          style='border-right: 1px solid black',
+          width = 6,
+          plotlyOutput(paste0("method", (r*2)-1)),
+          uiOutput(paste0("method_text", (r*2)-1)),
+          hr()
+        ),
+        column(
+          width = 6,
+          plotlyOutput(paste0("method", (r*2))),
+          uiOutput(paste0("method_text", (r*2))),
+          hr()
+        )
+      )
+      
+    })
+    # do.call(tagList, plot_output_list)
+    
+    verticalLayout(
+      vert_list
+    )
+  })
+  
+  # generate up to the maximum number of plots
+  for (m in 1:length(methods_avail)){
+    local({
+      my_m <- m
+      output[[paste0("method", my_m)]] <- renderPlotly({
+        if (my_m <= length(methods_chosen)){
+          plot_cleaned(cleaned_df$sub, input$method_indiv_type,
+                       input$subj, 
+                       methods_chosen$m[my_m],
+                       input$show_fit_line, input$show_sd_shade, 
+                       input$calc_fit_w_impl, 
+                       single = T)
+        } else {
+          ggplotly(ggplot()+theme(panel.background = element_blank()))
+        }
+      })
+    })
+  }
   
   # output run results ----
   
