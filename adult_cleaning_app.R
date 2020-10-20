@@ -230,7 +230,14 @@ sub_subj_type <- function(cleaned_df, type, subj){
 # function to plot individual heights and weights
 plot_cleaned <- function(cleaned_df, type, subj, 
                          show_fit_line = T, show_sd_shade = T, 
-                         calc_fit_w_impl = T, legn = F){
+                         calc_fit_w_impl = F, legn = F){
+  # the minimum +/- value around the mean for the y axis to show
+  min_range_band <- c(
+    "HEIGHTCM" = 3.5,
+    "WEIGHTKG" = 5
+  )
+  
+  # maps for configuring ggplot
   color_map <- c(
     "Include" = "#000000",
     "Implausible" = "#e62315"
@@ -310,6 +317,22 @@ plot_cleaned <- function(cleaned_df, type, subj,
     }
   }
   
+  # consider the y range to be, at a minimum, a certain amount around the mean
+  min_rg <- min(bf_df[,-1], na.rm = T)
+  max_rg <- max(bf_df[,-1], na.rm = T)
+  yaxis_lim <- 
+    if (diff(c(min_rg, max_rg)) < (min_range_band[type]*2)){
+      c(
+        mean(c(min_rg, max_rg))-min_range_band[type],
+        mean(c(min_rg, max_rg))+min_range_band[type]
+      )
+    } else {
+      c(
+        min_rg-(.01*diff(c(min_rg,max_rg))), 
+        max_rg+(.01*diff(c(min_rg,max_rg)))
+      )
+    }
+  
   # make the scatter plot (applies in all situations)
   p <- suppressWarnings(
     ggplot()+
@@ -335,8 +358,7 @@ plot_cleaned <- function(cleaned_df, type, subj,
         "Count Implausible", 
         range = c(1,3), limits = c(1,3), breaks = c(1:3)
       )+
-      # theme(legend.position = "bottom",
-      # legend.direction = "horizontal")+
+      ylim(yaxis_lim)+
       theme(plot.title = element_text(hjust = .5))+
       xlab("Age (Years)")+
       ylab(type_map[type])+
@@ -438,7 +460,6 @@ gen_subj_text <- function(cleaned_df, type, subj){
 # TODO: LOOK INTO MODULES
 
 ui <- navbarPage(
-  
   # UI: compute and compare results ----
   
   "Adult EHR Cleaning",
@@ -751,7 +772,7 @@ server <- function(input, output, session) {
       # run each method and save the results
       c_df <- df
       for (m in methods_avail){
-        incProgress(1/tot_increments, 
+        incProgress(1/tot_increments,
                     message = paste("Running", simpleCap(m)),
                     detail = Sys.time())
         
