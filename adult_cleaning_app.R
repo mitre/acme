@@ -101,7 +101,7 @@ tab_clean_res <- function(cleaned_df, type, methods_chosen = methods_avail){
   return(t_tab)
 }
 
-# function to plot overall hist
+# function to plot overall histogram
 plot_hist <- function(t_tab, yval = "Implausible"){
   if (nrow(t_tab) > 0){
     ggplotly(
@@ -120,7 +120,7 @@ plot_hist <- function(t_tab, yval = "Implausible"){
   }
 }
 
-# function to generate shiny tab title
+# function to generate the overall title for each shiny tab
 gen_title <- function(criteria, tab_titl){
   return(
     if (criteria){
@@ -135,7 +135,7 @@ gen_title <- function(criteria, tab_titl){
   )
 }
 
-# function to tabulate reasons for a given height or weight
+# function to tabulate reasons for implausibility for a given height or weight
 tab_clean_reason <- function(cleaned_df, type, 
                              show_count = F, 
                              methods_chosen = methods_avail){
@@ -179,7 +179,7 @@ tab_clean_reason <- function(cleaned_df, type,
   return(tot_tab)
 }
 
-# function to subset based on subject and type
+# function to subset cleaned data based on subject and type
 sub_subj_type <- function(cleaned_df, type, subj,
                           methods_chosen = methods_avail){
   result_map <- c(
@@ -428,7 +428,7 @@ plot_cleaned <- function(cleaned_df, type, subj,
   }
 }
 
-# generate the text that appears below individual subject plots
+# function to generate the summary that appears below individual subject plots
 gen_subj_text <- function(cleaned_df, type, subj,
                           methods_chosen = methods_avail){
   # subset the data to the subject, type, and methods we care about
@@ -809,7 +809,6 @@ ui <- navbarPage(
 # SERVER ----
 
 server <- function(input, output, session) {
-  
   # preallocate reactive values ----
   
   cleaned_df <- reactiveValues(
