@@ -148,8 +148,29 @@ for (i in unique(df$subjid)){
   
   criteria <- remove_diff_from_sd(h_subj_df, .025)
   
+  # keep for the next step
+  orig_h_subj_df <- h_subj_df
+  
   h_subj_keep[h_subj_df$id[criteria]] <- "Implausible"
   h_subj_reason[h_subj_df$id[criteria]] <- paste0("Erroneous, Step ", step)
-  h_subj_keep <- h_subj_df[!criteria,]
+  h_subj_df <- h_subj_df[!criteria,]
+  
+  # 3h, H compare difference to SD, with most deviant height dropped ----
+  # 3h. Run step 2h again, but with the most deviant height dropped to see if 
+  # there are any more implausible values.
+  step <- "3h, H compare difference to SD, with most deviant height dropped"
+  
+  # find most deviant height
+  avg_h <- mean(orig_h_subj_df$measurement)
+  most_dev <- which.max(
+    sapply(orig_h_subj_df$measurement, function(x){abs(x-avg_h)})
+  )
+  # remove most deviant height and rerun the algorithm
+  orig_h_subj_df <- orig_h_subj_df[-most_dev,]
+  criteria <- remove_diff_from_sd(orig_h_subj_df, .025)
+  
+  h_subj_keep[orig_h_subj_df$id[criteria]] <- "Implausible"
+  h_subj_reason[orig_h_subj_df$id[criteria]] <- paste0("Erroneous, Step ", step)
+  h_subj_df[orig_h_subj_df$id,] <- h_subj_df[orig_h_subj_df$id,][!criteria,]
   
 }
