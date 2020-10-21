@@ -103,4 +103,31 @@ for (i in unique(df$subjid)){
     h_subj_df[as.character(comb_df$id.x),] <- 
       h_subj_df[as.character(comb_df$id.x),][comb_df$tot_res == "Include",]
   }
+  
+  # 2, remove erroneous values based on SD ----
+  # 2. Remove erroneous values that have large standard deviations.
+  
+  # 2w, W compare difference from average to SD ----
+  # 2w. Exclude any weight measurements where: 1) difference between mean weight
+  # and recorded weight was greater than the standard deviation (SD) AND 2) the 
+  # SD was greater than 10% of the mean.
+  step <- "2w, W compare difference from average to SD"
+  
+  avg_w <- mean(w_subj_df$measurement)
+  st_dev_w <- sd(w_subj_df$measurement)
+  
+  # if the SD is greater than 10% of the mean, we can evaluate the record
+  if (st_dev_w/avg_w > .1){
+    # criteria to exclude the record
+    criteria <- sapply(w_subj_df$measurement, function(x){
+      abs(x-avg_w) > st_dev_w
+    })
+  }
+  
+  w_subj_keep[w_subj_df$id[criteria]] <- "Implausible"
+  w_subj_reason[w_subj_df$id[criteria]] <- paste0("Erroneous, Step ", step)
+  w_subj_keep <- w_subj_df[!criteria,]
+  
+  
+  
 }
