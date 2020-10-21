@@ -4,6 +4,27 @@
 
 # paper: https://www.cdc.gov/pcd/issues/2012/11_0267.htm
 
+# supporting functions for this implementation only ----
+
+# function to calculate the criteria to remove measurement based on difference
+# of record from mean compared to SD, provided that the SD is large enough
+remove_diff_from_sd <- function(subj_df, max_sd_of_mean){
+  avg <- mean(subj_df$measurement)
+  st_dev <- sd(subj_df$measurement)
+  
+  # if the SD is greater than specified fraction of mean, we can evaluate record
+  if (st_dev/avg > max_sd_of_mean){
+    # criteria to exclude the record
+    criteria <- sapply(subj_df$measurement, function(x){
+      abs(x-avg) > st_dev
+    })
+  } else {
+    criteria <- rep(F, nrow(subj_df))
+  }
+  
+  return(criteria)
+}
+
 # implement littman, et al. ----
 
 # method specific constants ----
@@ -113,21 +134,22 @@ for (i in unique(df$subjid)){
   # SD was greater than 10% of the mean.
   step <- "2w, W compare difference from average to SD"
   
-  avg_w <- mean(w_subj_df$measurement)
-  st_dev_w <- sd(w_subj_df$measurement)
-  
-  # if the SD is greater than 10% of the mean, we can evaluate the record
-  if (st_dev_w/avg_w > .1){
-    # criteria to exclude the record
-    criteria <- sapply(w_subj_df$measurement, function(x){
-      abs(x-avg_w) > st_dev_w
-    })
-  }
+  criteria <- remove_diff_from_sd(w_subj_df, .1)
   
   w_subj_keep[w_subj_df$id[criteria]] <- "Implausible"
   w_subj_reason[w_subj_df$id[criteria]] <- paste0("Erroneous, Step ", step)
   w_subj_keep <- w_subj_df[!criteria,]
   
+  # 2h, H compare difference from average to SD ----
+  # 2h. Exclude any height measurements where: 1) difference between mean height
+  # and recorded height was greater than SD AND 2) SD was greater than 2.5% of 
+  # mean.
+  step <- "2h, H compare difference from average to SD"
   
+  criteria <- remove_diff_from_sd(h_subj_df, .025)
+  
+  h_subj_keep[h_subj_df$id[criteria]] <- "Implausible"
+  h_subj_reason[h_subj_df$id[criteria]] <- paste0("Erroneous, Step ", step)
+  h_subj_keep <- h_subj_df[!criteria,]
   
 }
