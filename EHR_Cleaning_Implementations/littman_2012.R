@@ -76,14 +76,62 @@ for (i in unique(df$subjid)){
   h_subj_df <- h_subj_df[!criteria,]
   
   # 1w, W BIV ----
-  # 1w. remove biologically impossible weight records
-  step <- "1w, W BIV"
+  # 1w. remove biologically impossible weight records based on 2 possibilities:
+  # a) [weight <75 lbs  or >600 lbs] OR
+  # b) [weight change per week > 2 lbs and > 50 lbs overall] OR [weight change > 
+  # 100 lbs, no matter the rate]
+  step <- "1w, W BIV" # NOTE: reason is recorded differently below
   
-  criteria <- remove_biv(w_subj_df, "weight", biv_df)
-  w_subj_keep[criteria] <- "Implausible"
-  w_subj_reason[criteria] <- paste0("Erroneous, Step ",step)
+  # criteria a) traditional weight biv removal
+  criteria_a <- remove_biv(w_subj_df, "weight", biv_df)
   
-  w_subj_df <- w_subj_df[!criteria,]
+  # criteria b) rate change biv removal
+  # preallocate
+  criteria_b <- rep(F, nrow(w_subj_df))
+  
+  # compute overall weight change
+  w_ch_overall <- 
+    abs(diff(c(min(w_subj_df$measurement), max(w_subj_df$measurement))))
+  
+  # convert years to weeks
+  w_subj_df <- w_subj_df[order(w_subj_df$age_years),]
+  age_weeks <- w_subj_df$age_years*52.1429
+  # get lagged time change
+  time_ch <- sapply(2:nrow(w_subj_df), function(x){
+    age_weeks[x]-age_weeks[x-1]
+  })
+  # get lagged weight change
+  w_ch <- sapply(2:nrow(w_subj_df), function(x){
+    abs(w_subj_df$measurement[x]-w_subj_df$measurement[x-1])
+  })
+  # note that if weight changes at all for no time difference, it is 
+  # implausible (Inf)
+  w_ch_per_week <- w_ch/time_ch
+  # compensate for 0/0, which is plausible
+  w_ch_per_week[is.na(w_ch_per_week)] <- 0 
+  
+  # [weight change per week > 2 lbs and > 50 lbs overall]
+  invalid_1 <- which(
+    w_ch_per_week > 2*.453592 & w_ch_overall > 50*.453592
+  )
+  # [weight change > 100 lbs, no matter the rate]
+  invalid_2 <- which(w_ch_per_week > 100*.453592)
+  
+  # both around those changes should be implausible
+  if (length(invalid_1) > 0){
+    criteria_b[c(invalid_1, invalid_1+1)] <- T
+  }
+  if (length(invalid_2) > 0){
+    criteria_b[c(invalid_2, invalid_2+1)] <- T
+  }
+  
+  w_subj_keep[criteria_a | criteria_b] <- "Implausible"
+  w_subj_reason[criteria_a] <- 
+    paste0("Erroneous, Step ", "1wa, W BIV cutoffs")
+  w_subj_reason[criteria_b] <- 
+    paste0("Erroneous, Step ", "1wb, W BIV rate change")
+  
+  w_subj_df <- w_subj_df[!(criteria_a | criteria_b),]
   
   # 1bmi, BMI BIV ----
   # 1bmi. remove biologically implausible bmi values for each set of height
@@ -138,7 +186,7 @@ for (i in unique(df$subjid)){
   
   w_subj_keep[w_subj_df$id[criteria]] <- "Implausible"
   w_subj_reason[w_subj_df$id[criteria]] <- paste0("Erroneous, Step ", step)
-  w_subj_keep <- w_subj_df[!criteria,]
+  w_subj_df <- w_subj_df[!criteria,]
   
   # 2h, H compare difference from average to SD ----
   # 2h. Exclude any height measurements where: 1) difference between mean height
