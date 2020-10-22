@@ -39,7 +39,7 @@ sourceDir("EHR_Cleaning_Implementations")
 
 # supporting data ----
 
-methods_avail <- c("muthalagu", "cheng", "chan")
+methods_avail <- c("muthalagu", "cheng", "chan", "littman")
 
 # types cleaned for each method
 m_types <- list(
@@ -49,7 +49,8 @@ m_types <- list(
 
 methods_func <- list(muthalagu_clean_ht,
                      cheng_clean_both,
-                     chan_clean_both)
+                     chan_clean_both,
+                     littman_clean_both)
 names(methods_func) <- methods_avail
 
 # capitalize first letter of words, from ?toupper, edited to handle vector
@@ -1020,7 +1021,7 @@ server <- function(input, output, session) {
     local({
       my_m <- m
       output[[paste0("method", my_m)]] <- renderPlotly({
-        if (my_m <= length(methods_chosen)){
+        if (my_m <= length(methods_chosen$m)){
           plot_cleaned(cleaned_df$sub, input$method_indiv_type,
                        input$subj, 
                        methods_chosen$m[my_m],
