@@ -58,12 +58,14 @@ for (i in unique(df$subjid)){
   names(h_subj_keep) <- names(h_subj_reason) <- h_df$id
   
   h_subj_df <- h_df
+  rownames(h_subj_df) <- h_subj_df$id
   
   w_subj_keep <- rep("Include", nrow(w_df))
   w_subj_reason <- rep("", nrow(w_df))
   names(w_subj_keep) <- names(w_subj_reason) <- w_df$id
   
   w_subj_df <- w_df
+  rownames(w_subj_df) <- w_subj_df$id
   
   # 1h, H BIV ----
   # 1h. remove biologically impossible height records
@@ -89,40 +91,43 @@ for (i in unique(df$subjid)){
   # preallocate
   criteria_b <- rep(F, nrow(w_subj_df))
   
-  # compute overall weight change
-  w_ch_overall <- 
-    abs(diff(c(min(w_subj_df$measurement), max(w_subj_df$measurement))))
-  
-  # convert years to weeks
-  w_subj_df <- w_subj_df[order(w_subj_df$age_years),]
-  age_weeks <- w_subj_df$age_years*52.1429
-  # get lagged time change
-  time_ch <- sapply(2:nrow(w_subj_df), function(x){
-    age_weeks[x]-age_weeks[x-1]
-  })
-  # get lagged weight change
-  w_ch <- sapply(2:nrow(w_subj_df), function(x){
-    abs(w_subj_df$measurement[x]-w_subj_df$measurement[x-1])
-  })
-  # note that if weight changes at all for no time difference, it is 
-  # implausible (Inf)
-  w_ch_per_week <- w_ch/time_ch
-  # compensate for 0/0, which is plausible
-  w_ch_per_week[is.na(w_ch_per_week)] <- 0 
-  
-  # [weight change per week > 2 lbs and > 50 lbs overall]
-  invalid_1 <- which(
-    w_ch_per_week > 2*.453592 & w_ch_overall > 50*.453592
-  )
-  # [weight change > 100 lbs, no matter the rate]
-  invalid_2 <- which(w_ch_per_week > 100*.453592)
-  
-  # both around those changes should be implausible
-  if (length(invalid_1) > 0){
-    criteria_b[c(invalid_1, invalid_1+1)] <- T
-  }
-  if (length(invalid_2) > 0){
-    criteria_b[c(invalid_2, invalid_2+1)] <- T
+  # need at least 2 values to compute rate change
+  if (nrow(w_subj_df) >= 2){
+    # compute overall weight change
+    w_ch_overall <- 
+      abs(diff(c(min(w_subj_df$measurement), max(w_subj_df$measurement))))
+    
+    # convert years to weeks
+    w_subj_df <- w_subj_df[order(w_subj_df$age_years),]
+    age_weeks <- w_subj_df$age_years*52.1429
+    # get lagged time change
+    time_ch <- sapply(2:nrow(w_subj_df), function(x){
+      age_weeks[x]-age_weeks[x-1]
+    })
+    # get lagged weight change
+    w_ch <- sapply(2:nrow(w_subj_df), function(x){
+      abs(w_subj_df$measurement[x]-w_subj_df$measurement[x-1])
+    })
+    # note that if weight changes at all for no time difference, it is 
+    # implausible (Inf)
+    w_ch_per_week <- w_ch/time_ch
+    # compensate for 0/0, which is plausible
+    w_ch_per_week[is.na(w_ch_per_week)] <- 0 
+    
+    # [weight change per week > 2 lbs and > 50 lbs overall]
+    invalid_1 <- which(
+      w_ch_per_week > 2*.453592 & w_ch_overall > 50*.453592
+    )
+    # [weight change > 100 lbs, no matter the rate]
+    invalid_2 <- which(w_ch_per_week > 100*.453592)
+    
+    # both around those changes should be implausible
+    if (length(invalid_1) > 0){
+      criteria_b[c(invalid_1, invalid_1+1)] <- T
+    }
+    if (length(invalid_2) > 0){
+      criteria_b[c(invalid_2, invalid_2+1)] <- T
+    }
   }
   
   w_subj_keep[criteria_a | criteria_b] <- "Implausible"
@@ -140,7 +145,7 @@ for (i in unique(df$subjid)){
   
   # possible removal of height/weights by bmi
   # x = height, y = weight
-  comb_df <- merge(h_df, w_df, by = "age_years", all = T)
+  comb_df <- merge(h_subj_df, w_subj_df, by = "age_years", all = T)
   # remove ones that don't match
   comb_df <- comb_df[complete.cases(comb_df),]
   # also remove ones that are not plausible
@@ -165,12 +170,12 @@ for (i in unique(df$subjid)){
       h_subj_reason[as.character(comb_df$id.x)] <- comb_df$tot_reason
     
     # subset height and weight data
-    rownames(w_subj_df) <- w_subj_df$id
-    w_subj_df[as.character(comb_df$id.y),] <- 
-      w_subj_df[as.character(comb_df$id.y),][comb_df$tot_res == "Include",]
-    rownames(h_subj_df) <- h_subj_df$id
-    h_subj_df[as.character(comb_df$id.x),] <- 
-      h_subj_df[as.character(comb_df$id.x),][comb_df$tot_res == "Include",]
+    w_subj_df[unique(as.character(comb_df$id.y)),] <- 
+      w_subj_df[unique(as.character(comb_df$id.y)),][
+        comb_df$tot_res[!duplicated(comb_df$id.y)] == "Include",]
+    h_subj_df[unique(as.character(comb_df$id.x)),] <- 
+      h_subj_df[unique(as.character(comb_df$id.x)),][
+        comb_df$tot_res[!duplicated(comb_df$id.x)] == "Include",]
   }
   
   # 2, remove erroneous values based on SD ----
@@ -182,11 +187,14 @@ for (i in unique(df$subjid)){
   # SD was greater than 10% of the mean.
   step <- "2w, W compare difference from average to SD"
   
-  criteria <- remove_diff_from_sd(w_subj_df, .1)
-  
-  w_subj_keep[w_subj_df$id[criteria]] <- "Implausible"
-  w_subj_reason[w_subj_df$id[criteria]] <- paste0("Erroneous, Step ", step)
-  w_subj_df <- w_subj_df[!criteria,]
+  # to compute standard deviation, you need at least 2 plausible values
+  if (nrow(w_subj_df) > 1){
+    criteria <- remove_diff_from_sd(w_subj_df, .1)
+    
+    w_subj_keep[as.character(w_subj_df$id[criteria])] <- "Implausible"
+    w_subj_reason[as.character(w_subj_df$id[criteria])] <- paste0("Erroneous, Step ", step)
+    # do not need to update the weight df, since it's not used again
+  }
   
   # 2h, H compare difference from average to SD ----
   # 2h. Exclude any height measurements where: 1) difference between mean height
@@ -194,31 +202,44 @@ for (i in unique(df$subjid)){
   # mean.
   step <- "2h, H compare difference from average to SD"
   
-  criteria <- remove_diff_from_sd(h_subj_df, .025)
-  
   # keep for the next step
   orig_h_subj_df <- h_subj_df
   
-  h_subj_keep[h_subj_df$id[criteria]] <- "Implausible"
-  h_subj_reason[h_subj_df$id[criteria]] <- paste0("Erroneous, Step ", step)
-  h_subj_df <- h_subj_df[!criteria,]
+  # to compute standard deviation, you need at least 2 plausible values
+  if (nrow(h_subj_df) > 1){
+    criteria <- remove_diff_from_sd(h_subj_df, .025)
+    
+    h_subj_keep[as.character(h_subj_df$id[criteria])] <- "Implausible"
+    h_subj_reason[as.character(h_subj_df$id[criteria])] <- paste0("Erroneous, Step ", step)
+    # do not need to update the height df, since it's not used again
+  }
   
   # 3h, H compare difference to SD, with most deviant height dropped ----
   # 3h. Run step 2h again, but with the most deviant height dropped to see if 
   # there are any more implausible values.
   step <- "3h, H compare difference to SD, with most deviant height dropped"
   
-  # find most deviant height
-  avg_h <- mean(orig_h_subj_df$measurement)
-  most_dev <- which.max(
-    sapply(orig_h_subj_df$measurement, function(x){abs(x-avg_h)})
-  )
-  # remove most deviant height and rerun the algorithm
-  orig_h_subj_df <- orig_h_subj_df[-most_dev,]
-  criteria <- remove_diff_from_sd(orig_h_subj_df, .025)
+  # to compute standard deviation, you need at least 2 plausible values
+  if (nrow(orig_h_subj_df) > 1){
+    # find most deviant height
+    avg_h <- mean(orig_h_subj_df$measurement)
+    most_dev <- which.max(
+      sapply(orig_h_subj_df$measurement, function(x){abs(x-avg_h)})
+    )
+    # remove most deviant height and rerun the algorithm
+    orig_h_subj_df <- orig_h_subj_df[-most_dev,]
+    criteria <- remove_diff_from_sd(orig_h_subj_df, .025)
+    
+    h_subj_keep[as.character(orig_h_subj_df$id[criteria])] <- "Implausible"
+    h_subj_reason[as.character(orig_h_subj_df$id[criteria])] <- 
+      paste0("Erroneous, Step ", step)
+    # do not need to update the height df, since it's not used again
+  }
   
-  h_subj_keep[orig_h_subj_df$id[criteria]] <- "Implausible"
-  h_subj_reason[orig_h_subj_df$id[criteria]] <- paste0("Erroneous, Step ", step)
-  h_subj_df[orig_h_subj_df$id,] <- h_subj_df[orig_h_subj_df$id,][!criteria,]
+  # add results to full dataframe ----
   
+  df[as.character(names(w_subj_keep)), "result"] <- w_subj_keep
+  df[as.character(names(w_subj_reason)), "reason"] <- w_subj_reason
+  df[as.character(names(h_subj_keep)), "result"] <- h_subj_keep
+  df[as.character(names(h_subj_reason)), "reason"] <- h_subj_reason
 }
