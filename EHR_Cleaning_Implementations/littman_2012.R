@@ -198,9 +198,9 @@ littman_clean_both <- function(df){
     # 2. Remove erroneous values that have large standard deviations.
     
     # 2w, W compare difference from average to SD ----
-    # 2w. Exclude any weight measurements where: 1) difference between mean weight
-    # and recorded weight was greater than the standard deviation (SD) AND 2) the 
-    # SD was greater than 10% of the mean.
+    # 2w. Exclude any weight measurements where: 1) difference between mean
+    # weight and recorded weight was greater than the standard deviation (SD) 
+    # AND 2) the SD was greater than 10% of the mean.
     step <- "2w, W compare difference from average to SD"
     
     # to compute standard deviation, you need at least 2 plausible values
@@ -213,9 +213,9 @@ littman_clean_both <- function(df){
     }
     
     # 2h, H compare difference from average to SD ----
-    # 2h. Exclude any height measurements where: 1) difference between mean height
-    # and recorded height was greater than SD AND 2) SD was greater than 2.5% of 
-    # mean.
+    # 2h. Exclude any height measurements where: 1) difference between 
+    # mean height and recorded height was greater than SD AND 2) SD was greater
+    # than 2.5% of mean.
     step <- "2h, H compare difference from average to SD"
     
     # keep for the next step
