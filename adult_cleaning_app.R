@@ -39,7 +39,7 @@ sourceDir("EHR_Cleaning_Implementations")
 
 # supporting data ----
 
-methods_avail <- c("muthalagu", "cheng", "chan")
+methods_avail <- c("muthalagu", "cheng", "chan", "littman")
 
 # types cleaned for each method
 m_types <- list(
@@ -49,7 +49,8 @@ m_types <- list(
 
 methods_func <- list(muthalagu_clean_ht,
                      cheng_clean_both,
-                     chan_clean_both)
+                     chan_clean_both,
+                     littman_clean_both)
 names(methods_func) <- methods_avail
 
 # capitalize first letter of words, from ?toupper, edited to handle vector
@@ -262,12 +263,12 @@ plot_cleaned <- function(cleaned_df, type, subj,
   # maps for configuring ggplot
   color_map <- c(
     "Include" = "#000000",
-    "Implausible" = "#e62315"
+    "Implausible" = "#ff9900"
   )
   
   shape_map <- c(
     "Include" = 16,
-    "Implausible" = 15
+    "Implausible" = 25
   )
   
   type_map <- c(
@@ -278,6 +279,9 @@ plot_cleaned <- function(cleaned_df, type, subj,
   # subset the data to the subject, type, and methods we care about
   # also create necessary counts for plotting and such
   clean_df <- sub_subj_type(cleaned_df, type, subj, methods_chosen)
+  
+  # get the possible methods for this type
+  m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
   
   if (nrow(clean_df) == 0){
     if (legn){
@@ -377,7 +381,9 @@ plot_cleaned <- function(cleaned_df, type, subj,
       scale_shape_manual("Result", values = shape_map, breaks = names(shape_map))+
       scale_size(
         "Count Implausible", 
-        range = c(1,3), limits = c(1,3), breaks = c(1:3)
+        range = c(1,length(m_for_type)), 
+        limits = c(1,length(m_for_type)), 
+        breaks = c(1:length(m_for_type))
       )+
       ylim(yaxis_lim)+
       theme(plot.title = element_text(hjust = .5))+
@@ -660,7 +666,7 @@ ui <- navbarPage(
               width = 6,
               HTML(
                 "<center><h3>Welcome to the Adult EHR Cleaning Application!</h3></center><p>",
-                "This application seeks to compare different methods of cleaning adult EHR data, implementing a variety of methods. This currently includes Muthalagu, et al., Cheng, et al., and Chan, et al. To find out more about these methods, please click on their respective tabs. More to come soon!<p>",
+                "This application seeks to compare different methods of cleaning adult EHR data, implementing a variety of methods. This currently includes Muthalagu, et al., Cheng, et al., Chan, et al., and Littman, et al. To find out more about these methods, please click on their respective tabs. More to come soon!<p>",
                 "To start, you'll begin by uploading your data in the sidebar under the 'Compare' tab. This data should be a CSV in the following format:"
               ),
               dataTableOutput("dat_example"),
@@ -727,7 +733,7 @@ ui <- navbarPage(
                 "<b>Step 2h, H compare difference from average to SD</b><br>",
                 "<ul><li>Exclude height if a) absolute difference between that height and average height > standard deviation (SD) AND b) SD > 2.5% of average height.</li></ul>",
                 "<b>Step 1w, W BIV</b><br>",
-                "<ul><li>Remove biologically implausible weight records. Heights are biologically implausible if less than 24.9 kg or greater than 453.6 kg.</li></ul>",
+                "<ul><li>Remove biologically implausible weight records. Weights are biologically implausible if less than 24.9 kg or greater than 453.6 kg.</li></ul>",
                 "<b>Step 2w, W compare difference from average to range or SD</b><br>",
                 "<ul><li>Weight was determined to be inaccurate if: a) the range was > 22.7 kg AND absolute difference between recorded weight and avg weight was > 70% of range OR b) SD was >20% of the average weight AND absolute difference between that weight and average weight > the SD.</li></ul>",
                 "<b>Step 3, BMI BIV</b><br>",
@@ -756,11 +762,44 @@ ui <- navbarPage(
                 "<b>Step 2h, H check SD away from mean</b><br>",
                 "<ul><li>Exclude heights that were greater than 3 standard deviations from the mean.</li></ul>",
                 "<b>Step 1w, W BIV</b><br>",
-                "<ul><li>Remove biologically implausible weight records. Heights are biologically implausible if less than 22.7 kg or greater than 340.2 kg.</li></ul>",
+                "<ul><li>Remove biologically implausible weight records. Weights are biologically implausible if less than 22.7 kg or greater than 340.2 kg.</li></ul>",
                 "<b>Step 2w, W BMI BIV</b><br>",
                 "<ul><li>Calculate BMI based on average height for all weight records, then remove biologically implausible weights. BMIs are biologically implausible if less than 10 or greater than 100.</li></ul>",
                 "<b>Step 3w, W check SD away from mean</b><br>",
                 "<ul><li>Exclude weights that were greater than 3 standard deviations from the mean.</li></ul>"
+              )
+            ),
+            column(width = 3)
+          )
+        ),
+        tabPanel(
+          "Littman, et al. (2012)",
+          fluidRow(
+            column(width = 3),
+            column(
+              width = 6,
+              HTML(
+                "<h3>Littman, et al. (2012)</h3>",
+                "<h4>Cleans: Height and Weight Records</h4><p>",
+                "Littman, et al. aims to assess the reach and effectiveness of the MOVE! study on veteran obesity, and in doing so, decides implausible values based on comparing standard deviations to means and differences between records and means. More information on this method can be found <a href='https://www.cdc.gov/pcd/issues/2012/11_0267.htm' target = 'blank'>here</a>. Steps for this method, along with their titles (used in output) and descriptions, are below.<p>"
+              ),
+              hr(),
+              HTML(
+                "<h4>Steps:</h4>",
+                "<b>Step 1h, H BIV</b><br>",
+                "<ul><li>Remove biologically implausible height records. Heights are biologically implausible if less than 49 in (124.46 cm) or greater than 94 in (238.76 cm).</li></ul>",
+                "<b>Step 1wa, W BIV cutoffs</b><br>",
+                "<ul><li>Remove biologically implausible weight records. Weights are biologically implausible if less than 75 lbs (34.0194 kg) or greater than 600 lbs (272.1552 kg).</li></ul>",
+                "<b>Step 1wb, W BIV rate change</b><br>",
+                "<ul><li>Remove biologically implausible weight records based on rate of weight change over time. Weights are biologically implausible if the weight change per week is greater than 2 lbs (0.907184 kg) and greater than 50 lbs (22.6796 kg) overall, OR the rate of weight change is greater than 100 lbs (45.3592 kg).</li></ul>",
+                "<b>Step 1bmi, BMI BIV</b><br>",
+                "<ul><li>Remove biologically implausible BMI records. If BMI for a given set of height/weights is > 80, deem implausible.</li></ul>",
+                "<b>Step 2w, W compare difference from average to SD</b><br>",
+                "<ul><li>Exclude any weight measurements where: 1) difference between mean weight and recorded weight was greater than the standard deviation (SD) AND 2) the SD was greater than 10% of the mean.</li></ul>",
+                "<b>Step 2h, H compare difference from average to SD</b><br>",
+                "<ul><li>Exclude any height measurements where: 1) difference between mean height and recorded height was greater than SD AND 2) SD was greater than 2.5% of mean.</li></ul>",
+                "<b>3h, H compare difference to SD, with most deviant height dropped</b><br>",
+                "<ul><li>Run step 2h again, but with the most deviant height dropped to see if there are any more implausible values.</li></ul>"
               )
             ),
             column(width = 3)
@@ -1020,7 +1059,7 @@ server <- function(input, output, session) {
     local({
       my_m <- m
       output[[paste0("method", my_m)]] <- renderPlotly({
-        if (my_m <= length(methods_chosen)){
+        if (my_m <= length(methods_chosen$m)){
           plot_cleaned(cleaned_df$sub, input$method_indiv_type,
                        input$subj, 
                        methods_chosen$m[my_m],
