@@ -263,12 +263,12 @@ plot_cleaned <- function(cleaned_df, type, subj,
   # maps for configuring ggplot
   color_map <- c(
     "Include" = "#000000",
-    "Implausible" = "#e62315"
+    "Implausible" = "#ff9900"
   )
   
   shape_map <- c(
     "Include" = 16,
-    "Implausible" = 15
+    "Implausible" = 25
   )
   
   type_map <- c(
@@ -279,6 +279,9 @@ plot_cleaned <- function(cleaned_df, type, subj,
   # subset the data to the subject, type, and methods we care about
   # also create necessary counts for plotting and such
   clean_df <- sub_subj_type(cleaned_df, type, subj, methods_chosen)
+  
+  # get the possible methods for this type
+  m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
   
   if (nrow(clean_df) == 0){
     if (legn){
@@ -378,7 +381,9 @@ plot_cleaned <- function(cleaned_df, type, subj,
       scale_shape_manual("Result", values = shape_map, breaks = names(shape_map))+
       scale_size(
         "Count Implausible", 
-        range = c(1,3), limits = c(1,3), breaks = c(1:3)
+        range = c(1,length(m_for_type)), 
+        limits = c(1,length(m_for_type)), 
+        breaks = c(1:length(m_for_type))
       )+
       ylim(yaxis_lim)+
       theme(plot.title = element_text(hjust = .5))+
