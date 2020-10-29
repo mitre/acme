@@ -36,8 +36,8 @@ for (i in unique(df$subjid)){
 
   subj_df <- h_df
   
-  # convert all heights to inches
-  subj_df$measurement <- subj_df$measurement/2.54
+  # convert all heights to inches (round to nearest inch)
+  subj_df$measurement <- round(subj_df$measurement/2.54)
 
   # 1h, H BIV ----
   # 1h. remove biologically implausible height records
@@ -52,6 +52,29 @@ for (i in unique(df$subjid)){
   # add results to full dataframe
   df[names(subj_keep), "result"] <- subj_keep
   df[names(subj_reason), "reason"] <- subj_reason
+  
+  # then do weight ----
+  
+  w_df <- df[df$param == "WEIGHTKG" & slog,]
+  
+  subj_keep <- rep("Include", nrow(w_df))
+  subj_reason <- rep("", nrow(w_df))
+  names(subj_keep) <- names(subj_reason) <- w_df$id
+  
+  subj_df <- w_df
+  
+  # convert all weights to lbs (round to nearest hundreth pound)
+  subj_df$measurement <- round(subj_df$measurement*2.20462, 2)
+  
+  # 1w, W BIV ----
+  # 1w. remove biologically impossible weight records
+  step <- "1w, W BIV"
+  
+  criteria <- remove_biv(subj_df, "weight", biv_df)
+  subj_keep[criteria] <- "Implausible"
+  subj_reason[criteria] <- paste0("Implausible, Step ",step)
+  
+  subj_df <- subj_df[!criteria,]
 
 }
 
