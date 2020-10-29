@@ -46,8 +46,6 @@ for (i in unique(df$subjid)){
   criteria <- remove_biv(subj_df, "height", biv_df)
   subj_keep[criteria] <- "Implausible"
   subj_reason[criteria] <- paste0("Missing, Step ",step)
-
-  subj_df <- subj_df[!criteria,]
   
   # add results to full dataframe
   df[names(subj_keep), "result"] <- subj_keep
@@ -72,9 +70,50 @@ for (i in unique(df$subjid)){
   
   criteria <- remove_biv(subj_df, "weight", biv_df)
   subj_keep[criteria] <- "Implausible"
-  subj_reason[criteria] <- paste0("Implausible, Step ",step)
+  subj_reason[criteria] <- paste0("Missing, Step ",step)
   
   subj_df <- subj_df[!criteria,]
+  
+  # you need at least 3 measurements to compute this
+  if (nrow(subj_df) > 3){
+    # 2w, W compare weight trajectory ratios ----
+    # 2w. Compute ratios of weight trajectories (ratio 1: current/prior, ratio 2:
+    # current/next). Compute indicator variables based on the ratios:
+    # - ratio <= .67 -> indicator = -1
+    # - ratio <= 1.50 -> indicator = 1
+    # - else indicator = 0
+    # Exclude if both ratios are -1 OR both ratios are 1.
+    
+    # by default, end values are included, I guess -- you can't compute both 
+    # ratios
+    
+    # sort by age
+    subj_df <- subj_df[order(subj_df$age_years),]
+    
+    # compute ratios
+    ratio_1 <- sapply(2:(nrow(subj_df)-1), function(x){
+      subj_df$measurement[x]/subj_df$measurement[x-1]
+    })
+    ratio_2 <- sapply(2:(nrow(subj_df)-1), function(x){
+      subj_df$measurement[x]/subj_df$measurement[x+1]
+    })
+    
+    # compute ratio indicators
+    rind_1 <- rep(0, length(ratio_1))
+    rind_1[ratio_1 <= .67] <- -1
+    rind_1[ratio_1 >= 1.5] <- 1
+    rind_2 <- rep(0, length(ratio_2))
+    rind_2[ratio_2 <= .67] <- -1
+    rind_2[ratio_2 >= 1.5] <- 1
+    
+    # criteria to remove
+    criteria <- (rind_1 == -1 & rind_2 == -1) | (rind_1 == 1 & rind_2 == 1)
+    subj_keep[as.character(subj_df$id[2:(nrow(subj_df)-1)])][criteria] <-
+      "Implausible"
+    subj_reason[as.character(subj_df$id[2:(nrow(subj_df)-1)])][criteria] <- 
+      paste0("Missing, Step ",step)
+    
+  }
 
 }
 
