@@ -39,7 +39,7 @@ sourceDir("EHR_Cleaning_Implementations")
 
 # supporting data ----
 
-methods_avail <- c("muthalagu", "cheng", "chan", "littman")
+methods_avail <- c("muthalagu", "cheng", "chan", "littman", "breland")
 
 # types cleaned for each method
 m_types <- list(
@@ -50,7 +50,8 @@ m_types <- list(
 methods_func <- list(muthalagu_clean_ht,
                      cheng_clean_both,
                      chan_clean_both,
-                     littman_clean_both)
+                     littman_clean_both,
+                     breland_clean_both)
 names(methods_func) <- methods_avail
 
 # capitalize first letter of words, from ?toupper, edited to handle vector
@@ -1030,7 +1031,7 @@ server <- function(input, output, session) {
   # set up a grid to plot each individual
   output$method_subj_plots <- renderUI({
     nc <- 2
-    nr <- ceiling(length(methods_chosen)/2)
+    nr <- ceiling(length(methods_chosen$m)/nc)
     
     vert_list <- lapply(1:nr, function(r){
       fluidRow(
