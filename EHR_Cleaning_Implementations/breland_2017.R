@@ -45,9 +45,13 @@ for (i in unique(df$subjid)){
 
   criteria <- remove_biv(subj_df, "height", biv_df)
   subj_keep[criteria] <- "Implausible"
-  subj_reason[criteria] <- paste0("Implausible, Step ",step)
+  subj_reason[criteria] <- paste0("Missing, Step ",step)
 
   subj_df <- subj_df[!criteria,]
+  
+  # add results to full dataframe
+  df[names(subj_keep), "result"] <- subj_keep
+  df[names(subj_reason), "reason"] <- subj_reason
 
 }
 
