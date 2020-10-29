@@ -39,7 +39,7 @@ sourceDir("EHR_Cleaning_Implementations")
 
 # supporting data ----
 
-methods_avail <- c("muthalagu", "cheng", "chan", "littman")
+methods_avail <- c("muthalagu", "cheng", "chan", "littman", "breland")
 
 # types cleaned for each method
 m_types <- list(
@@ -50,7 +50,8 @@ m_types <- list(
 methods_func <- list(muthalagu_clean_ht,
                      cheng_clean_both,
                      chan_clean_both,
-                     littman_clean_both)
+                     littman_clean_both,
+                     breland_clean_both)
 names(methods_func) <- methods_avail
 
 # capitalize first letter of words, from ?toupper, edited to handle vector
@@ -358,9 +359,40 @@ plot_cleaned <- function(cleaned_df, type, subj,
       )
     }
   
+  p <- ggplot()
+  
+  p <- p +
+    if (single){
+      ggtitle(paste0("Method: ", simpleCap(methods_chosen)))
+    } else {
+      ggtitle(paste0("Subject: ", subj))
+    }
+  
+  if (show_fit_line){
+    p <- p +
+      geom_line(data = bf_df, 
+                aes(x = age_years, y = best_fit), 
+                size = 1, linetype = "longdash", 
+                color = "#3F8FB4")+
+      scale_x_continuous(expand = expansion(mult = c(0,0)))
+      
+  }
+  
+  if (show_sd_shade){
+    p <- p +
+      geom_ribbon(
+        data = bf_df, 
+        aes(x = age_years, ymin = min_sd1, ymax = max_sd1),
+        fill = "#74B9DF", alpha = .5)+ # grey70 old
+      geom_ribbon(
+        data = bf_df, 
+        aes(x = age_years,  ymin = min_sd2, ymax = max_sd2), 
+        fill = "#74B9DF", alpha = .2)
+  }
+  
   # make the scatter plot (applies in all situations)
   p <- suppressWarnings(
-    ggplot()+
+    p +
       geom_point(
         data = clean_df, 
         aes(
@@ -392,34 +424,6 @@ plot_cleaned <- function(cleaned_df, type, subj,
       NULL
   )
   
-  p <- p +
-    if (single){
-      ggtitle(paste0("Method: ", simpleCap(methods_chosen)))
-    } else {
-      ggtitle(paste0("Subject: ", subj))
-    }
-  
-  if (show_fit_line){
-    p <- p +
-      geom_line(data = bf_df, 
-                aes(x = age_years, y = best_fit), 
-                size = 1, linetype = "longdash")+
-      scale_x_continuous(expand = expansion(mult = c(0,0)))
-      
-  }
-  
-  if (show_sd_shade){
-    p <- p +
-      geom_ribbon(
-        data = bf_df, 
-        aes(x = age_years, ymin = min_sd1, ymax = max_sd1),
-        fill = "grey70", alpha = .5)+
-      geom_ribbon(
-        data = bf_df, 
-        aes(x = age_years,  ymin = min_sd2, ymax = max_sd2), 
-        fill = "grey70", alpha = .2)
-  }
-  
   if (legn){
     p <- p +
       theme(legend.position = "bottom",
@@ -432,6 +436,7 @@ plot_cleaned <- function(cleaned_df, type, subj,
     
     return(ggplotly(p, tooltip = c("text")))
   }
+  
 }
 
 # function to generate the summary that appears below individual subject plots
@@ -806,6 +811,38 @@ ui <- navbarPage(
           )
         ),
         tabPanel(
+          "Breland, et al. (2017)",
+          fluidRow(
+            column(width = 3),
+            column(
+              width = 6,
+              HTML(
+                "<h3>Breland, et al. (2017)</h3>",
+                "<h4>Cleans: Height and Weight Records</h4><p>",
+                "Breland, et al. aims to describe the prevalence of obesity among Veteran sub-populations to inform weight management programs, deciding implausible values based on computing biologically implausible values and weight trajectories. More information on this method can be found <a href='https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5359156/' target = 'blank'>here</a>. Steps for this method, along with their titles (used in output) and descriptions, are below.<p>"
+              ),
+              hr(),
+              HTML(
+                "<h4>Steps:</h4>",
+                "<b>Preprocessing Step:</b><br>",
+                "<ul><li>Convert all heights to inches and weights to pounds. Round height to the nearest whole inch. Round weight to the nearest hundreth pound.</li></ul>",
+                "<b>Step 1h, H BIV</b><br>",
+                "<ul><li>Remove biologically implausible height records. Heights are biologically implausible if less than 48 in or greater than 84 in.</li></ul>",
+                "<b>Step 1w, W BIV</b><br>",
+                "<ul><li>Remove biologically implausible weight records. Weights are biologically implausible if less than 75 lbs or greater than 700 lbs.</li></ul>",
+                "<b>Step 2w, W compare weight trajectory ratios</b><br>",
+                "<ul><li>Compute ratios of weight trajectories (ratio 1: current record/prior record, ratio 2: current record/next record). Compute indicator variables based on the ratios:<ul>
+                <li>if ratio <= .67, indicator = -1</li>
+                <li>if ratio <= 1.50, indicator = 1</li>
+                <li>else, indicator = 0</li></ul>
+                Set record to missing if both ratios are -1 OR both ratios are 1.</li></ul>",
+                "</ul>"
+              )
+            ),
+            column(width = 3)
+          )
+        ),
+        tabPanel(
           "About Synthetic Data",
           fluidRow(
             column(width = 3),
@@ -1026,7 +1063,7 @@ server <- function(input, output, session) {
   # set up a grid to plot each individual
   output$method_subj_plots <- renderUI({
     nc <- 2
-    nr <- ceiling(length(methods_chosen)/2)
+    nr <- ceiling(length(methods_chosen$m)/nc)
     
     vert_list <- lapply(1:nr, function(r){
       fluidRow(
