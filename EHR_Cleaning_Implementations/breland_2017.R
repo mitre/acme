@@ -112,9 +112,12 @@ for (i in unique(df$subjid)){
       "Implausible"
     subj_reason[as.character(subj_df$id[2:(nrow(subj_df)-1)])][criteria] <- 
       paste0("Missing, Step ",step)
-    
   }
-
+  
+  
+  # add results to full dataframe
+  df[names(subj_keep), "result"] <- subj_keep
+  df[names(subj_reason), "reason"] <- subj_reason
 }
 
 return(df)
