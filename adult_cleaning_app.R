@@ -358,9 +358,40 @@ plot_cleaned <- function(cleaned_df, type, subj,
       )
     }
   
+  p <- ggplot()
+  
+  p <- p +
+    if (single){
+      ggtitle(paste0("Method: ", simpleCap(methods_chosen)))
+    } else {
+      ggtitle(paste0("Subject: ", subj))
+    }
+  
+  if (show_fit_line){
+    p <- p +
+      geom_line(data = bf_df, 
+                aes(x = age_years, y = best_fit), 
+                size = 1, linetype = "longdash", 
+                color = "#3F8FB4")+
+      scale_x_continuous(expand = expansion(mult = c(0,0)))
+      
+  }
+  
+  if (show_sd_shade){
+    p <- p +
+      geom_ribbon(
+        data = bf_df, 
+        aes(x = age_years, ymin = min_sd1, ymax = max_sd1),
+        fill = "#74B9DF", alpha = .5)+ # grey70 old
+      geom_ribbon(
+        data = bf_df, 
+        aes(x = age_years,  ymin = min_sd2, ymax = max_sd2), 
+        fill = "#74B9DF", alpha = .2)
+  }
+  
   # make the scatter plot (applies in all situations)
   p <- suppressWarnings(
-    ggplot()+
+    p +
       geom_point(
         data = clean_df, 
         aes(
@@ -392,34 +423,6 @@ plot_cleaned <- function(cleaned_df, type, subj,
       NULL
   )
   
-  p <- p +
-    if (single){
-      ggtitle(paste0("Method: ", simpleCap(methods_chosen)))
-    } else {
-      ggtitle(paste0("Subject: ", subj))
-    }
-  
-  if (show_fit_line){
-    p <- p +
-      geom_line(data = bf_df, 
-                aes(x = age_years, y = best_fit), 
-                size = 1, linetype = "longdash")+
-      scale_x_continuous(expand = expansion(mult = c(0,0)))
-      
-  }
-  
-  if (show_sd_shade){
-    p <- p +
-      geom_ribbon(
-        data = bf_df, 
-        aes(x = age_years, ymin = min_sd1, ymax = max_sd1),
-        fill = "grey70", alpha = .5)+
-      geom_ribbon(
-        data = bf_df, 
-        aes(x = age_years,  ymin = min_sd2, ymax = max_sd2), 
-        fill = "grey70", alpha = .2)
-  }
-  
   if (legn){
     p <- p +
       theme(legend.position = "bottom",
@@ -432,6 +435,7 @@ plot_cleaned <- function(cleaned_df, type, subj,
     
     return(ggplotly(p, tooltip = c("text")))
   }
+  
 }
 
 # function to generate the summary that appears below individual subject plots
