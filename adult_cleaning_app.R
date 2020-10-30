@@ -39,7 +39,7 @@ sourceDir("EHR_Cleaning_Implementations")
 
 # supporting data ----
 
-methods_avail <- c("muthalagu", "cheng", "chan", "littman", "breland")
+methods_avail <- c("muthalagu", "cheng", "chan", "littman", "breland", "growthcleanr-naive")
 
 # types cleaned for each method
 m_types <- list(
@@ -51,7 +51,8 @@ methods_func <- list(muthalagu_clean_ht,
                      cheng_clean_both,
                      chan_clean_both,
                      littman_clean_both,
-                     breland_clean_both)
+                     breland_clean_both,
+                     growthcleanr_clean_both)
 names(methods_func) <- methods_avail
 
 # capitalize first letter of words, from ?toupper, edited to handle vector
