@@ -150,4 +150,53 @@ for (i in unique(df$subjid)){
   # add results to full dataframe
   df[names(subj_keep), "result"] <- subj_keep
   df[names(subj_reason), "reason"] <- subj_reason
+  
+  # then do weight ----
+  
+  w_df <- df[df$param == "WEIGHTKG" & slog,]
+  
+  subj_keep <- rep("Include", nrow(w_df))
+  subj_reason <- rep("", nrow(w_df))
+  names(subj_keep) <- names(subj_reason) <- w_df$id
+  
+  subj_df <- w_df
+  
+  # 1w, W calculate ewma ----
+  # 1w. do some ewma calc
+  step <- "1w, W calculate ewma"
+  
+  # convert age years to days
+  subj_df$age_days <- subj_df$age_years*365.2425
+  
+  # sort by age
+  subj_df <- subj_df[order(subj_df$age_days),]
+  
+  # calculate z-scores (based on the single person)
+  if (nrow(subj_df) >= 3 & sd(subj_df$measurement) > 0){
+    subj_df$z <- (subj_df$measurement - mean(subj_df$measurement))/
+      sd(subj_df$measurement)
+    
+    # calculate ewma
+    ewma_res <- ewma(subj_df$age_days, subj_df$z)
+    
+    # all three need to be beyond a cutoff for exclusion
+    
+    # exclude the most extreme, then recalculate again and again
+    # this might have to be adjusted for adults
+    dewma <- abs(ewma_res-subj_df$z)
+    colnames(dewma) <- paste0("d",colnames(ewma_res))
+    
+    criteria <- 
+      (dewma$dewma.all > 3.5 & 
+         dewma$dewma.before > 3 & 
+         dewma$dewma.after > 3 & 
+         abs(subj_df$z) > 3.5)
+    
+    subj_keep[criteria] <- "Implausible"
+    subj_reason[criteria] <- paste0("Implausible, Step ",step)
+  }
+  
+  # add results to full dataframe
+  df[names(subj_keep), "result"] <- subj_keep
+  df[names(subj_reason), "reason"] <- subj_reason
 }
