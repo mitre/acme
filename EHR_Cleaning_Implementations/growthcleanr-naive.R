@@ -4,7 +4,8 @@
 
 # paper: https://academic.oup.com/jamia/article/24/6/1080/3767271
 
-# THIS IS GOING TO BE A MORE ITERATIVE IMPLEMENTATION
+# This is more of a speculative implementation.
+# Note: this could be more clean/optimized.
 
 # supporting functions for this implementation only ----
 
@@ -93,8 +94,52 @@ ewma <- function(agedays, z, ewma.exp = 1.5, ewma.adjacent = T) {
       data.frame(ewma.all))
 }
 
-# implement growthcleanr-naive ----
+# Function to remove data based on exponentially-weighted moving average 
+# (Daymont, et al.). Cutoff defaults adjusted downwards for adults.
+# inputs:
+# subj_df: subject data frame, which has age in days and z-score
+# ewma_cutoff: EWMA past which considered invalid (center value). left and right
+#   are .5 less.
+remove_ewma <- function(subj_df, ewma_cutoff = 2){
+  orig_subj_df <- subj_df
+  
+  # all three need to be beyond a cutoff for exclusion
+  # exclude the most extreme, then recalculate again and again
+  rem_ids <- c()
+  change <- T
+  while (change){
+    # calculate ewma
+    ewma_res <- ewma(subj_df$age_days, subj_df$z)
+    
+    dewma <- abs(ewma_res-subj_df$z)
+    colnames(dewma) <- paste0("d",colnames(ewma_res))
+    
+    criteria_new <- 
+      (dewma$dewma.all > ewma_cutoff & 
+         dewma$dewma.before > ewma_cutoff - .5 & 
+         dewma$dewma.after > ewma_cutoff - .5 & 
+         abs(subj_df$z) > ewma_cutoff)
+    
+    if (all(!criteria_new)){
+      # if none of them are to be removed
+      change <- F
+    } else {
+      # figure out the most extreme value and remove it and rerun
+      to_rem <- which.max(abs(dewma$dewma.all)[criteria_new])
+      # keep the ids that failed and remove
+      rem_ids[length(rem_ids)+1] <- subj_df[criteria_new,][to_rem, "id"]
+      subj_df <- subj_df[subj_df$id != rem_ids[length(rem_ids)],]
+    }
+  }
+  
+  # form results into a logical vector
+  criteria <- rep(F, nrow(subj_df))
+  criteria[orig_subj_df$id %in% rem_ids] <- T
+  
+  return(criteria)
+}
 
+# implement growthcleanr-naive ----
 
 # function to clean height and weight data by Daymont, et al.
 # inputs:
@@ -133,7 +178,10 @@ growthcleanr_clean_both <- function(df){
     subj_df <- h_df
     
     # 1h, H calculate ewma ----
-    # 1h. do some ewma calc
+    # 1h. Exclude extreme errors by calculating the exponentially weighted 
+    # moving average and removing by a specified cutoff. If record(s) is/are 
+    # found to be extreme, remove the most extreme one and recalculate. Repeat
+    # until this no more values are found to be extreme.
     step <- "1h, H calculate ewma"
     
     # convert age years to days
@@ -147,21 +195,8 @@ growthcleanr_clean_both <- function(df){
       subj_df$z <- (subj_df$measurement - mean(subj_df$measurement))/
         sd(subj_df$measurement)
       
-      # calculate ewma
-      ewma_res <- ewma(subj_df$age_days, subj_df$z)
-      
-      # all three need to be beyond a cutoff for exclusion
-      
-      # exclude the most extreme, then recalculate again and again
-      # this might have to be adjusted for adults
-      dewma <- abs(ewma_res-subj_df$z)
-      colnames(dewma) <- paste0("d",colnames(ewma_res))
-      
-      criteria <- 
-        (dewma$dewma.all > 2 & 
-           dewma$dewma.before > 1.5 & 
-           dewma$dewma.after > 1.5 & 
-           abs(subj_df$z) > 2)
+      # calculate the criteria to remove the ewma
+      criteria <- remove_ewma(subj_df, ewma_cutoff = 2)
       
       subj_keep[criteria] <- "Implausible"
       subj_reason[criteria] <- paste0("Implausible, Step ",step)
@@ -182,7 +217,10 @@ growthcleanr_clean_both <- function(df){
     subj_df <- w_df
     
     # 1w, W calculate ewma ----
-    # 1w. do some ewma calc
+    # 1w. Exclude extreme errors by calculating the exponentially weighted 
+    # moving average and removing by a specified cutoff. If record(s) is/are 
+    # found to be extreme, remove the most extreme one and recalculate. Repeat
+    # until this no more values are found to be extreme.
     step <- "1w, W calculate ewma"
     
     # convert age years to days
@@ -196,21 +234,8 @@ growthcleanr_clean_both <- function(df){
       subj_df$z <- (subj_df$measurement - mean(subj_df$measurement))/
         sd(subj_df$measurement)
       
-      # calculate ewma
-      ewma_res <- ewma(subj_df$age_days, subj_df$z)
-      
-      # all three need to be beyond a cutoff for exclusion
-      
-      # exclude the most extreme, then recalculate again and again
-      # this might have to be adjusted for adults
-      dewma <- abs(ewma_res-subj_df$z)
-      colnames(dewma) <- paste0("d",colnames(ewma_res))
-      
-      criteria <- 
-        (dewma$dewma.all > 2 & 
-           dewma$dewma.before > 1.5 & 
-           dewma$dewma.after > 1.5 & 
-           abs(subj_df$z) > 2)
+      # calculate the criteria to remove the ewma
+      criteria <- remove_ewma(subj_df, ewma_cutoff = 2)
       
       subj_keep[criteria] <- "Implausible"
       subj_reason[criteria] <- paste0("Implausible, Step ",step)
