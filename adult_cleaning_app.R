@@ -306,42 +306,36 @@ plot_cleaned <- function(cleaned_df, type, subj,
   )
   
   # if user wants to show the line fit
-  if (show_fit_line | show_sd_shade){
-    # add best fit line (padded slightly for plotting prettiness)
-    if (show_fit_line){
-      bf_df$best_fit <- 
-        if (calc_fit_w_impl){
-          predict(lm(measurement ~ age_years, clean_df), bf_df)
-        } else {
-          predict(lm(measurement ~ age_years, clean_df, 
-                     subset = clean_df$all_result == "Include"), 
-                  bf_df)
-        }
+  # add best fit line (padded slightly for plotting prettiness)
+  bf_df$best_fit <- 
+    if (calc_fit_w_impl){
+      predict(lm(measurement ~ age_years, clean_df), bf_df)
+    } else {
+      predict(lm(measurement ~ age_years, clean_df, 
+                 subset = clean_df$all_result == "Include"), 
+              bf_df)
     }
+  
+  st_dev <- 
+    if (calc_fit_w_impl){
+      sd(clean_df$measurement)
+    } else {
+      sd(clean_df$measurement[clean_df$all_result == "Include"])
+    }
+  
+  
+  if (show_fit_line){
+    bf_df$min_sd1 <- bf_df$best_fit-st_dev
+    bf_df$max_sd1 <- bf_df$best_fit+st_dev
+    bf_df$min_sd2 <- bf_df$best_fit-(2*st_dev)
+    bf_df$max_sd2 <- bf_df$best_fit+(2*st_dev)
+  } else {
+    bf_df$min_sd1 <- bf_df$measurement_orig-st_dev
+    bf_df$max_sd1 <- bf_df$measurement_orig+st_dev
+    bf_df$min_sd2 <- bf_df$measurement_orig-(2*st_dev)
+    bf_df$max_sd2 <- bf_df$measurement_orig+(2*st_dev)
     
-    if (show_sd_shade){
-      st_dev <- 
-      if (calc_fit_w_impl){
-        sd(clean_df$measurement)
-      } else {
-        sd(clean_df$measurement[clean_df$all_result == "Include"])
-      }
-     
-      
-      if (show_fit_line){
-        bf_df$min_sd1 <- bf_df$best_fit-st_dev
-        bf_df$max_sd1 <- bf_df$best_fit+st_dev
-        bf_df$min_sd2 <- bf_df$best_fit-(2*st_dev)
-        bf_df$max_sd2 <- bf_df$best_fit+(2*st_dev)
-      } else {
-        bf_df$min_sd1 <- bf_df$measurement_orig-st_dev
-        bf_df$max_sd1 <- bf_df$measurement_orig+st_dev
-        bf_df$min_sd2 <- bf_df$measurement_orig-(2*st_dev)
-        bf_df$max_sd2 <- bf_df$measurement_orig+(2*st_dev)
-        
-        bf_df <- bf_df[complete.cases(bf_df),]
-      }
-    }
+    bf_df <- bf_df[complete.cases(bf_df),]
   }
   
   # consider the y range to be, at a minimum, a certain amount around the mean
