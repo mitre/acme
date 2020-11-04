@@ -513,7 +513,7 @@ ui <- navbarPage(
   tabPanel(
     "Compare",
     sidebarLayout(
-      sidebarPanel(
+      sidebarPanel(width = 3,
         HTML("<b>Upload adult EHR data and click the button below to get started!</b> If no data is input, default synthetic data will be used. More information on data format can be found in the \"About\" tab.<p>"),
         fileInput("dat_file", "Upload Data CSV",
                   accept = c(".csv", ".CSV")),
@@ -525,7 +525,7 @@ ui <- navbarPage(
         HTML("<b>Settings for all plots:</b><p>"),
         textAreaInput("subj_focus", 
                       "Enter subjects to focus on (line separated):",
-                      width = "300px",
+                      width = "100%",
                       height = "100px"),
         div(style="display:inline-block",
           actionButton("update_subj", "Update Subjects"),
@@ -577,7 +577,8 @@ ui <- navbarPage(
           value = F
         )
       ),
-      mainPanel(tabsetPanel(
+      mainPanel(width = 9,
+        tabsetPanel(
         tabPanel(
           "Overall",
           fluidRow(
