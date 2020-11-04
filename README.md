@@ -1,6 +1,6 @@
 # Adult growthcleanr Explorer
 
-This application seeks to compare different methods of cleaning adult EHR data, implementing a variety of methods. This currently includes Muthalagu, et al., Cheng, et al., Chan, et al., Littman, et al., and Breland, et al. More to come soon!
+This application seeks to compare different methods of cleaning adult EHR data, implementing a variety of methods. This currently includes Muthalagu, et al., Cheng, et al., Chan, et al., Littman, et al., Breland, et al., and Daymont, et al.
 
 ## README Outline
 
