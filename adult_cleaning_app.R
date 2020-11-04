@@ -117,9 +117,9 @@ plot_hist <- function(t_tab, yval = "Implausible"){
         scale_y_continuous(expand = expansion(mult = c(0,.05))) +
         NULL,
       tooltip = c("x","y")
-    )
+    ) %>% config(displayModeBar = F)
   } else {
-    ggplotly(ggplot()+theme_bw())
+    ggplotly(ggplot()+theme_bw()) %>% config(displayModeBar = F)
   }
 }
 
@@ -289,7 +289,7 @@ plot_cleaned <- function(cleaned_df, type, subj,
     if (legn){
       return(ggplot()+theme_bw())
     } else {
-      return(ggplotly(ggplot()+theme_bw()))
+      return(ggplotly(ggplot()+theme_bw()) %>% config(displayModeBar = F))
     }
   }
   
@@ -435,7 +435,7 @@ plot_cleaned <- function(cleaned_df, type, subj,
     p <- p +
       theme(legend.position = "none")
     
-    return(ggplotly(p, tooltip = c("text")))
+    return(ggplotly(p, tooltip = c("text")) %>% config(displayModeBar = F))
   }
   
 }
@@ -1129,7 +1129,8 @@ server <- function(input, output, session) {
                        input$calc_fit_w_impl, 
                        single = T)
         } else {
-          ggplotly(ggplot()+theme(panel.background = element_blank()))
+          ggplotly(ggplot()+theme(panel.background = element_blank())) %>% 
+            config(displayModeBar = F)
         }
       })
     })
@@ -1177,7 +1178,7 @@ server <- function(input, output, session) {
         ggtitle("Age Distribution")+
         theme(plot.title = element_text(hjust = .5))+
         NULL
-    )
+    ) %>% config(displayModeBar = F)
   })
   
   output$syn_ht_dens <- renderPlotly({
@@ -1192,7 +1193,7 @@ server <- function(input, output, session) {
         ggtitle("Height Distribution")+
         theme(plot.title = element_text(hjust = .5))+
         NULL
-    )
+    ) %>% config(displayModeBar = F)
   })
   
   output$syn_wt_dens <- renderPlotly({
@@ -1207,7 +1208,7 @@ server <- function(input, output, session) {
         ggtitle("Weight Distribution")+
         theme(plot.title = element_text(hjust = .5))+
         NULL
-    )
+    ) %>% config(displayModeBar = F)
   })
   
   output$syn_sex_bar <- renderPlotly({
@@ -1229,7 +1230,7 @@ server <- function(input, output, session) {
         theme(plot.title = element_text(hjust = .5),
               legend.position = "none")+
         NULL
-    )
+    ) %>% config(displayModeBar = F)
   })
 }
 
