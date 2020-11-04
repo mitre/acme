@@ -296,8 +296,8 @@ plot_cleaned <- function(cleaned_df, type, subj,
   bf_df <- data.frame(
     "age_years" = c(
       clean_df$age_years,
-      min(clean_df$age_years)-(diff(range(clean_df$measurement))*.05),
-      max(clean_df$age_years)+(diff(range(clean_df$measurement))*.05)
+      min(clean_df$age_years)-(diff(range(clean_df$age_years))*.05),
+      max(clean_df$age_years)+(diff(range(clean_df$age_years))*.05)
     ),
     "measurement_orig" = c(
       clean_df$measurement,
