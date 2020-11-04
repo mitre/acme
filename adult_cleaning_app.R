@@ -1027,7 +1027,7 @@ server <- function(input, output, session) {
   output$indiv_choose <- renderUI({
     selectInput(
       "subj",
-      label = "Which subject's cleaned data would you like to visualize?",
+      label = HTML("<p style = 'font-weight: normal'><b>Which subject's cleaned data would you like to visualize?</b> Search for subjects by pressing backspace and typing.</p>"),
       choices = 
         if (nrow(cleaned_df$sub) == 0){c()} else {unique(cleaned_df$sub$subjid)}
     )
