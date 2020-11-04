@@ -100,6 +100,8 @@ ewma <- function(agedays, z, ewma.exp = 1.5, ewma.adjacent = T) {
 # subj_df: subject data frame, which has age in days and z-score
 # ewma_cutoff: EWMA past which considered invalid (center value). left and right
 #   are .5 less.
+# outputs:
+#  logical indicating whether to exclude a record
 remove_ewma <- function(subj_df, ewma_cutoff = 2){
   orig_subj_df <- subj_df
   

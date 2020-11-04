@@ -844,6 +844,29 @@ ui <- navbarPage(
           )
         ),
         tabPanel(
+          "Growthcleanr-naive (Daymont, et al. (2017))",
+          fluidRow(
+            column(width = 3),
+            column(
+              width = 6,
+              HTML(
+                "<h3>Growthcleanr-naive (Daymont, et al. (2017))</h3>",
+                "<h4>Cleans: Height and Weight Records</h4><p>",
+                "Daymont, et al. aims to automatically detect implausible values in pediatric electronic health records, deciding implausible values based on cutoffs for exponentially weighted moving averages (EWMA). This implementation is a truncated/more simplified version of this method, only using the EWMA protocol and adjusting the cutoffs for adults. More information on this method can be found <a href='https://academic.oup.com/jamia/article/24/6/1080/3767271' target = 'blank'>here</a>. Steps for this method, along with their titles (used in output) and descriptions, are below.<p>"
+              ),
+              hr(),
+              HTML(
+                "<h4>Steps:</h4>",
+                "<b>Step 1h, H calculate ewma</b><br>",
+                "<ul><li>1h. Exclude extreme errors by calculating the exponentially weighted moving average and removing by a specified cutoff. If record(s) is/are found to be extreme, remove the most extreme one and recalculate. Repeat until this no more values are found to be extreme.</li></ul>",
+                "<b>Step 1w, W calculate ewma</b><br>",
+                "<ul><li>1w. Exclude extreme errors by calculating the exponentially weighted moving average and removing by a specified cutoff. If record(s) is/are found to be extreme, remove the most extreme one and recalculate. Repeat until this no more values are found to be extreme.</li></ul>"
+              )
+            ),
+            column(width = 3)
+          )
+        ),
+        tabPanel(
           "About Synthetic Data",
           fluidRow(
             column(width = 3),
