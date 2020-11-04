@@ -270,7 +270,7 @@ plot_cleaned <- function(cleaned_df, type, subj,
   
   shape_map <- c(
     "Include" = 16,
-    "Implausible" = 25
+    "Implausible" = 17
   )
   
   type_map <- c(
@@ -384,11 +384,11 @@ plot_cleaned <- function(cleaned_df, type, subj,
       geom_ribbon(
         data = bf_df, 
         aes(x = age_years, ymin = min_sd1, ymax = max_sd1),
-        fill = "#74B9DF", alpha = .5)+ # grey70 old
+        fill = "#80C4EA", alpha = .5)+ # grey70 old
       geom_ribbon(
         data = bf_df, 
         aes(x = age_years,  ymin = min_sd2, ymax = max_sd2), 
-        fill = "#74B9DF", alpha = .2)
+        fill = "#80C4EA", alpha = .2)
   }
   
   # make the scatter plot (applies in all situations)
