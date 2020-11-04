@@ -18,6 +18,12 @@ To run this application, please follow the following steps (assuming you have al
 install.packages(c("shiny", "ggplot2", "rstudioapi", "colorspace", "plotly", "viridisLite", "ggplotify"))
 ```
 
+If you are on a Mac, additionally enter:
+
+```{r}
+install.packages("Cairo")
+```
+
 Note that this may ask for some input about updating related packages -- "no" is a fine answer. This may take some time.
 
 4. Open adult_cleaning_app.R, which should be included in the downloaded files from this repository. It should open in the top-left corner RStudio by default.
