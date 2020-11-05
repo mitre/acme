@@ -160,6 +160,14 @@ tab_clean_reason <- function(cleaned_df, type,
       table(cleaned_df[criteria, paste0(m, "_reason")])
       )
     tmp_tab <- tmp_tab[order(tmp_tab$Freq, decreasing = T),]
+    
+    if (length(tmp_tab) == 0){
+      tmp_tab <- data.frame(
+        "Var1" = "",
+        "Freq" = 0
+      )
+    }
+    
     colnames(tmp_tab) <- paste0(simpleCap(m),
                                 c("_Reason", "_Count"))
     tmp_tab$row <- 1:nrow(tmp_tab)
@@ -537,7 +545,8 @@ ui <- navbarPage(
                       height = "100px"),
         div(style="display:inline-block",
           actionButton("update_subj", "Update Subjects"),
-          actionButton("reset_subj", "Reset")
+          actionButton("reset_subj", "Reset"),
+          downloadButton("download_focus", label = "Download Subjects")
         ),
         HTML("<p>"),
         checkboxGroupInput("togg_methods",
@@ -564,6 +573,10 @@ ui <- navbarPage(
         hr(),
         HTML("<b>Settings for individual/individual by method plots:</b><p>"),
         uiOutput("indiv_choose"),
+        div(style="display:inline-block",
+            actionButton("add_subj_focus", "Add Subject to Focus On")
+        ),
+        HTML("<p>"),
         selectInput(
           "method_indiv_type",
           "Choose which parameter to display in individual by method plots:",
@@ -585,6 +598,7 @@ ui <- navbarPage(
           value = F
         )
       ),
+      
       mainPanel(width = 9,
         tabsetPanel(
         tabPanel(
@@ -929,6 +943,10 @@ server <- function(input, output, session) {
     "m" = methods_avail
   )
   
+  subj_focus <- reactiveValues(
+    "subj" = c()
+  )
+  
   # observe button inputs ----
   
   observeEvent(input$run_data, {
@@ -991,12 +1009,39 @@ server <- function(input, output, session) {
   # reset output to include all subjects
   observeEvent(input$reset_subj, {
     cleaned_df$sub <- cleaned_df$full
+    subj_focus$subj <- c()
+    
+    updateTextAreaInput(session,
+                        "subj_focus",
+                        value = "")
   })
   
   # update output to only focus on specified methods
   observeEvent(input$update_methods, {
     methods_chosen$m <- input$togg_methods
   })
+  
+  observeEvent(input$add_subj_focus, {
+    subj_focus$subj[length(subj_focus$subj)+1] <- input$subj
+    
+    updateTextAreaInput(session,
+                        "subj_focus",
+                        value = paste(subj_focus$subj, collapse = "\n"))
+  })
+  
+  output$download_focus <- downloadHandler(
+    filename = function() {
+      if (is.null(input$dat_file)){
+        "Adult_EHR_Cleaning_Subject_Focus_List_Example_Data.csv"
+      } else {
+        paste0("Adult_EHR_Cleaning_Subject_Focus_List_", input$dat_file$name)
+      }
+    },
+    content = function(file) {
+      write.csv(data.frame("Focus.Subjects" = subj_focus$subj),
+                file, row.names = FALSE, na = "")
+    }
+  )
   
   # plot overall results ----
   
