@@ -21,10 +21,10 @@ downloaded/cloned this repository):
 install.packages(c("shiny", "ggplot2", "rstudioapi", "colorspace", "plotly", "viridisLite", "ggplotify"))
 ```
 
-If you are on a Mac, the [Cairo](https://cairographics.org/) graphics library is also
-required. You may need to [download and install
-Cairo](https://cairographics.org/download/). With Cairo installed on your system, for
-R, additionally enter:
+If you are on a Mac, R also requires the `Cairo` package, which itself requires that
+the [XQuartz](https://www.xquartz.org/) package is also installed. You may need to
+download and install XQuartz first, as it does not come with MacOS by default. After
+XQuartz is installed on your system, install `Cairo` in R:
 
 ```{r}
 install.packages("Cairo")
