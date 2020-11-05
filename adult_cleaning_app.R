@@ -117,9 +117,9 @@ plot_hist <- function(t_tab, yval = "Implausible"){
         scale_y_continuous(expand = expansion(mult = c(0,.05))) +
         NULL,
       tooltip = c("x","y")
-    )
+    ) %>% config(displayModeBar = F)
   } else {
-    ggplotly(ggplot()+theme_bw())
+    ggplotly(ggplot()+theme_bw()) %>% config(displayModeBar = F)
   }
 }
 
@@ -160,6 +160,14 @@ tab_clean_reason <- function(cleaned_df, type,
       table(cleaned_df[criteria, paste0(m, "_reason")])
       )
     tmp_tab <- tmp_tab[order(tmp_tab$Freq, decreasing = T),]
+    
+    if (length(tmp_tab) == 0){
+      tmp_tab <- data.frame(
+        "Var1" = "",
+        "Freq" = 0
+      )
+    }
+    
     colnames(tmp_tab) <- paste0(simpleCap(m),
                                 c("_Reason", "_Count"))
     tmp_tab$row <- 1:nrow(tmp_tab)
@@ -270,7 +278,7 @@ plot_cleaned <- function(cleaned_df, type, subj,
   
   shape_map <- c(
     "Include" = 16,
-    "Implausible" = 25
+    "Implausible" = 17
   )
   
   type_map <- c(
@@ -289,15 +297,15 @@ plot_cleaned <- function(cleaned_df, type, subj,
     if (legn){
       return(ggplot()+theme_bw())
     } else {
-      return(ggplotly(ggplot()+theme_bw()))
+      return(ggplotly(ggplot()+theme_bw()) %>% config(displayModeBar = F))
     }
   }
   
   bf_df <- data.frame(
     "age_years" = c(
       clean_df$age_years,
-      min(clean_df$age_years)-(diff(range(clean_df$measurement))*.05),
-      max(clean_df$age_years)+(diff(range(clean_df$measurement))*.05)
+      min(clean_df$age_years)-(diff(range(clean_df$age_years))*.05),
+      max(clean_df$age_years)+(diff(range(clean_df$age_years))*.05)
     ),
     "measurement_orig" = c(
       clean_df$measurement,
@@ -306,42 +314,36 @@ plot_cleaned <- function(cleaned_df, type, subj,
   )
   
   # if user wants to show the line fit
-  if (show_fit_line | show_sd_shade){
-    # add best fit line (padded slightly for plotting prettiness)
-    if (show_fit_line){
-      bf_df$best_fit <- 
-        if (calc_fit_w_impl){
-          predict(lm(measurement ~ age_years, clean_df), bf_df)
-        } else {
-          predict(lm(measurement ~ age_years, clean_df, 
-                     subset = clean_df$all_result == "Include"), 
-                  bf_df)
-        }
+  # add best fit line (padded slightly for plotting prettiness)
+  bf_df$best_fit <- 
+    if (calc_fit_w_impl){
+      predict(lm(measurement ~ age_years, clean_df), bf_df)
+    } else {
+      predict(lm(measurement ~ age_years, clean_df, 
+                 subset = clean_df$all_result == "Include"), 
+              bf_df)
     }
+  
+  st_dev <- 
+    if (calc_fit_w_impl){
+      sd(clean_df$measurement)
+    } else {
+      sd(clean_df$measurement[clean_df$all_result == "Include"])
+    }
+  
+  
+  if (show_fit_line){
+    bf_df$min_sd1 <- bf_df$best_fit-st_dev
+    bf_df$max_sd1 <- bf_df$best_fit+st_dev
+    bf_df$min_sd2 <- bf_df$best_fit-(2*st_dev)
+    bf_df$max_sd2 <- bf_df$best_fit+(2*st_dev)
+  } else {
+    bf_df$min_sd1 <- bf_df$measurement_orig-st_dev
+    bf_df$max_sd1 <- bf_df$measurement_orig+st_dev
+    bf_df$min_sd2 <- bf_df$measurement_orig-(2*st_dev)
+    bf_df$max_sd2 <- bf_df$measurement_orig+(2*st_dev)
     
-    if (show_sd_shade){
-      st_dev <- 
-      if (calc_fit_w_impl){
-        sd(clean_df$measurement)
-      } else {
-        sd(clean_df$measurement[clean_df$all_result == "Include"])
-      }
-     
-      
-      if (show_fit_line){
-        bf_df$min_sd1 <- bf_df$best_fit-st_dev
-        bf_df$max_sd1 <- bf_df$best_fit+st_dev
-        bf_df$min_sd2 <- bf_df$best_fit-(2*st_dev)
-        bf_df$max_sd2 <- bf_df$best_fit+(2*st_dev)
-      } else {
-        bf_df$min_sd1 <- bf_df$measurement_orig-st_dev
-        bf_df$max_sd1 <- bf_df$measurement_orig+st_dev
-        bf_df$min_sd2 <- bf_df$measurement_orig-(2*st_dev)
-        bf_df$max_sd2 <- bf_df$measurement_orig+(2*st_dev)
-        
-        bf_df <- bf_df[complete.cases(bf_df),]
-      }
-    }
+    bf_df <- bf_df[complete.cases(bf_df),]
   }
   
   # consider the y range to be, at a minimum, a certain amount around the mean
@@ -384,11 +386,11 @@ plot_cleaned <- function(cleaned_df, type, subj,
       geom_ribbon(
         data = bf_df, 
         aes(x = age_years, ymin = min_sd1, ymax = max_sd1),
-        fill = "#74B9DF", alpha = .5)+ # grey70 old
+        fill = "#80C4EA", alpha = .5)+ # grey70 old
       geom_ribbon(
         data = bf_df, 
         aes(x = age_years,  ymin = min_sd2, ymax = max_sd2), 
-        fill = "#74B9DF", alpha = .2)
+        fill = "#80C4EA", alpha = .2)
   }
   
   # make the scatter plot (applies in all situations)
@@ -435,14 +437,15 @@ plot_cleaned <- function(cleaned_df, type, subj,
     p <- p +
       theme(legend.position = "none")
     
-    return(ggplotly(p, tooltip = c("text")))
+    return(ggplotly(p, tooltip = c("text")) %>% config(displayModeBar = F))
   }
   
 }
 
 # function to generate the summary that appears below individual subject plots
 gen_subj_text <- function(cleaned_df, type, subj,
-                          methods_chosen = methods_avail){
+                          methods_chosen = methods_avail,
+                          single = F){
   # subset the data to the subject, type, and methods we care about
   clean_df <- sub_subj_type(cleaned_df, type, subj, methods_chosen)
   
@@ -486,20 +489,33 @@ gen_subj_text <- function(cleaned_df, type, subj,
     reason_text <- paste0(reason_text,"</ul>")
   }
   
-  return(
-    HTML(paste0(
-      "<b>Subject: </b>", subj,"<br>",
-      "<b>Number of Records: </b>", nrow(clean_df),"<br>",
-      "<b>Total Include (by all methods): </b>",
-      sum(clean_df$all_result == "Include"),"<br>",
-      incl_by_method,
-      "<b>Total Implausible (by any method): </b>",
-      sum(clean_df$all_result == "Implausible"),"<br>",
-      impl_by_method,
-      "<b>Reasons for Implausibility: </b><br>",
-      reason_text
-    ))
-  )
+  if (!single){
+    return(
+      HTML(paste0(
+        "<b>Subject: </b>", subj,"<br>",
+        "<b>Number of Records: </b>", nrow(clean_df),"<br>",
+        "<b>Total Include (by all methods): </b>",
+        sum(clean_df$all_result == "Include"),"<br>",
+        incl_by_method,
+        "<b>Total Implausible (by any method): </b>",
+        sum(clean_df$all_result == "Implausible"),"<br>",
+        impl_by_method,
+        "<b>Reasons for Implausibility: </b><br>",
+        reason_text
+      ))
+    )
+  } else {
+    return(
+      HTML(paste0(
+        "<b>Subject: </b>", subj,"<br>",
+        "<b>Number of Records: </b>", nrow(clean_df),"<br>",
+        incl_by_method,
+        impl_by_method,
+        "<b>Reasons for Implausibility: </b><br>",
+        reason_text
+      ))
+    )
+  }
 }
 
 # UI ----
@@ -513,7 +529,7 @@ ui <- navbarPage(
   tabPanel(
     "Compare",
     sidebarLayout(
-      sidebarPanel(
+      sidebarPanel(width = 3,
         HTML("<b>Upload adult EHR data and click the button below to get started!</b> If no data is input, default synthetic data will be used. More information on data format can be found in the \"About\" tab.<p>"),
         fileInput("dat_file", "Upload Data CSV",
                   accept = c(".csv", ".CSV")),
@@ -525,11 +541,12 @@ ui <- navbarPage(
         HTML("<b>Settings for all plots:</b><p>"),
         textAreaInput("subj_focus", 
                       "Enter subjects to focus on (line separated):",
-                      width = "300px",
+                      width = "100%",
                       height = "100px"),
         div(style="display:inline-block",
           actionButton("update_subj", "Update Subjects"),
-          actionButton("reset_subj", "Reset")
+          actionButton("reset_subj", "Reset"),
+          downloadButton("download_focus", label = "Download Subjects")
         ),
         HTML("<p>"),
         checkboxGroupInput("togg_methods",
@@ -556,6 +573,10 @@ ui <- navbarPage(
         hr(),
         HTML("<b>Settings for individual/individual by method plots:</b><p>"),
         uiOutput("indiv_choose"),
+        div(style="display:inline-block",
+            actionButton("add_subj_focus", "Add Subject to Focus On")
+        ),
+        HTML("<p>"),
         selectInput(
           "method_indiv_type",
           "Choose which parameter to display in individual by method plots:",
@@ -577,7 +598,9 @@ ui <- navbarPage(
           value = F
         )
       ),
-      mainPanel(tabsetPanel(
+      
+      mainPanel(width = 9,
+        tabsetPanel(
         tabPanel(
           "Overall",
           fluidRow(
@@ -611,7 +634,7 @@ ui <- navbarPage(
             column(width = 6, style='padding-right: 20px; border-right: 1px solid black',
                    HTML("<h3><center>Height Results</center></h3>"),
                    plotlyOutput("subj_ht"),
-                   plotOutput("subj_legn_ht", height = "20px"),
+                   plotOutput("subj_legn_ht", height = "30px"),
                    HTML("<br>Note: shading indicates standard deviations (SD) away from fit/data (darker for 1 SD, lighter for 2 SD)."),
                    hr(),
                    fluidRow(
@@ -622,7 +645,7 @@ ui <- navbarPage(
             column(width = 6, style = "padding-left: 20px;",
                    HTML("<h3><center>Weight Results</center></h3>"),
                    plotlyOutput("subj_wt"),
-                   plotOutput("subj_legn_wt", height = "20px"),
+                   plotOutput("subj_legn_wt", height = "30px"),
                    HTML("<br>Note: shading indicates standard deviations (SD) away from fit/data (darker for 1 SD, lighter for 2 SD)."),
                    hr(),
                    fluidRow(
@@ -858,9 +881,9 @@ ui <- navbarPage(
               HTML(
                 "<h4>Steps:</h4>",
                 "<b>Step 1h, H calculate ewma</b><br>",
-                "<ul><li>1h. Exclude extreme errors by calculating the exponentially weighted moving average and removing by a specified cutoff. If record(s) is/are found to be extreme, remove the most extreme one and recalculate. Repeat until this no more values are found to be extreme.</li></ul>",
+                "<ul><li>Exclude extreme errors by calculating the exponentially weighted moving average and removing by a specified cutoff. If record(s) is/are found to be extreme, remove the most extreme one and recalculate. Repeat until this no more values are found to be extreme.</li></ul>",
                 "<b>Step 1w, W calculate ewma</b><br>",
-                "<ul><li>1w. Exclude extreme errors by calculating the exponentially weighted moving average and removing by a specified cutoff. If record(s) is/are found to be extreme, remove the most extreme one and recalculate. Repeat until this no more values are found to be extreme.</li></ul>"
+                "<ul><li>Exclude extreme errors by calculating the exponentially weighted moving average and removing by a specified cutoff. If record(s) is/are found to be extreme, remove the most extreme one and recalculate. Repeat until this no more values are found to be extreme.</li></ul>"
               )
             ),
             column(width = 3)
@@ -918,6 +941,10 @@ server <- function(input, output, session) {
   
   methods_chosen <- reactiveValues(
     "m" = methods_avail
+  )
+  
+  subj_focus <- reactiveValues(
+    "subj" = c()
   )
   
   # observe button inputs ----
@@ -982,12 +1009,39 @@ server <- function(input, output, session) {
   # reset output to include all subjects
   observeEvent(input$reset_subj, {
     cleaned_df$sub <- cleaned_df$full
+    subj_focus$subj <- c()
+    
+    updateTextAreaInput(session,
+                        "subj_focus",
+                        value = "")
   })
   
   # update output to only focus on specified methods
   observeEvent(input$update_methods, {
     methods_chosen$m <- input$togg_methods
   })
+  
+  observeEvent(input$add_subj_focus, {
+    subj_focus$subj[length(subj_focus$subj)+1] <- input$subj
+    
+    updateTextAreaInput(session,
+                        "subj_focus",
+                        value = paste(subj_focus$subj, collapse = "\n"))
+  })
+  
+  output$download_focus <- downloadHandler(
+    filename = function() {
+      if (is.null(input$dat_file)){
+        "Adult_EHR_Cleaning_Subject_Focus_List_Example_Data.csv"
+      } else {
+        paste0("Adult_EHR_Cleaning_Subject_Focus_List_", input$dat_file$name)
+      }
+    },
+    content = function(file) {
+      write.csv(data.frame("Focus.Subjects" = subj_focus$subj),
+                file, row.names = FALSE, na = "")
+    }
+  )
   
   # plot overall results ----
   
@@ -1026,7 +1080,7 @@ server <- function(input, output, session) {
   output$indiv_choose <- renderUI({
     selectInput(
       "subj",
-      label = "Which subject's cleaned data would you like to visualize?",
+      label = HTML("<p style = 'font-weight: normal'><b>Which subject's cleaned data would you like to visualize?</b> Search for subjects by pressing backspace and typing.</p>"),
       choices = 
         if (nrow(cleaned_df$sub) == 0){c()} else {unique(cleaned_df$sub$subjid)}
     )
@@ -1093,16 +1147,23 @@ server <- function(input, output, session) {
       fluidRow(
         width = 12,
         column(
-          style='border-right: 1px solid black',
+          style='padding-right: 20px; border-right: 1px solid black',
           width = 6,
           plotlyOutput(paste0("method", (r*2)-1)),
-          uiOutput(paste0("method_text", (r*2)-1)),
+          fluidRow(
+            style = "border: 1px #e3e3e3; border-style: solid; border-radius: 10px; background: #f5f5f5; padding: 10px;",
+            uiOutput(paste0("method_text", (r*2)-1))
+          ),
           hr()
         ),
         column(
+          style = "padding-left: 20px;",
           width = 6,
           plotlyOutput(paste0("method", (r*2))),
-          uiOutput(paste0("method_text", (r*2))),
+          fluidRow(
+            style = "border: 1px #e3e3e3; border-style: solid; border-radius: 10px; background: #f5f5f5; padding: 10px;",
+            uiOutput(paste0("method_text", (r*2)))
+          ),
           hr()
         )
       )
@@ -1128,8 +1189,14 @@ server <- function(input, output, session) {
                        input$calc_fit_w_impl, 
                        single = T)
         } else {
-          ggplotly(ggplot()+theme(panel.background = element_blank()))
+          ggplotly(ggplot()+theme(panel.background = element_blank())) %>% 
+            config(displayModeBar = F)
         }
+      })
+      
+      output[[paste0("method_text", my_m)]] <- renderUI({
+        gen_subj_text(cleaned_df$sub, input$method_indiv_type, input$subj,
+                      methods_chosen$m[my_m], single = T)
       })
     })
   }
@@ -1176,7 +1243,7 @@ server <- function(input, output, session) {
         ggtitle("Age Distribution")+
         theme(plot.title = element_text(hjust = .5))+
         NULL
-    )
+    ) %>% config(displayModeBar = F)
   })
   
   output$syn_ht_dens <- renderPlotly({
@@ -1191,7 +1258,7 @@ server <- function(input, output, session) {
         ggtitle("Height Distribution")+
         theme(plot.title = element_text(hjust = .5))+
         NULL
-    )
+    ) %>% config(displayModeBar = F)
   })
   
   output$syn_wt_dens <- renderPlotly({
@@ -1206,7 +1273,7 @@ server <- function(input, output, session) {
         ggtitle("Weight Distribution")+
         theme(plot.title = element_text(hjust = .5))+
         NULL
-    )
+    ) %>% config(displayModeBar = F)
   })
   
   output$syn_sex_bar <- renderPlotly({
@@ -1228,7 +1295,7 @@ server <- function(input, output, session) {
         theme(plot.title = element_text(hjust = .5),
               legend.position = "none")+
         NULL
-    )
+    ) %>% config(displayModeBar = F)
   })
 }
 
