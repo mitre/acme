@@ -436,7 +436,8 @@ plot_cleaned <- function(cleaned_df, type, subj,
 
 # function to generate the summary that appears below individual subject plots
 gen_subj_text <- function(cleaned_df, type, subj,
-                          methods_chosen = methods_avail){
+                          methods_chosen = methods_avail,
+                          single = F){
   # subset the data to the subject, type, and methods we care about
   clean_df <- sub_subj_type(cleaned_df, type, subj, methods_chosen)
   
@@ -480,20 +481,33 @@ gen_subj_text <- function(cleaned_df, type, subj,
     reason_text <- paste0(reason_text,"</ul>")
   }
   
-  return(
-    HTML(paste0(
-      "<b>Subject: </b>", subj,"<br>",
-      "<b>Number of Records: </b>", nrow(clean_df),"<br>",
-      "<b>Total Include (by all methods): </b>",
-      sum(clean_df$all_result == "Include"),"<br>",
-      incl_by_method,
-      "<b>Total Implausible (by any method): </b>",
-      sum(clean_df$all_result == "Implausible"),"<br>",
-      impl_by_method,
-      "<b>Reasons for Implausibility: </b><br>",
-      reason_text
-    ))
-  )
+  if (!single){
+    return(
+      HTML(paste0(
+        "<b>Subject: </b>", subj,"<br>",
+        "<b>Number of Records: </b>", nrow(clean_df),"<br>",
+        "<b>Total Include (by all methods): </b>",
+        sum(clean_df$all_result == "Include"),"<br>",
+        incl_by_method,
+        "<b>Total Implausible (by any method): </b>",
+        sum(clean_df$all_result == "Implausible"),"<br>",
+        impl_by_method,
+        "<b>Reasons for Implausibility: </b><br>",
+        reason_text
+      ))
+    )
+  } else {
+    return(
+      HTML(paste0(
+        "<b>Subject: </b>", subj,"<br>",
+        "<b>Number of Records: </b>", nrow(clean_df),"<br>",
+        incl_by_method,
+        impl_by_method,
+        "<b>Reasons for Implausibility: </b><br>",
+        reason_text
+      ))
+    )
+  }
 }
 
 # UI ----
@@ -1088,16 +1102,23 @@ server <- function(input, output, session) {
       fluidRow(
         width = 12,
         column(
-          style='border-right: 1px solid black',
+          style='padding-right: 20px; border-right: 1px solid black',
           width = 6,
           plotlyOutput(paste0("method", (r*2)-1)),
-          uiOutput(paste0("method_text", (r*2)-1)),
+          fluidRow(
+            style = "border: 1px #e3e3e3; border-style: solid; border-radius: 10px; background: #f5f5f5; padding: 10px;",
+            uiOutput(paste0("method_text", (r*2)-1))
+          ),
           hr()
         ),
         column(
+          style = "padding-left: 20px;",
           width = 6,
           plotlyOutput(paste0("method", (r*2))),
-          uiOutput(paste0("method_text", (r*2))),
+          fluidRow(
+            style = "border: 1px #e3e3e3; border-style: solid; border-radius: 10px; background: #f5f5f5; padding: 10px;",
+            uiOutput(paste0("method_text", (r*2)))
+          ),
           hr()
         )
       )
@@ -1126,6 +1147,11 @@ server <- function(input, output, session) {
           ggplotly(ggplot()+theme(panel.background = element_blank())) %>% 
             config(displayModeBar = F)
         }
+      })
+      
+      output[[paste0("method_text", my_m)]] <- renderUI({
+        gen_subj_text(cleaned_df$sub, input$method_indiv_type, input$subj,
+                      methods_chosen$m[my_m], single = T)
       })
     })
   }
