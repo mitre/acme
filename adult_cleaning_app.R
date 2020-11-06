@@ -524,11 +524,11 @@ gen_subj_text <- function(cleaned_df, type, subj,
 
 ui <- navbarPage(
   # UI: compute and compare results ----
-  
-  "Adult EHR Cleaning",
+  "Adult EHR Data Cleaning",
   tabPanel(
     "Compare",
     sidebarLayout(
+      # UI: sidebar options ----
       sidebarPanel(width = 3,
         HTML("<b>Upload adult EHR data and click the button below to get started!</b> If no data is input, default synthetic data will be used. More information on data format can be found in the \"About\" tab.<p>"),
         fileInput("dat_file", "Upload Data CSV",
@@ -598,7 +598,7 @@ ui <- navbarPage(
           value = F
         )
       ),
-      
+      # UI: result visualizations ----
       mainPanel(width = 9,
         tabsetPanel(
         tabPanel(
@@ -687,6 +687,7 @@ ui <- navbarPage(
     mainPanel(
       width = 12,
       tabsetPanel(
+        # UI: about formatting ----
         tabPanel(
           "About Adult EHR Cleaning and Data Format",
           fluidRow(
@@ -695,7 +696,8 @@ ui <- navbarPage(
               width = 6,
               HTML(
                 "<center><h3>Welcome to the Adult EHR Cleaning Application!</h3></center><p>",
-                "This application seeks to compare different methods of cleaning adult EHR data, implementing a variety of methods. This currently includes Muthalagu, et al., Cheng, et al., Chan, et al., and Littman, et al. To find out more about these methods, please click on their respective tabs. More to come soon!<p>",
+                paste0("<center><h4>Version ", vers_adult_ehr, "</h4></center>"),
+                "This application seeks to compare different methods of cleaning adult EHR data, implementing a variety of methods. This currently includes Muthalagu, et al., Cheng, et al., Chan, et al., Littman, et al., Breland, et al., and Growthcleanr-naive. To find out more about these methods, please click on their respective tabs. This application is best viewed in a full screen window.<p>",
                 "To start, you'll begin by uploading your data in the sidebar under the 'Compare' tab. This data should be a CSV in the following format:"
               ),
               dataTableOutput("dat_example"),
@@ -708,12 +710,13 @@ ui <- navbarPage(
                 "<li><b>age_years:</b> age in years</li>",
                 "<li><b>sex:</b> 0 (male) or 1 (female)</li>",
                 "</ul><p>",
-                "If no data is input, the app will use synthetic data (to find out more about this example data, click on the 'Synthetic Data' tab). Then click run to get started!"
+                "If no data is input, the app will use synthetic data (to find out more about this example data, click on the 'Synthetic Data' tab). Then click run to get started!<p>"
               ),
               column(width = 3)
             )
           )
         ),
+        # UI: muthalagu ----
         tabPanel(
           "Muthalagu, et al. (2014)",
           fluidRow(
@@ -743,6 +746,7 @@ ui <- navbarPage(
             column(width = 3)
           )
         ),
+        # UI: cheng ----
         tabPanel(
           "Cheng, et al. (2016)",
           fluidRow(
@@ -772,6 +776,7 @@ ui <- navbarPage(
             column(width = 3)
           )
         ),
+        # UI: chan ----
         tabPanel(
           "Chan, et al. (2017)",
           fluidRow(
@@ -801,6 +806,7 @@ ui <- navbarPage(
             column(width = 3)
           )
         ),
+        # UI: littman ----
         tabPanel(
           "Littman, et al. (2012)",
           fluidRow(
@@ -834,6 +840,7 @@ ui <- navbarPage(
             column(width = 3)
           )
         ),
+        # UI: breland ----
         tabPanel(
           "Breland, et al. (2017)",
           fluidRow(
@@ -866,6 +873,7 @@ ui <- navbarPage(
             column(width = 3)
           )
         ),
+        # UI: growthcleanr-naive ----
         tabPanel(
           "Growthcleanr-naive (Daymont, et al. (2017))",
           fluidRow(
@@ -889,6 +897,7 @@ ui <- navbarPage(
             column(width = 3)
           )
         ),
+        # UI: about synthetic data ----
         tabPanel(
           "About Synthetic Data",
           fluidRow(
