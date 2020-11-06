@@ -104,8 +104,8 @@ tab_clean_res <- function(cleaned_df, type, methods_chosen = methods_avail){
   return(t_tab)
 }
 
-# function to plot overall histogram
-plot_hist <- function(t_tab, yval = "Implausible"){
+# function to plot overall bar plot
+plot_bar <- function(t_tab, yval = "Implausible"){
   if (nrow(t_tab) > 0){
     ggplotly(
       ggplot(t_tab, aes_string("Method", yval, fill = "Method"))+
@@ -516,6 +516,45 @@ gen_subj_text <- function(cleaned_df, type, subj,
       ))
     )
   }
+}
+
+# function to generate correlation plots for methods (overall plot)
+plot_methods_corr <- function(cleaned_df, type,
+                              methods_chosen = methods_avail){
+  
+  # DON'T FORGET TO CONSIDER 0
+  
+  # get the possible methods for this type
+  m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
+  
+  # subset the data to the things we care about
+  clean_df <- cleaned_df[cleaned_df$param == type,]
+  # subset to only the methods included
+  clean_df <- clean_df[
+    ,
+    (!grepl("_result", colnames(clean_df)) &
+       !grepl("_reason", colnames(clean_df))) |
+      (colnames(clean_df) %in% paste0(m_for_type, "_reason") |
+         colnames(clean_df) %in% paste0(m_for_type, "_result"))
+  ]
+  
+  corr_map <- c(
+    "Implausible" = 1,
+    "Include" = 0
+  )
+  
+  corr_df <- clean_df[, grepl("_result", colnames(clean_df))]
+  corr_df[corr_df == "Include"] <- 0
+  corr_df[corr_df == "Implausible"] <- 1
+  corr_df <- sapply(corr_df, as.numeric)
+  corr_df <- cor(corr_df)
+  
+  ggplotly(
+    ggcorrplot(corr_df, 
+             type = "upper")+
+      scale_x_discrete(expand = c(0,0))+
+      scale_y_discrete(expand = c(0,0))
+  )
 }
 
 # UI ----
@@ -1060,12 +1099,12 @@ server <- function(input, output, session) {
   
   output$overall_ht <- renderPlotly({
     ht_tab <- tab_clean_res(cleaned_df$sub, "HEIGHTCM", methods_chosen$m)
-    plot_hist(ht_tab, input$togg_res_count)
+    plot_bar(ht_tab, input$togg_res_count)
   })
   
   output$overall_wt <- renderPlotly({
     wt_tab <- tab_clean_res(cleaned_df$sub, "WEIGHTKG", methods_chosen$m)
-    plot_hist(wt_tab, input$togg_res_count)
+    plot_bar(wt_tab, input$togg_res_count)
   })
   
   output$overall_ht_top_reasons <- renderDataTable({
