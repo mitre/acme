@@ -107,6 +107,8 @@ tab_clean_res <- function(cleaned_df, type, methods_chosen = methods_avail){
 # function to plot overall histogram
 plot_hist <- function(t_tab, yval = "Implausible"){
   if (nrow(t_tab) > 0){
+    t_tab$Method <- factor(t_tab$Method, levels = unique(t_tab$Method))
+    
     ggplotly(
       ggplot(t_tab, aes_string("Method", yval, fill = "Method"))+
         geom_bar(stat = "identity")+
