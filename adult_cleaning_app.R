@@ -525,6 +525,10 @@ plot_methods_corr <- function(cleaned_df, type,
                               methods_chosen = methods_avail){
   
   # DON'T FORGET TO CONSIDER 0
+  type_n <- c(
+    "HEIGHTCM" = "Height",
+    "WEIGHTKG" = "Weight"
+  )
   
   # get the possible methods for this type
   m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
@@ -540,23 +544,44 @@ plot_methods_corr <- function(cleaned_df, type,
          colnames(clean_df) %in% paste0(m_for_type, "_result"))
   ]
   
-  corr_map <- c(
-    "Implausible" = 1,
-    "Include" = 0
-  )
+  if (nrow(clean_df) == 0){
+    return(ggplotly(ggplot()+theme_bw()))
+  }
   
+  # get columns for correlation
   corr_df <- clean_df[, grepl("_result", colnames(clean_df))]
+  colnames(corr_df) <- simpleCap(gsub("_result","",colnames(corr_df)))
   corr_df[corr_df == "Include"] <- 0
   corr_df[corr_df == "Implausible"] <- 1
+  
+  # compute correlation
   corr_df <- sapply(corr_df, as.numeric)
   corr_df <- cor(corr_df)
+  corr_df[lower.tri(corr_df)] <- NA
   
-  ggplotly(
-    ggcorrplot(corr_df, 
-             type = "upper")+
+  # melt into long form for ggplot
+  corr_df <- melt(corr_df)
+  colnames(corr_df) <- c("Method.1", "Method.2", "Correlation")
+  
+  # create correlation heat map
+  p <- ggplotly(
+    ggplot(corr_df, aes(Method.1, Method.2, fill = Correlation))+
+      geom_tile()+
+      scale_fill_gradient2(
+        breaks = c(-1,0,1),
+        limits = c(-1,1),
+        low = "#0571b0", mid = "#f7f7f7", high = "#ca0020")+
+      theme_bw()+
       scale_x_discrete(expand = c(0,0))+
-      scale_y_discrete(expand = c(0,0))
+      scale_y_discrete(expand = c(0,0))+
+      theme(axis.title = element_blank(),
+            axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+            plot.title = element_text(hjust = .5))+
+      ggtitle(paste0("Correlation of Implausible Values for ", type_n[type]))+
+      NULL
   )
+  
+  return(p)
 }
 
 # UI ----
@@ -654,14 +679,16 @@ ui <- navbarPage(
               plotlyOutput("overall_ht"),
               hr(),
               HTML("<h4><center><b>Top Reasons for Implausible Values</center></b></h4>"),
-              dataTableOutput("overall_ht_top_reasons")
+              dataTableOutput("overall_ht_top_reasons"),
+              plotlyOutput("overall_corr_ht", height = "500px")
             ),
             column(width = 6, 
               HTML("<h3><center>Weight Results</center></h3>"),
               plotlyOutput("overall_wt"),
               hr(),
               HTML("<h4><center><b>Top Reasons for Implausible Values</center></b></h4>"),
-              dataTableOutput("overall_wt_top_reasons")
+              dataTableOutput("overall_wt_top_reasons"),
+              plotlyOutput("overall_corr_wt", height = "500px")
             )
           )
         ),
@@ -1124,6 +1151,16 @@ server <- function(input, output, session) {
   options = list(scrollX = TRUE,
                  pageLength = 5)
   )
+  
+  output$overall_corr_ht <- renderPlotly({
+    plot_methods_corr(cleaned_df$sub, "HEIGHTCM",
+                      methods_chosen = methods_chosen$m)
+  })
+  
+  output$overall_corr_wt <- renderPlotly({
+    plot_methods_corr(cleaned_df$sub, "WEIGHTKG",
+                      methods_chosen = methods_chosen$m)
+  })
   
   # plot individual results ----
   
