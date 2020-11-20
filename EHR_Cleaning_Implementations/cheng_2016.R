@@ -66,7 +66,7 @@ cheng_clean_both <- function(df){
     
     subj_df <- subj_df[!criteria,]
     
-    if (nrow(subj_df) > 0){
+    if (nrow(subj_df) > 1){
       # 2h, H compare difference from average to SD ----
       # 2h. Exclude height if a) absolute difference between that height and average
       # height > standard deviation (SD) AND b) SD > 2.5% of average height.
@@ -114,7 +114,7 @@ cheng_clean_both <- function(df){
     
     subj_df <- subj_df[!criteria,]
     
-    if (nrow(subj_df) > 0){
+    if (nrow(subj_df) > 1){
       # 2w, W compare difference from average to range or SD ----
       # 2w. weight inaccurate if:
       # a) the range was > 22.7 kg AND absolute difference between recorded weight 
