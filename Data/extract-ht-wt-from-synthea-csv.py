@@ -77,7 +77,7 @@
 # In[1]:
 
 
-get_ipython().system('exa --long ~/projects/synthea/output/csv')
+get_ipython().system('ls -lh ~/projects/synthea/output/csv')
 
 
 # Note that the Synthea CSV export schema is detailed at https://github.com/synthetichealth/synthea/wiki/CSV-File-Data-Dictionary.
