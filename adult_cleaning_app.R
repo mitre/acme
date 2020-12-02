@@ -525,7 +525,6 @@ gen_subj_text <- function(cleaned_df, type, subj,
 plot_methods_corr <- function(cleaned_df, type,
                               methods_chosen = methods_avail){
   
-  # DON'T FORGET TO CONSIDER 0
   type_n <- c(
     "HEIGHTCM" = "Height",
     "WEIGHTKG" = "Weight"
@@ -563,11 +562,15 @@ plot_methods_corr <- function(cleaned_df, type,
   # melt into long form for ggplot
   corr_df <- melt(corr_df)
   colnames(corr_df) <- c("Method.1", "Method.2", "Correlation")
+  corr_df$Correlation <- signif(corr_df$Correlation, 3)
   
   # create correlation heat map
   p <- ggplotly(
-    ggplot(corr_df, aes(Method.1, Method.2, fill = Correlation))+
+    ggplot(corr_df, aes(Method.1, Method.2,
+                        fill = Correlation,
+                        label = Correlation))+
       geom_tile()+
+      geom_text()+
       scale_fill_gradient2(
         breaks = c(-1,0,1),
         limits = c(-1,1),
@@ -580,7 +583,7 @@ plot_methods_corr <- function(cleaned_df, type,
             plot.title = element_text(hjust = .5))+
       ggtitle(paste0("Correlation of Implausible Values for ", type_n[type]))+
       NULL
-  )
+  ) %>% config(displayModeBar = F)
   
   return(p)
 }
