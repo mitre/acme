@@ -588,6 +588,51 @@ plot_methods_corr <- function(cleaned_df, type,
   return(p)
 }
 
+# function to create a heat map of results for methods (specific tab)
+plot_result_heat_map <- function(cleaned_df, type,
+                                 methods_chosen = methods_avail,
+                                 sort_col = "none",
+                                 sort_dec = F){
+  type_n <- c(
+    "HEIGHTCM" = "Height",
+    "WEIGHTKG" = "Weight"
+  )
+  
+  # get the possible methods for this type
+  m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
+  
+  # subset the data to the things we care about
+  clean_df <- cleaned_df[cleaned_df$param == type,]
+  # subset to only the methods included
+  clean_df <- clean_df[
+    ,
+    (!grepl("_result", colnames(clean_df)) &
+       !grepl("_reason", colnames(clean_df))) |
+      (colnames(clean_df) %in% paste0(m_for_type, "_reason") |
+         colnames(clean_df) %in% paste0(m_for_type, "_result"))
+  ]
+  
+  if (nrow(clean_df) == 0){
+    return(ggplotly(ggplot()+theme_bw()))
+  }
+  
+  # only keep the results and necessary sorting
+  clean_df <- 
+    clean_df[,
+      !(grepl("_reason", colnames(clean_df)) | 
+          grepl("param", colnames(clean_df)))
+    ]
+  
+  # sort for visualizing
+  if (sort_col != "none"){
+    clean_df <- 
+      clean_df[do.call('order', 
+                       c(clean_df[sort_col], list(decreasing = sort_dec))),]
+  }
+  
+  # STOP HERE
+}
+
 # UI ----
 
 # TODO: LOOK INTO MODULES
