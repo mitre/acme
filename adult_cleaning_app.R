@@ -16,6 +16,7 @@ library(colorspace)
 library(plotly)
 library(viridisLite)
 library(ggplotify)
+library(reshape2)
 
 #https://stackoverflow.com/questions/3452086/getting-path-of-an-r-script/35842176#35842176
 # set working directory - only works in RStudio (with rstudioapi)
@@ -778,7 +779,8 @@ ui <- navbarPage(
                 "<li><b>age_years:</b> age in years</li>",
                 "<li><b>sex:</b> 0 (male) or 1 (female)</li>",
                 "</ul><p>",
-                "If no data is input, the app will use synthetic data (to find out more about this example data, click on the 'Synthetic Data' tab). Then click run to get started!<p>"
+                "If no data is input, the app will use synthetic data (to find out more about this example data, click on the 'Synthetic Data' tab). Then click run to get started!<p>",
+                paste0("Version: ", vers_adult_ehr, "<p>")
               ),
               column(width = 3)
             )

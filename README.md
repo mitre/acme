@@ -18,7 +18,7 @@ downloaded/cloned this repository):
 3. In the console window (bottom-left corner by default), enter the following to download necessary packages:
 
 ```{r}
-install.packages(c("shiny", "ggplot2", "rstudioapi", "colorspace", "plotly", "viridisLite", "ggplotify"))
+install.packages(c("shiny", "ggplot2", "rstudioapi", "colorspace", "plotly", "viridisLite", "ggplotify", "reshape2"))
 ```
 
 If you are on a Mac, R also requires the `Cairo` package, which itself requires that
