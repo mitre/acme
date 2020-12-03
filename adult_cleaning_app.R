@@ -777,6 +777,42 @@ ui <- navbarPage(
           "calc_fit_w_impl",
           label = HTML("<b>Calculate fit/standard deviation with implausible values?</b> If unchecked, records with at least one implausible determination are excluded."),
           value = F
+        ),
+        hr(),
+        HTML("<b>Settings for all individuals heat map:</b><p>"),
+        selectInput(
+          "heat_type",
+          "Choose which parameter to display in individual by method plots:",
+          choices = c("Height (cm)" = "HEIGHTCM", "Weight (kg)" = "WEIGHTKG")
+        ),
+        selectInput(
+          "heat_sort_col",
+          "Columns to sort on (in order, \"None\" alone indicates no sorting):",
+          choices = c(
+            "None" = "none",
+            "ID" = "id",
+            "Subject" = "subj",
+            "Measurement" = "measurement",
+            "Age (years)" = "age_years",
+            "Sex" = "sex"
+          ),
+          selected = "None",
+          multiple = T
+        ),
+        checkboxInput(
+          "heat_sort_dec", 
+          HTML("<b>Sort decreasing?</b>"),
+          value = F
+        ),
+        checkboxInput(
+          "heat_interactive", 
+          HTML("<b>Make interactive?</b> Will not be interactive if the amount of records and methods selected exceeds 1500."),
+          value = T
+        ),
+        checkboxInput(
+          "heat_show_y_lab", 
+          HTML("<b>Show y labels?</b> Will not be shown if the amount of records exceeds 100."),
+          value = T
         )
       ),
       # UI: result visualizations ----
@@ -848,6 +884,11 @@ ui <- navbarPage(
             width = 12,
             uiOutput("method_subj_plots")
           )
+        ),
+        tabPanel(
+          "All Individuals",
+          uiOutput("all_indiv_title"),
+          uiOutput("all_subj_heatmap_ui")
         ),
         tabPanel(
           "View Results",
