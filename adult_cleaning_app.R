@@ -589,13 +589,24 @@ plot_methods_corr <- function(cleaned_df, type,
 }
 
 # function to create a heat map of results for methods (specific tab)
+# y labels will not be shown if there are more than 100 records
+# interactivity will not be shown if number of records and methods chosen exceeds
+# 1500
+# CONSIDER AN OVERRIDE?
 plot_result_heat_map <- function(cleaned_df, type,
                                  methods_chosen = methods_avail,
                                  sort_col = "none",
-                                 sort_dec = F){
+                                 sort_dec = F,
+                                 interactive = F,
+                                 show_y_lab = F){
   type_n <- c(
     "HEIGHTCM" = "Height",
     "WEIGHTKG" = "Weight"
+  )
+  
+  color_map <- c(
+    "Include" = "#d4d4d4",
+    "Implausible" = "#ff9900"
   )
   
   # get the possible methods for this type
@@ -630,7 +641,62 @@ plot_result_heat_map <- function(cleaned_df, type,
                        c(clean_df[sort_col], list(decreasing = sort_dec))),]
   }
   
-  # STOP HERE
+  # create label column (combining all the non result columns)
+  clean_df$Label <- trimws(apply(
+    clean_df[, !grepl("_result", colnames(clean_df))],
+    1,
+    paste,
+    collapse = " / "
+  ))
+  lab <- paste(
+    colnames(clean_df[, !(grepl("_result", colnames(clean_df)) | 
+                            grepl("Label", colnames(clean_df)))]),
+    collapse = " / "
+    )
+  # remove the sort columns
+  clean_df <- clean_df[, (grepl("_result", colnames(clean_df)) | 
+                             grepl("Label", colnames(clean_df)))]
+  # rename result columns
+  colnames(clean_df)[grepl("_result", colnames(clean_df))] <-
+    simpleCap(
+      gsub("_result", "", 
+           colnames(clean_df)[grepl("_result", colnames(clean_df))])
+    )
+  
+  clean_m <- melt(clean_df, id.vars = "Label", variable.name = "Method")
+  
+  p <- ggplot(clean_m[clean_m$Label %in% unique(clean_m$Label)[1:300],], aes(Method, Label, fill = value))+
+    geom_tile()+
+    theme_bw()+
+    scale_fill_discrete(type = color_map)+
+    scale_x_discrete(expand = c(0,0), position = "top")+
+    scale_y_discrete(expand = c(0,0))+
+    theme(axis.title.x = element_blank(),
+          axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=0),
+          legend.position = "top",
+          legend.direction = "horizontal",
+          legend.title = element_blank())+
+    ylab(paste("Record:", lab))+
+    NULL
+  
+  if (!show_y_lab | length(unique(clean_m$Label)) > 100){
+    p <- p + 
+      theme(axis.text.y = element_blank(),
+            axis.ticks.y = element_blank())
+  }
+  
+  if (interactive & length(unique(clean_m$Label))*length(m_for_type) < 250*6){
+    p <- ggplotly(
+      p
+    ) %>%
+      layout(legend = list(orientation = "h",   # show entries horizontally
+                           xanchor = "center",  # use center of legend as anchor
+                           x = 0.5,
+                           y = 1.1)) %>% 
+      config(displayModeBar = F)
+  }
+  
+  return(p)
 }
 
 # UI ----
