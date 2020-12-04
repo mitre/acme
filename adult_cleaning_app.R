@@ -635,7 +635,9 @@ plot_result_heat_map <- function(cleaned_df, type,
     ]
   
   # sort for visualizing
-  if (sort_col != "none"){
+  if (!"none" %in% sort_col){
+    sort_col <- sort_col[sort_col != "none"]
+    
     clean_df <- 
       clean_df[do.call('order', 
                        c(clean_df[sort_col], list(decreasing = sort_dec))),]
@@ -664,15 +666,17 @@ plot_result_heat_map <- function(cleaned_df, type,
     )
   
   clean_m <- melt(clean_df, id.vars = "Label", variable.name = "Method")
+  clean_m$Label <- factor(clean_m$Label, levels = unique(clean_m$Label))
   
-  p <- ggplot(clean_m[clean_m$Label %in% unique(clean_m$Label)[1:300],], aes(Method, Label, fill = value))+
+  p <- ggplot(clean_m, 
+              aes(Method, Label, fill = value))+
     geom_tile()+
     theme_bw()+
     scale_fill_discrete(type = color_map)+
-    scale_x_discrete(expand = c(0,0), position = "top")+
+    scale_x_discrete(expand = c(0,0))+
     scale_y_discrete(expand = c(0,0))+
     theme(axis.title.x = element_blank(),
-          axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=0),
+          axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
           legend.position = "top",
           legend.direction = "horizontal",
           legend.title = element_blank())+
@@ -685,15 +689,30 @@ plot_result_heat_map <- function(cleaned_df, type,
             axis.ticks.y = element_blank())
   }
   
-  if (interactive & length(unique(clean_m$Label))*length(m_for_type) < 250*6){
-    p <- ggplotly(
-      p
-    ) %>%
-      layout(legend = list(orientation = "h",   # show entries horizontally
-                           xanchor = "center",  # use center of legend as anchor
-                           x = 0.5,
-                           y = 1.1)) %>% 
-      config(displayModeBar = F)
+  if (interactive){
+    # if there are too many entries, the plotly won't render
+    if (length(unique(clean_m$Label))*length(m_for_type) > 250*6){
+      p <- ggplotly(
+        ggplot()+
+          theme_bw()+
+          ggtitle(
+            "Too many entries. Reduce the amount of subjects or remove interactivity in the sidebar."
+          )
+      )
+    } else {
+      p <- suppressWarnings({
+        ggplotly(
+          p
+        ) %>%
+          layout(legend = list(orientation = "h",   # show entries horizontally
+                               xanchor = "center",  # use center of legend as anchor
+                               x = 0.5,
+                               y = 1.1)) %>% 
+          config(displayModeBar = F)
+      })
+    }
+  } else {
+    p <- p + theme(text = element_text(size = 15))
   }
   
   return(p)
@@ -782,7 +801,7 @@ ui <- navbarPage(
         HTML("<b>Settings for all individuals heat map:</b><p>"),
         selectInput(
           "heat_type",
-          "Choose which parameter to display in individual by method plots:",
+          "Choose which parameter to display in all individuals heat map:",
           choices = c("Height (cm)" = "HEIGHTCM", "Weight (kg)" = "WEIGHTKG")
         ),
         selectInput(
@@ -796,7 +815,7 @@ ui <- navbarPage(
             "Age (years)" = "age_years",
             "Sex" = "sex"
           ),
-          selected = "None",
+          selected = "none",
           multiple = T
         ),
         checkboxInput(
@@ -806,7 +825,7 @@ ui <- navbarPage(
         ),
         checkboxInput(
           "heat_interactive", 
-          HTML("<b>Make interactive?</b> Will not be interactive if the amount of records and methods selected exceeds 1500."),
+          HTML("<b>Make interactive?</b> Interactivity will not render if the amount of records and methods selected exceeds 1500."),
           value = T
         ),
         checkboxInput(
@@ -888,7 +907,15 @@ ui <- navbarPage(
         tabPanel(
           "All Individuals",
           uiOutput("all_indiv_title"),
-          uiOutput("all_subj_heatmap_ui")
+          
+          conditionalPanel(
+            "input.heat_interactive == true",
+            plotlyOutput("heat_all_plotly", height = 800)
+          ),
+          conditionalPanel(
+            "input.heat_interactive == false",
+            plotOutput("heat_all_plot", height = 800)
+          )
         ),
         tabPanel(
           "View Results",
@@ -1444,6 +1471,45 @@ server <- function(input, output, session) {
       })
     })
   }
+  
+  # plot all individuals heat map ----
+  
+  # give the overall title
+  output$all_indiv_title <- renderUI({
+    type_map <- c(
+      "HEIGHTCM" = "Height (cm)",
+      "WEIGHTKG" = "Weight (kg)"
+    )
+    
+    HTML(paste0("<center><h3>All ",
+                type_map[input$heat_type],
+                " Records for ",
+                length(unique(cleaned_df$sub$subj)),
+                " Subjects",
+                "</center></h3>"))
+  })
+  
+  # render plotly version -- will only render if UI is allocated
+  output$heat_all_plotly <- renderPlotly({
+    plot_result_heat_map(cleaned_df$sub, 
+                         input$heat_type,
+                         methods_chosen = methods_chosen$m,
+                         sort_col = input$heat_sort_col,
+                         sort_dec = input$heat_sort_dec,
+                         interactive = T,
+                         show_y_lab = input$heat_show_y_lab)
+  })
+  
+  # render ggplot version -- will only render if UI is allocated
+  output$heat_all_plot <- renderPlot({
+    plot_result_heat_map(cleaned_df$sub, 
+                         input$heat_type,
+                         methods_chosen = methods_chosen$m,
+                         sort_col = input$heat_sort_col,
+                         sort_dec = input$heat_sort_dec,
+                         interactive = F,
+                         show_y_lab = input$heat_show_y_lab)
+  })
   
   # output run results ----
   
