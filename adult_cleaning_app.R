@@ -17,6 +17,7 @@ library(plotly)
 library(viridisLite)
 library(ggplotify)
 library(reshape2)
+library(shinyBS)
 
 #https://stackoverflow.com/questions/3452086/getting-path-of-an-r-script/35842176#35842176
 # set working directory - only works in RStudio (with rstudioapi)
@@ -738,100 +739,114 @@ ui <- navbarPage(
             downloadButton("download_results", label = "Download Results")
         ),
         hr(),
-        HTML("<b>Settings for all plots:</b><p>"),
-        textAreaInput("subj_focus", 
-                      "Enter subjects to focus on (line separated):",
-                      width = "100%",
-                      height = "100px"),
-        div(style="display:inline-block",
-          actionButton("update_subj", "Update Subjects"),
-          actionButton("reset_subj", "Reset"),
-          downloadButton("download_focus", label = "Download Subjects")
-        ),
-        HTML("<p>"),
-        checkboxGroupInput("togg_methods",
-                           "Choose methods to compare:",
-                           choices = 
-                             setNames(methods_avail, simpleCap(methods_avail)),
-                           selected = methods_avail,
-                           inline = T
-                           ),
-        actionButton("update_methods", "Update Methods"),
-        hr(),
-        HTML("<b>Settings for overall plots:</b><p>"),
-        selectInput(
-          "togg_res_count",
-          label = "Which result would you like to see counted in bar graphs?",
-          choices = c("Implausible", "Include"),
-          selected = "Implausible"
-        ),
-        checkboxInput(
-          "show_reason_count", 
-          label = HTML("<b>Show counts in reasons for implausible values?</b>"),
-          value = F
-        ),
-        hr(),
-        HTML("<b>Settings for individual/individual by method plots:</b><p>"),
-        uiOutput("indiv_choose"),
-        div(style="display:inline-block",
-            actionButton("add_subj_focus", "Add Subject to Focus On")
-        ),
-        HTML("<p>"),
-        selectInput(
-          "method_indiv_type",
-          "Choose which parameter to display in individual by method plots:",
-          choices = c("Height (cm)" = "HEIGHTCM", "Weight (kg)" = "WEIGHTKG")
-        ),
-        checkboxInput(
-          "show_fit_line",
-          label = HTML("<b>Show linear fit?</b>"),
-          value = T
-        ),
-        checkboxInput(
-          "show_sd_shade",
-          label = HTML("<b>Show standard deviation shading?</b> If fit included, this will be around the fit. Otherwise, this will be added around the points."),
-          value = T
-        ),
-        checkboxInput(
-          "calc_fit_w_impl",
-          label = HTML("<b>Calculate fit/standard deviation with implausible values?</b> If unchecked, records with at least one implausible determination are excluded."),
-          value = F
-        ),
-        hr(),
-        HTML("<b>Settings for all individuals heat map:</b><p>"),
-        selectInput(
-          "heat_type",
-          "Choose which parameter to display in all individuals heat map:",
-          choices = c("Height (cm)" = "HEIGHTCM", "Weight (kg)" = "WEIGHTKG")
-        ),
-        selectInput(
-          "heat_sort_col",
-          "Columns to sort on (in order, \"None\" alone indicates no sorting):",
-          choices = c(
-            "None" = "none",
-            "ID" = "id",
-            "Subject" = "subj",
-            "Measurement" = "measurement",
-            "Age (years)" = "age_years",
-            "Sex" = "sex"
+        HTML("<b>Click on each box's title below to see the settings for specified plots.</b><p>"),
+        bsCollapse(
+          id = "settings",
+          multiple = T,
+          bsCollapsePanel(
+            "Settings: All Plots",
+            textAreaInput("subj_focus", 
+                          "Enter subjects to focus on (line separated):",
+                          width = "100%",
+                          height = "100px"),
+            div(style="display:inline-block",
+                actionButton("update_subj", "Update Subjects"),
+                actionButton("reset_subj", "Reset"),
+                downloadButton("download_focus", label = "Download Subjects")
+            ),
+            HTML("<p>"),
+            checkboxGroupInput(
+              "togg_methods",
+              "Choose methods to compare:",
+              choices = setNames(methods_avail, simpleCap(methods_avail)),
+              selected = methods_avail,
+              inline = T
+            ),
+            actionButton("update_methods", "Update Methods"),
+            style = "default"
           ),
-          selected = "none",
-          multiple = T
-        ),
-        checkboxInput(
-          "heat_sort_dec", 
-          HTML("<b>Sort decreasing?</b>"),
-          value = F
-        ),
-        checkboxInput(
-          "heat_interactive", 
-          HTML("<b>Make interactive?</b> Interactivity will not render if the amount of records and methods selected exceeds 1500."),
-          value = T
-        ),
-        checkboxInput(
-          "heat_show_y_lab", 
-          HTML("<b>Show y labels?</b> Will not be shown if the amount of records exceeds 100."),
-          value = T
+          bsCollapsePanel(
+            "Settings: Overall Plots",
+            selectInput(
+              "togg_res_count",
+              label = "Which result would you like to see counted in bar graphs?",
+              choices = c("Implausible", "Include"),
+              selected = "Implausible"
+            ),
+            checkboxInput(
+              "show_reason_count", 
+              label = HTML("<b>Show counts in reasons for implausible values?</b>"),
+              value = F
+            ),
+            style = "default"
+          ),
+          bsCollapsePanel(
+            "Settings: Individual/Individual By Method Plots",
+            uiOutput("indiv_choose"),
+            div(style="display:inline-block",
+                actionButton("add_subj_focus", "Add Subject to Focus On")
+            ),
+            HTML("<p>"),
+            selectInput(
+              "method_indiv_type",
+              "Choose which parameter to display in individual by method plots:",
+              choices = c("Height (cm)" = "HEIGHTCM", "Weight (kg)" = "WEIGHTKG")
+            ),
+            checkboxInput(
+              "show_fit_line",
+              label = HTML("<b>Show linear fit?</b>"),
+              value = T
+            ),
+            checkboxInput(
+              "show_sd_shade",
+              label = HTML("<b>Show standard deviation shading?</b> If fit included, this will be around the fit. Otherwise, this will be added around the points."),
+              value = T
+            ),
+            checkboxInput(
+              "calc_fit_w_impl",
+              label = HTML("<b>Calculate fit/standard deviation with implausible values?</b> If unchecked, records with at least one implausible determination are excluded."),
+              value = F
+            ),
+            style = "default"
+          ),
+          bsCollapsePanel(
+            "Settings: All Individuals Heat Map",
+            selectInput(
+              "heat_type",
+              "Choose which parameter to display in all individuals heat map:",
+              choices = c("Height (cm)" = "HEIGHTCM", "Weight (kg)" = "WEIGHTKG")
+            ),
+            selectInput(
+              "heat_sort_col",
+              "Columns to sort on (in order, \"None\" alone indicates no sorting):",
+              choices = c(
+                "None" = "none",
+                "ID" = "id",
+                "Subject" = "subj",
+                "Measurement" = "measurement",
+                "Age (years)" = "age_years",
+                "Sex" = "sex"
+              ),
+              selected = "none",
+              multiple = T
+            ),
+            checkboxInput(
+              "heat_sort_dec", 
+              HTML("<b>Sort decreasing?</b>"),
+              value = F
+            ),
+            checkboxInput(
+              "heat_interactive", 
+              HTML("<b>Make interactive?</b> Interactivity will not render if the amount of records and methods selected exceeds 1500."),
+              value = T
+            ),
+            checkboxInput(
+              "heat_show_y_lab", 
+              HTML("<b>Show y labels?</b> Will not be shown if the amount of records exceeds 100."),
+              value = T
+            ),
+            style = "default"
+          )
         )
       ),
       # UI: result visualizations ----
