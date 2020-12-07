@@ -26,6 +26,9 @@ setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 # load default data - fake 
 # dat <- read.csv(file.path("Data", "adult_synthetic_data_seed_8.csv"))
 dat <- read.csv(file.path("Data", "synthea-adults-sub-100subj.csv"))
+dat_res <- read.csv(
+  file.path("Data", "Adult_EHR_Cleaning_Results_data_example.csv")
+)
 
 # load requisite functions
 # function below from ?source
@@ -731,11 +734,12 @@ ui <- navbarPage(
     sidebarLayout(
       # UI: sidebar options ----
       sidebarPanel(width = 3,
-        HTML("<b>Upload adult EHR data and click the button below to get started!</b> If no data is input, default synthetic data will be used. More information on data format can be found in the \"About\" tab.<p>"),
-        fileInput("dat_file", "Upload Data CSV",
+        HTML("<b>Upload adult EHR data or results and click the corresponding button below to get started!</b> If no data is input, default synthetic data/results will be used. More information on data format can be found in the \"About\" tab.<p>"),
+        fileInput("dat_file", "Upload Data/Results CSV",
                   accept = c(".csv", ".CSV")),
         div(style="display:inline-block",
             actionButton("run_data", "Run data!"),
+            actionButton("upload_res", "Upload Results"),
             downloadButton("download_results", label = "Download Results")
         ),
         hr(),
@@ -1259,6 +1263,23 @@ server <- function(input, output, session) {
       # initialize subset (cleaned_df holds all subjects)
       cleaned_df$full <- cleaned_df$sub <- c_df
     })
+  })
+  
+  # upload result data
+  observeEvent(input$upload_res, {
+    c_df <-
+      if (is.null(input$dat_file)){
+        # use example data
+        dat_res
+      } else {
+        read.csv(input$dat_file$datapath)
+      }
+    # because it reads in dashes as periods
+    colnames(c_df)[grepl("growthcleanr", colnames(c_df))] <-
+      c("growthcleanr-naive_result", "growthcleanr-naive_reason")
+    
+    # initialize subset
+    cleaned_df$full <- cleaned_df$sub <- c_df
   })
   
   # download data results
