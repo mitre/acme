@@ -601,6 +601,7 @@ plot_result_heat_map <- function(cleaned_df, type,
                                  methods_chosen = methods_avail,
                                  sort_col = "none",
                                  sort_dec = F,
+                                 hide_agree = F, 
                                  interactive = F,
                                  show_y_lab = F){
   type_n <- c(
@@ -638,6 +639,14 @@ plot_result_heat_map <- function(cleaned_df, type,
           grepl("param", colnames(clean_df)))
     ]
   
+  # if we choose to remove where they all agree, do so!
+  if (hide_agree){
+    # result columns
+    res_col <- grepl("_result", colnames(clean_df))
+    
+    clean_df <- clean_df[rowSums(clean_df[, res_col] != "Include") > 0,]
+  }
+  
   # sort for visualizing
   if (!"none" %in% sort_col){
     sort_col <- sort_col[sort_col != "none"]
@@ -668,6 +677,14 @@ plot_result_heat_map <- function(cleaned_df, type,
       gsub("_result", "", 
            colnames(clean_df)[grepl("_result", colnames(clean_df))])
     )
+  
+  if (nrow(clean_df) == 0){
+    if (interactive){
+      return(ggplotly(ggplot()+theme_bw()))
+    } else {
+      return(ggplot()+theme_bw())
+    }
+  }
   
   clean_m <- melt(clean_df, id.vars = "Label", variable.name = "Method")
   clean_m$Label <- factor(clean_m$Label, levels = unique(clean_m$Label))
@@ -717,7 +734,7 @@ plot_result_heat_map <- function(cleaned_df, type,
           p
         ) %>%
           layout(legend = list(orientation = "h",   # show entries horizontally
-                               xanchor = "center",  # use center of legend as anchor
+                               xanchor = "center",  
                                x = 0.5,
                                y = 1.1)) %>% 
           config(displayModeBar = F)
@@ -845,6 +862,11 @@ ui <- navbarPage(
             checkboxInput(
               "heat_sort_dec", 
               HTML("<b>Sort decreasing?</b>"),
+              value = F
+            ),
+            checkboxInput(
+              "heat_hide_agree", 
+              HTML("<b>Hide rows where all methods include?</b>"),
               value = F
             ),
             checkboxInput(
@@ -1539,6 +1561,7 @@ server <- function(input, output, session) {
                          input$heat_type,
                          methods_chosen = methods_chosen$m,
                          sort_col = input$heat_sort_col,
+                         hide_agree = input$heat_hide_agree,
                          sort_dec = input$heat_sort_dec,
                          interactive = T,
                          show_y_lab = input$heat_show_y_lab)
@@ -1550,6 +1573,7 @@ server <- function(input, output, session) {
                          input$heat_type,
                          methods_chosen = methods_chosen$m,
                          sort_col = input$heat_sort_col,
+                         hide_agree = input$heat_hide_agree,
                          sort_dec = input$heat_sort_dec,
                          interactive = F,
                          show_y_lab = input$heat_show_y_lab)
