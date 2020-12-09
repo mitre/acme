@@ -674,7 +674,6 @@ plot_result_heat_map <- function(cleaned_df, type,
   
   p <- ggplot(clean_m, 
               aes(Method, Label, fill = value))+
-    geom_tile()+
     theme_bw()+
     scale_fill_discrete(type = color_map)+
     scale_x_discrete(expand = c(0,0))+
@@ -691,6 +690,15 @@ plot_result_heat_map <- function(cleaned_df, type,
     p <- p + 
       theme(axis.text.y = element_blank(),
             axis.ticks.y = element_blank())
+  }
+  
+  # if there aren't a ton of entries, you can add grids
+  if (length(unique(clean_m$Label))*length(m_for_type) < 250*6){
+    p <- p + 
+      geom_tile(color = "black")
+  } else {
+    p <- p + 
+      geom_tile()
   }
   
   if (interactive){
