@@ -207,7 +207,7 @@ sub_subj_type <- function(cleaned_df, type, subj,
   
   m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
   
-  if (length(m_for_type) == 0){
+  if (length(m_for_type) == 0 | nrow(cleaned_df) == 0){
     return(data.frame())
   }
   
@@ -892,6 +892,7 @@ ui <- navbarPage(
       # UI: result visualizations ----
       mainPanel(width = 9,
         tabsetPanel(
+        id = "res_tabset",
         tabPanel(
           "Overall",
           fluidRow(
@@ -1300,7 +1301,7 @@ server <- function(input, output, session) {
     "subj" = c()
   )
   
-  # observe button inputs ----
+  # observe button/click inputs ----
   
   observeEvent(input$run_data, {
     withProgress(message = "Cleaning data!", value = 0, {
@@ -1412,6 +1413,35 @@ server <- function(input, output, session) {
                 file, row.names = FALSE, na = "")
     }
   )
+  
+  # open the options for the given tab with tab opening
+  observeEvent(input$res_tabset, {
+    all_collapse_names <- c(
+      "Settings: All Plots", 
+      "Settings: Overall Plots", 
+      "Settings: Individual/Individual By Method Plots", 
+      "Settings: Individual/Individual By Method Plots", 
+      "Settings: All Individuals Heat Map"
+    )
+    
+    tab_map_open <- c(
+      "Overall" = "Settings: Overall Plots",
+      "Individual" = "Settings: Individual/Individual By Method Plots",
+      "Individual by Method" = "Settings: Individual/Individual By Method Plots",
+      "All Individuals" = "Settings: All Individuals Heat Map",
+      "View Results" = NA
+    )
+    
+    open_settings <- c("Settings: All Plots", 
+                       unname(tab_map_open[input$res_tabset]))
+    
+    updateCollapse(
+      session, 
+      id = "settings",
+      open = open_settings,
+      close = all_collapse_names[!all_collapse_names %in% open_settings]
+    )
+  })
   
   # plot overall results ----
   
