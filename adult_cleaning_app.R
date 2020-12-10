@@ -680,9 +680,9 @@ plot_result_heat_map <- function(cleaned_df, type,
   
   if (nrow(clean_df) == 0){
     if (interactive){
-      return(ggplotly(ggplot()+theme_bw()))
+      return(ggplotly(ggplot()+theme_bw()+ggtitle("No entries.")))
     } else {
-      return(ggplot()+theme_bw())
+      return(ggplot()+theme_bw()+ggtitle("No entries."))
     }
   }
   
@@ -733,7 +733,8 @@ plot_result_heat_map <- function(cleaned_df, type,
         ggplotly(
           p
         ) %>%
-          layout(legend = list(orientation = "h",   # show entries horizontally
+          layout(
+            legend = list(orientation = "h",   # show entries horizontally
                                xanchor = "center",  
                                x = 0.5,
                                y = 1.1)) %>% 
@@ -840,9 +841,14 @@ ui <- navbarPage(
           ),
           bsCollapsePanel(
             "Settings: All Individuals Heat Map",
+            checkboxInput(
+              "heat_side_by_side", 
+              HTML("<b>Display both height and weight heat maps side by side?</b>"),
+              value = T
+            ),
             selectInput(
               "heat_type",
-              "Choose which parameter to display in all individuals heat map:",
+              "Choose which parameter to display in all individuals heat map (if displaying only one type):",
               choices = c("Height (cm)" = "HEIGHTCM", "Weight (kg)" = "WEIGHTKG")
             ),
             selectInput(
@@ -876,7 +882,7 @@ ui <- navbarPage(
             ),
             checkboxInput(
               "heat_show_y_lab", 
-              HTML("<b>Show y labels?</b> Will not be shown if the amount of records exceeds 100."),
+              HTML("<b>Show y labels?</b> Will not be shown if the amount of records exceeds 100. Not recommended with long subject labels when plots are interactive and both types are shown side by side."),
               value = T
             ),
             style = "default"
@@ -955,15 +961,50 @@ ui <- navbarPage(
         ),
         tabPanel(
           "All Individuals",
-          uiOutput("all_indiv_title"),
-          
-          conditionalPanel(
-            "input.heat_interactive == true",
-            plotlyOutput("heat_all_plotly", height = 800)
+          fluidRow(
+            width = 12,
+            uiOutput("all_indiv_title"),
           ),
           conditionalPanel(
-            "input.heat_interactive == false",
-            plotOutput("heat_all_plot", height = 800)
+            "input.heat_side_by_side == true",
+            fluidRow(
+              column(
+                width = 6,
+                HTML("<h3><center>Height (cm)</center></h3>"),
+                conditionalPanel(
+                  "input.heat_interactive == true",
+                  plotlyOutput("ht_heat_all_plotly", height = 800)
+                ),
+                conditionalPanel(
+                  "input.heat_interactive == false",
+                  plotOutput("ht_heat_all_plot", height = 800)
+                )
+              ),
+              column(
+                width = 6,
+                HTML("<h3><center>Weight (kg)</center></h3>"),
+                conditionalPanel(
+                  "input.heat_interactive == true",
+                  plotlyOutput("wt_heat_all_plotly", height = 800)
+                ),
+                conditionalPanel(
+                  "input.heat_interactive == false",
+                  plotOutput("wt_heat_all_plot", height = 800)
+                )
+              )
+            )
+          ),
+          conditionalPanel(
+            "input.heat_side_by_side == false",
+            uiOutput("one_heat_type_title"),
+            conditionalPanel(
+              "input.heat_interactive == true",
+              plotlyOutput("one_heat_all_plotly", height = 800)
+            ),
+            conditionalPanel(
+              "input.heat_interactive == false",
+              plotOutput("one_heat_all_plot", height = 800)
+            )
           )
         ),
         tabPanel(
@@ -1542,21 +1583,74 @@ server <- function(input, output, session) {
   
   # give the overall title
   output$all_indiv_title <- renderUI({
-    type_map <- c(
-      "HEIGHTCM" = "Height (cm)",
-      "WEIGHTKG" = "Weight (kg)"
-    )
-    
     HTML(paste0("<center><h3>All ",
-                type_map[input$heat_type],
-                " Records for ",
+                "Records for ",
                 length(unique(cleaned_df$sub$subj)),
                 " Subjects",
                 "</center></h3>"))
   })
   
+  output$one_heat_type_title <- renderUI({
+    type_map <- c(
+      "HEIGHTCM" = "Height (cm)",
+      "WEIGHTKG" = "Weight (kg)"
+    )
+    
+    HTML(paste0("<center><h3>",
+                type_map[input$heat_type],
+                "</center></h3>"))
+  })
+  
   # render plotly version -- will only render if UI is allocated
-  output$heat_all_plotly <- renderPlotly({
+  output$ht_heat_all_plotly <- renderPlotly({
+    plot_result_heat_map(cleaned_df$sub, 
+                         "HEIGHTCM",
+                         methods_chosen = methods_chosen$m,
+                         sort_col = input$heat_sort_col,
+                         hide_agree = input$heat_hide_agree,
+                         sort_dec = input$heat_sort_dec,
+                         interactive = T,
+                         show_y_lab = input$heat_show_y_lab)
+  })
+  
+  # render ggplot version -- will only render if UI is allocated
+  output$ht_heat_all_plot <- renderPlot({
+    plot_result_heat_map(cleaned_df$sub, 
+                         "HEIGHTCM",
+                         methods_chosen = methods_chosen$m,
+                         sort_col = input$heat_sort_col,
+                         hide_agree = input$heat_hide_agree,
+                         sort_dec = input$heat_sort_dec,
+                         interactive = F,
+                         show_y_lab = input$heat_show_y_lab)
+  })
+  
+  # render plotly version -- will only render if UI is allocated
+  output$wt_heat_all_plotly <- renderPlotly({
+    plot_result_heat_map(cleaned_df$sub, 
+                         "WEIGHTKG",
+                         methods_chosen = methods_chosen$m,
+                         sort_col = input$heat_sort_col,
+                         hide_agree = input$heat_hide_agree,
+                         sort_dec = input$heat_sort_dec,
+                         interactive = T,
+                         show_y_lab = input$heat_show_y_lab)
+  })
+  
+  # render ggplot version -- will only render if UI is allocated
+  output$wt_heat_all_plot <- renderPlot({
+    plot_result_heat_map(cleaned_df$sub, 
+                         "WEIGHTKG",
+                         methods_chosen = methods_chosen$m,
+                         sort_col = input$heat_sort_col,
+                         hide_agree = input$heat_hide_agree,
+                         sort_dec = input$heat_sort_dec,
+                         interactive = F,
+                         show_y_lab = input$heat_show_y_lab)
+  })
+  
+  # render plotly version -- will only render if UI is allocated
+  output$one_heat_all_plotly <- renderPlotly({
     plot_result_heat_map(cleaned_df$sub, 
                          input$heat_type,
                          methods_chosen = methods_chosen$m,
@@ -1568,7 +1662,7 @@ server <- function(input, output, session) {
   })
   
   # render ggplot version -- will only render if UI is allocated
-  output$heat_all_plot <- renderPlot({
+  output$one_heat_all_plot <- renderPlot({
     plot_result_heat_map(cleaned_df$sub, 
                          input$heat_type,
                          methods_chosen = methods_chosen$m,
