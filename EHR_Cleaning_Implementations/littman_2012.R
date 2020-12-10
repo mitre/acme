@@ -235,8 +235,9 @@ littman_clean_both <- function(df){
     # there are any more implausible values.
     step <- "3h, H compare difference to SD, with most deviant height dropped"
     
-    # to compute standard deviation, you need at least 2 plausible values
-    if (nrow(orig_h_subj_df) > 1){
+    # to compute standard deviation, you need at least 2 plausible values (one will
+    # be dropped, so you need 3)
+    if (nrow(orig_h_subj_df) > 2){
       # find most deviant height
       avg_h <- mean(orig_h_subj_df$measurement)
       most_dev <- which.max(

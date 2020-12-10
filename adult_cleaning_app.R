@@ -5,7 +5,7 @@
 # This implements a prototype application to explore adult EHR cleaning 
 # implementations.
 
-vers_adult_ehr <- "0.1.0"
+vers_adult_ehr <- "0.2.0"
 
 # load libraries, scripts, and data ----
 
@@ -16,6 +16,8 @@ library(colorspace)
 library(plotly)
 library(viridisLite)
 library(ggplotify)
+library(reshape2)
+library(shinyBS)
 
 #https://stackoverflow.com/questions/3452086/getting-path-of-an-r-script/35842176#35842176
 # set working directory - only works in RStudio (with rstudioapi)
@@ -24,6 +26,9 @@ setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 # load default data - fake 
 # dat <- read.csv(file.path("Data", "adult_synthetic_data_seed_8.csv"))
 dat <- read.csv(file.path("Data", "synthea-adults-sub-100subj.csv"))
+dat_res <- read.csv(
+  file.path("Data", "Adult_EHR_Cleaning_Results_data_example.csv")
+)
 
 # load requisite functions
 # function below from ?source
@@ -104,8 +109,8 @@ tab_clean_res <- function(cleaned_df, type, methods_chosen = methods_avail){
   return(t_tab)
 }
 
-# function to plot overall histogram
-plot_hist <- function(t_tab, yval = "Implausible"){
+# function to plot overall bar plot
+plot_bar <- function(t_tab, yval = "Implausible"){
   if (nrow(t_tab) > 0){
     t_tab$Method <- factor(t_tab$Method, levels = unique(t_tab$Method))
     
@@ -202,7 +207,7 @@ sub_subj_type <- function(cleaned_df, type, subj,
   
   m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
   
-  if (length(m_for_type) == 0){
+  if (length(m_for_type) == 0 | nrow(cleaned_df) == 0){
     return(data.frame())
   }
   
@@ -520,89 +525,377 @@ gen_subj_text <- function(cleaned_df, type, subj,
   }
 }
 
+# function to generate correlation plots for methods (overall plot)
+plot_methods_corr <- function(cleaned_df, type,
+                              methods_chosen = methods_avail){
+  
+  type_n <- c(
+    "HEIGHTCM" = "Height",
+    "WEIGHTKG" = "Weight"
+  )
+  
+  # get the possible methods for this type
+  m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
+  
+  # subset the data to the things we care about
+  clean_df <- cleaned_df[cleaned_df$param == type,]
+  # subset to only the methods included
+  clean_df <- clean_df[
+    ,
+    (!grepl("_result", colnames(clean_df)) &
+       !grepl("_reason", colnames(clean_df))) |
+      (colnames(clean_df) %in% paste0(m_for_type, "_reason") |
+         colnames(clean_df) %in% paste0(m_for_type, "_result"))
+  ]
+  
+  if (nrow(clean_df) == 0){
+    return(ggplotly(ggplot()+theme_bw()))
+  }
+  
+  # get columns for correlation
+  corr_df <- clean_df[, grepl("_result", colnames(clean_df))]
+  colnames(corr_df) <- simpleCap(gsub("_result","",colnames(corr_df)))
+  corr_df[corr_df == "Include"] <- 0
+  corr_df[corr_df == "Implausible"] <- 1
+  
+  # compute correlation
+  corr_df <- sapply(corr_df, as.numeric)
+  corr_df <- cor(corr_df)
+  corr_df[lower.tri(corr_df)] <- NA
+  
+  # melt into long form for ggplot
+  corr_df <- melt(corr_df)
+  colnames(corr_df) <- c("Method.1", "Method.2", "Correlation")
+  corr_df$Correlation <- signif(corr_df$Correlation, 3)
+  
+  # create correlation heat map
+  p <- ggplotly(
+    ggplot(corr_df, aes(Method.1, Method.2,
+                        fill = Correlation,
+                        label = Correlation))+
+      geom_tile()+
+      geom_text()+
+      scale_fill_gradient2(
+        breaks = c(-1,0,1),
+        limits = c(-1,1),
+        low = "#0571b0", mid = "#f7f7f7", high = "#ca0020")+
+      theme_bw()+
+      scale_x_discrete(expand = c(0,0))+
+      scale_y_discrete(expand = c(0,0))+
+      theme(axis.title = element_blank(),
+            axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+            plot.title = element_text(hjust = .5))+
+      ggtitle(paste0("Correlation of Implausible Values for ", type_n[type]))+
+      NULL
+  ) %>% config(displayModeBar = F)
+  
+  return(p)
+}
+
+# function to create a heat map of results for methods (specific tab)
+# y labels will not be shown if there are more than 100 records
+# interactivity will not be shown if number of records and methods chosen exceeds
+# 1500
+# CONSIDER AN OVERRIDE?
+plot_result_heat_map <- function(cleaned_df, type,
+                                 methods_chosen = methods_avail,
+                                 sort_col = "none",
+                                 sort_dec = F,
+                                 hide_agree = F, 
+                                 interactive = F,
+                                 show_y_lab = F){
+  type_n <- c(
+    "HEIGHTCM" = "Height",
+    "WEIGHTKG" = "Weight"
+  )
+  
+  color_map <- c(
+    "Include" = "#d4d4d4",
+    "Implausible" = "#ff9900"
+  )
+  
+  # get the possible methods for this type
+  m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
+  
+  # subset the data to the things we care about
+  clean_df <- cleaned_df[cleaned_df$param == type,]
+  # subset to only the methods included
+  clean_df <- clean_df[
+    ,
+    (!grepl("_result", colnames(clean_df)) &
+       !grepl("_reason", colnames(clean_df))) |
+      (colnames(clean_df) %in% paste0(m_for_type, "_reason") |
+         colnames(clean_df) %in% paste0(m_for_type, "_result"))
+  ]
+  
+  if (nrow(clean_df) == 0){
+    return(ggplotly(ggplot()+theme_bw()))
+  }
+  
+  # only keep the results and necessary sorting
+  clean_df <- 
+    clean_df[,
+      !(grepl("_reason", colnames(clean_df)) | 
+          grepl("param", colnames(clean_df)))
+    ]
+  
+  # if we choose to remove where they all agree, do so!
+  if (hide_agree){
+    # result columns
+    res_col <- grepl("_result", colnames(clean_df))
+    
+    clean_df <- clean_df[rowSums(clean_df[, res_col] != "Include") > 0,]
+  }
+  
+  # sort for visualizing
+  if (!"none" %in% sort_col){
+    sort_col <- sort_col[sort_col != "none"]
+    
+    clean_df <- 
+      clean_df[do.call('order', 
+                       c(clean_df[sort_col], list(decreasing = sort_dec))),]
+  }
+  
+  # create label column (combining all the non result columns)
+  clean_df$Label <- trimws(apply(
+    clean_df[, !grepl("_result", colnames(clean_df))],
+    1,
+    paste,
+    collapse = " / "
+  ))
+  lab <- paste(
+    colnames(clean_df[, !(grepl("_result", colnames(clean_df)) | 
+                            grepl("Label", colnames(clean_df)))]),
+    collapse = " / "
+    )
+  # remove the sort columns
+  clean_df <- clean_df[, (grepl("_result", colnames(clean_df)) | 
+                             grepl("Label", colnames(clean_df)))]
+  # rename result columns
+  colnames(clean_df)[grepl("_result", colnames(clean_df))] <-
+    simpleCap(
+      gsub("_result", "", 
+           colnames(clean_df)[grepl("_result", colnames(clean_df))])
+    )
+  
+  if (nrow(clean_df) == 0){
+    if (interactive){
+      return(ggplotly(ggplot()+theme_bw()+ggtitle("No entries.")))
+    } else {
+      return(ggplot()+theme_bw()+ggtitle("No entries."))
+    }
+  }
+  
+  clean_m <- melt(clean_df, id.vars = "Label", variable.name = "Method")
+  clean_m$Label <- factor(clean_m$Label, levels = unique(clean_m$Label))
+  
+  p <- ggplot(clean_m, 
+              aes(Method, Label, fill = value))+
+    theme_bw()+
+    scale_fill_discrete(type = color_map)+
+    scale_x_discrete(expand = c(0,0))+
+    scale_y_discrete(expand = c(0,0))+
+    theme(axis.title.x = element_blank(),
+          axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+          legend.position = "top",
+          legend.direction = "horizontal",
+          legend.title = element_blank())+
+    ylab(paste("Record:", lab))+
+    NULL
+  
+  if (!show_y_lab | length(unique(clean_m$Label)) > 100){
+    p <- p + 
+      theme(axis.text.y = element_blank(),
+            axis.ticks.y = element_blank())
+  }
+  
+  # if there aren't a ton of entries, you can add grids
+  if (length(unique(clean_m$Label))*length(m_for_type) < 250*6){
+    p <- p + 
+      geom_tile(color = "black")
+  } else {
+    p <- p + 
+      geom_tile()
+  }
+  
+  if (interactive){
+    # if there are too many entries, the plotly won't render
+    if (length(unique(clean_m$Label))*length(m_for_type) > 250*6){
+      p <- ggplotly(
+        ggplot()+
+          theme_bw()+
+          ggtitle(
+            "Too many entries. Reduce the amount of subjects or remove interactivity in the sidebar."
+          )
+      )
+    } else {
+      p <- suppressWarnings({
+        ggplotly(
+          p
+        ) %>%
+          layout(
+            legend = list(orientation = "h",   # show entries horizontally
+                               xanchor = "center",  
+                               x = 0.5,
+                               y = 1.1)) %>% 
+          config(displayModeBar = F)
+      })
+    }
+  } else {
+    p <- p + theme(text = element_text(size = 15))
+  }
+  
+  return(p)
+}
+
 # UI ----
 
 # TODO: LOOK INTO MODULES
 
 ui <- navbarPage(
   # UI: compute and compare results ----
-  
-  "Adult EHR Cleaning",
+  "Adult EHR Data Cleaning",
   tabPanel(
     "Compare",
     sidebarLayout(
+      # UI: sidebar options ----
       sidebarPanel(width = 3,
-        HTML("<b>Upload adult EHR data and click the button below to get started!</b> If no data is input, default synthetic data will be used. More information on data format can be found in the \"About\" tab.<p>"),
-        fileInput("dat_file", "Upload Data CSV",
-                  accept = c(".csv", ".CSV")),
-        div(style="display:inline-block",
-            actionButton("run_data", "Run data!"),
-            downloadButton("download_results", label = "Download Results")
-        ),
-        hr(),
-        HTML("<b>Settings for all plots:</b><p>"),
-        textAreaInput("subj_focus", 
-                      "Enter subjects to focus on (line separated):",
-                      width = "100%",
-                      height = "100px"),
-        div(style="display:inline-block",
-          actionButton("update_subj", "Update Subjects"),
-          actionButton("reset_subj", "Reset"),
-          downloadButton("download_focus", label = "Download Subjects")
-        ),
-        HTML("<p>"),
-        checkboxGroupInput("togg_methods",
-                           "Choose methods to compare:",
-                           choices = 
-                             setNames(methods_avail, simpleCap(methods_avail)),
-                           selected = methods_avail,
-                           inline = T
-                           ),
-        actionButton("update_methods", "Update Methods"),
-        hr(),
-        HTML("<b>Settings for overall plots:</b><p>"),
-        selectInput(
-          "togg_res_count",
-          label = "Which result would you like to see counted in bar graphs?",
-          choices = c("Implausible", "Include"),
-          selected = "Implausible"
-        ),
-        checkboxInput(
-          "show_reason_count", 
-          label = HTML("<b>Show counts in reasons for implausible values?</b>"),
-          value = F
-        ),
-        hr(),
-        HTML("<b>Settings for individual/individual by method plots:</b><p>"),
-        uiOutput("indiv_choose"),
-        div(style="display:inline-block",
-            actionButton("add_subj_focus", "Add Subject to Focus On")
-        ),
-        HTML("<p>"),
-        selectInput(
-          "method_indiv_type",
-          "Choose which parameter to display in individual by method plots:",
-          choices = c("Height (cm)" = "HEIGHTCM", "Weight (kg)" = "WEIGHTKG")
-        ),
-        checkboxInput(
-          "show_fit_line",
-          label = HTML("<b>Show linear fit?</b>"),
-          value = T
-        ),
-        checkboxInput(
-          "show_sd_shade",
-          label = HTML("<b>Show standard deviation shading?</b> If fit included, this will be around the fit. Otherwise, this will be added around the points."),
-          value = T
-        ),
-        checkboxInput(
-          "calc_fit_w_impl",
-          label = HTML("<b>Calculate fit/standard deviation with implausible values?</b> If unchecked, records with at least one implausible determination are excluded."),
-          value = F
+        bsCollapse(
+          id = "settings",
+          multiple = T,
+          open = "Start: Run Data/Upload Results",
+          bsCollapsePanel(
+            "Start: Run Data/Upload Results",
+            HTML("<b>Upload adult EHR data or results and click the corresponding button below to get started!</b> If no data is input, default synthetic data/results will be used. More information on data format can be found in the \"About\" tab.<p>"),
+            fileInput("dat_file", "Upload Data/Results CSV",
+                      accept = c(".csv", ".CSV")),
+            div(style="display:inline-block",
+                actionButton("run_data", "Run data!"),
+                actionButton("upload_res", "Upload Results"),
+                downloadButton("download_results", label = "Download Results")
+            ),
+            style = "default"
+          ),
+          bsCollapsePanel(
+            "Options: All Plots",
+            textAreaInput("subj_focus", 
+                          "Enter subjects to focus on (line separated):",
+                          width = "100%",
+                          height = "100px"),
+            div(style="display:inline-block",
+                actionButton("update_subj", "Update Subjects"),
+                actionButton("reset_subj", "Reset"),
+                downloadButton("download_focus", label = "Download Subjects")
+            ),
+            HTML("<p>"),
+            checkboxGroupInput(
+              "togg_methods",
+              "Choose methods to compare:",
+              choices = setNames(methods_avail, simpleCap(methods_avail)),
+              selected = methods_avail,
+              inline = T
+            ),
+            actionButton("update_methods", "Update Methods"),
+            style = "default"
+          ),
+          bsCollapsePanel(
+            "Options: Overall Plots",
+            selectInput(
+              "togg_res_count",
+              label = "Which result would you like to see counted in bar graphs?",
+              choices = c("Implausible", "Include"),
+              selected = "Implausible"
+            ),
+            checkboxInput(
+              "show_reason_count", 
+              label = HTML("<b>Show counts in reasons for implausible values?</b>"),
+              value = F
+            ),
+            style = "default"
+          ),
+          bsCollapsePanel(
+            "Options: Individual/Individual By Method Plots",
+            uiOutput("indiv_choose"),
+            div(style="display:inline-block",
+                actionButton("add_subj_focus", "Add Subject to Focus On")
+            ),
+            HTML("<p>"),
+            selectInput(
+              "method_indiv_type",
+              "Choose which parameter to display in individual by method plots:",
+              choices = c("Height (cm)" = "HEIGHTCM", "Weight (kg)" = "WEIGHTKG")
+            ),
+            checkboxInput(
+              "show_fit_line",
+              label = HTML("<b>Show linear fit?</b>"),
+              value = T
+            ),
+            checkboxInput(
+              "show_sd_shade",
+              label = HTML("<b>Show standard deviation shading?</b> If fit included, this will be around the fit. Otherwise, this will be added around the points."),
+              value = T
+            ),
+            checkboxInput(
+              "calc_fit_w_impl",
+              label = HTML("<b>Calculate fit/standard deviation with implausible values?</b> If unchecked, records with at least one implausible determination are excluded."),
+              value = F
+            ),
+            style = "default"
+          ),
+          bsCollapsePanel(
+            "Options: All Individuals Heat Map",
+            checkboxInput(
+              "heat_side_by_side", 
+              HTML("<b>Display both height and weight heat maps side by side?</b>"),
+              value = T
+            ),
+            selectInput(
+              "heat_type",
+              "Choose which parameter to display in all individuals heat map (if displaying only one type):",
+              choices = c("Height (cm)" = "HEIGHTCM", "Weight (kg)" = "WEIGHTKG")
+            ),
+            selectInput(
+              "heat_sort_col",
+              "Columns to sort on (in order, \"None\" alone indicates no sorting):",
+              choices = c(
+                "None" = "none",
+                "ID" = "id",
+                "Subject" = "subj",
+                "Measurement" = "measurement",
+                "Age (years)" = "age_years",
+                "Sex" = "sex"
+              ),
+              selected = "none",
+              multiple = T
+            ),
+            checkboxInput(
+              "heat_sort_dec", 
+              HTML("<b>Sort decreasing?</b>"),
+              value = F
+            ),
+            checkboxInput(
+              "heat_hide_agree", 
+              HTML("<b>Hide rows where all methods include?</b>"),
+              value = F
+            ),
+            checkboxInput(
+              "heat_interactive", 
+              HTML("<b>Make interactive?</b> Interactivity will not render if the amount of records and methods selected exceeds 1500."),
+              value = T
+            ),
+            checkboxInput(
+              "heat_show_y_lab", 
+              HTML("<b>Show y labels?</b> Will not be shown if the amount of records exceeds 100. Not recommended with long subject labels when plots are interactive and both types are shown side by side."),
+              value = T
+            ),
+            style = "default"
+          )
         )
       ),
-      
+      # UI: result visualizations ----
       mainPanel(width = 9,
         tabsetPanel(
+        id = "res_tabset",
         tabPanel(
           "Overall",
           fluidRow(
@@ -615,14 +908,16 @@ ui <- navbarPage(
               plotlyOutput("overall_ht"),
               hr(),
               HTML("<h4><center><b>Top Reasons for Implausible Values</center></b></h4>"),
-              dataTableOutput("overall_ht_top_reasons")
+              dataTableOutput("overall_ht_top_reasons"),
+              plotlyOutput("overall_corr_ht", height = "500px")
             ),
             column(width = 6, 
               HTML("<h3><center>Weight Results</center></h3>"),
               plotlyOutput("overall_wt"),
               hr(),
               HTML("<h4><center><b>Top Reasons for Implausible Values</center></b></h4>"),
-              dataTableOutput("overall_wt_top_reasons")
+              dataTableOutput("overall_wt_top_reasons"),
+              plotlyOutput("overall_corr_wt", height = "500px")
             )
           )
         ),
@@ -633,7 +928,8 @@ ui <- navbarPage(
             uiOutput("indiv_subj_title")
           ),
           fluidRow(
-            column(width = 6, style='padding-right: 20px; border-right: 1px solid black',
+            column(width = 6, 
+                   style='padding-right: 20px; border-right: 1px solid black',
                    HTML("<h3><center>Height Results</center></h3>"),
                    plotlyOutput("subj_ht"),
                    plotOutput("subj_legn_ht", height = "30px"),
@@ -669,6 +965,55 @@ ui <- navbarPage(
           )
         ),
         tabPanel(
+          "All Individuals",
+          fluidRow(
+            width = 12,
+            uiOutput("all_indiv_title"),
+          ),
+          conditionalPanel(
+            "input.heat_side_by_side == true",
+            fluidRow(
+              column(
+                width = 6, 
+                style='padding-right: 20px; border-right: 1px solid black',
+                HTML("<h3><center>Height (cm)</center></h3>"),
+                conditionalPanel(
+                  "input.heat_interactive == true",
+                  plotlyOutput("ht_heat_all_plotly", height = 800)
+                ),
+                conditionalPanel(
+                  "input.heat_interactive == false",
+                  plotOutput("ht_heat_all_plot", height = 800)
+                )
+              ),
+              column(
+                width = 6,
+                HTML("<h3><center>Weight (kg)</center></h3>"),
+                conditionalPanel(
+                  "input.heat_interactive == true",
+                  plotlyOutput("wt_heat_all_plotly", height = 800)
+                ),
+                conditionalPanel(
+                  "input.heat_interactive == false",
+                  plotOutput("wt_heat_all_plot", height = 800)
+                )
+              )
+            )
+          ),
+          conditionalPanel(
+            "input.heat_side_by_side == false",
+            uiOutput("one_heat_type_title"),
+            conditionalPanel(
+              "input.heat_interactive == true",
+              plotlyOutput("one_heat_all_plotly", height = 800)
+            ),
+            conditionalPanel(
+              "input.heat_interactive == false",
+              plotOutput("one_heat_all_plot", height = 800)
+            )
+          )
+        ),
+        tabPanel(
           "View Results",
           uiOutput("res_subj_title"),
           fluidRow(
@@ -689,6 +1034,7 @@ ui <- navbarPage(
     mainPanel(
       width = 12,
       tabsetPanel(
+        # UI: about formatting ----
         tabPanel(
           "About Adult EHR Cleaning and Data Format",
           fluidRow(
@@ -697,7 +1043,8 @@ ui <- navbarPage(
               width = 6,
               HTML(
                 "<center><h3>Welcome to the Adult EHR Cleaning Application!</h3></center><p>",
-                "This application seeks to compare different methods of cleaning adult EHR data, implementing a variety of methods. This currently includes Muthalagu, et al., Cheng, et al., Chan, et al., and Littman, et al. To find out more about these methods, please click on their respective tabs. More to come soon!<p>",
+                paste0("<center><h4>Version ", vers_adult_ehr, "</h4></center>"),
+                "This application seeks to compare different methods of cleaning adult EHR data, implementing a variety of methods. This currently includes Muthalagu, et al., Cheng, et al., Chan, et al., Littman, et al., Breland, et al., and Growthcleanr-naive. To find out more about these methods, please click on their respective tabs. This application is best viewed in a full screen window.<p>",
                 "To start, you'll begin by uploading your data in the sidebar under the 'Compare' tab. This data should be a CSV in the following format:"
               ),
               dataTableOutput("dat_example"),
@@ -710,12 +1057,14 @@ ui <- navbarPage(
                 "<li><b>age_years:</b> age in years</li>",
                 "<li><b>sex:</b> 0 (male) or 1 (female)</li>",
                 "</ul><p>",
-                "If no data is input, the app will use synthetic data (to find out more about this example data, click on the 'Synthetic Data' tab). Then click run to get started!"
+                "If no data is input, the app will use synthetic data (to find out more about this example data, click on the 'Synthetic Data' tab). Then click run to get started!<p>",
+                paste0("Version: ", vers_adult_ehr, "<p>")
               ),
               column(width = 3)
             )
           )
         ),
+        # UI: muthalagu ----
         tabPanel(
           "Muthalagu, et al. (2014)",
           fluidRow(
@@ -745,6 +1094,7 @@ ui <- navbarPage(
             column(width = 3)
           )
         ),
+        # UI: cheng ----
         tabPanel(
           "Cheng, et al. (2016)",
           fluidRow(
@@ -774,6 +1124,7 @@ ui <- navbarPage(
             column(width = 3)
           )
         ),
+        # UI: chan ----
         tabPanel(
           "Chan, et al. (2017)",
           fluidRow(
@@ -803,6 +1154,7 @@ ui <- navbarPage(
             column(width = 3)
           )
         ),
+        # UI: littman ----
         tabPanel(
           "Littman, et al. (2012)",
           fluidRow(
@@ -836,6 +1188,7 @@ ui <- navbarPage(
             column(width = 3)
           )
         ),
+        # UI: breland ----
         tabPanel(
           "Breland, et al. (2017)",
           fluidRow(
@@ -868,6 +1221,7 @@ ui <- navbarPage(
             column(width = 3)
           )
         ),
+        # UI: growthcleanr-naive ----
         tabPanel(
           "Growthcleanr-naive (Daymont, et al. (2017))",
           fluidRow(
@@ -891,6 +1245,7 @@ ui <- navbarPage(
             column(width = 3)
           )
         ),
+        # UI: about synthetic data ----
         tabPanel(
           "About Synthetic Data",
           fluidRow(
@@ -949,7 +1304,7 @@ server <- function(input, output, session) {
     "subj" = c()
   )
   
-  # observe button inputs ----
+  # observe button/click inputs ----
   
   observeEvent(input$run_data, {
     withProgress(message = "Cleaning data!", value = 0, {
@@ -984,7 +1339,52 @@ server <- function(input, output, session) {
       
       # initialize subset (cleaned_df holds all subjects)
       cleaned_df$full <- cleaned_df$sub <- c_df
+      
+      # now let the tabs update
+      all_collapse_names <- c(
+        "Start: Run Data/Upload Results",
+        "Options: All Plots", 
+        "Options: Overall Plots", 
+        "Options: Individual/Individual By Method Plots", 
+        "Options: Individual/Individual By Method Plots", 
+        "Options: All Individuals Heat Map"
+      )
+      
+      tab_map_open <- c(
+        "Overall" = "Options: Overall Plots",
+        "Individual" = "Options: Individual/Individual By Method Plots",
+        "Individual by Method" = "Options: Individual/Individual By Method Plots",
+        "All Individuals" = "Options: All Individuals Heat Map",
+        "View Results" = NA
+      )
+      
+      open_settings <- c("Options: All Plots", 
+                         unname(tab_map_open[input$res_tabset]))
+      
+      updateCollapse(
+        session, 
+        id = "settings",
+        open = open_settings,
+        close = all_collapse_names[!all_collapse_names %in% open_settings]
+      )
     })
+  })
+  
+  # upload result data
+  observeEvent(input$upload_res, {
+    c_df <-
+      if (is.null(input$dat_file)){
+        # use example data
+        dat_res
+      } else {
+        read.csv(input$dat_file$datapath)
+      }
+    # because it reads in dashes as periods
+    colnames(c_df)[grepl("growthcleanr", colnames(c_df))] <-
+      c("growthcleanr-naive_result", "growthcleanr-naive_reason")
+    
+    # initialize subset
+    cleaned_df$full <- cleaned_df$sub <- c_df
   })
   
   # download data results
@@ -1045,6 +1445,38 @@ server <- function(input, output, session) {
     }
   )
   
+  # open the options for the given tab with tab opening
+  observeEvent(input$res_tabset, {
+    all_collapse_names <- c(
+      "Start: Run Data/Upload Results",
+      "Options: All Plots", 
+      "Options: Overall Plots", 
+      "Options: Individual/Individual By Method Plots", 
+      "Options: Individual/Individual By Method Plots", 
+      "Options: All Individuals Heat Map"
+    )
+    
+    tab_map_open <- c(
+      "Overall" = "Options: Overall Plots",
+      "Individual" = "Options: Individual/Individual By Method Plots",
+      "Individual by Method" = "Options: Individual/Individual By Method Plots",
+      "All Individuals" = "Options: All Individuals Heat Map",
+      "View Results" = NA
+    )
+    
+    open_settings <- c("Options: All Plots", 
+                       unname(tab_map_open[input$res_tabset]))
+    
+    if (nrow(cleaned_df$full) > 0){
+      updateCollapse(
+        session, 
+        id = "settings",
+        open = open_settings,
+        close = all_collapse_names[!all_collapse_names %in% open_settings]
+      )
+    }
+  })
+  
   # plot overall results ----
   
   output$overall_subj_title <- renderUI({
@@ -1053,12 +1485,12 @@ server <- function(input, output, session) {
   
   output$overall_ht <- renderPlotly({
     ht_tab <- tab_clean_res(cleaned_df$sub, "HEIGHTCM", methods_chosen$m)
-    plot_hist(ht_tab, input$togg_res_count)
+    plot_bar(ht_tab, input$togg_res_count)
   })
   
   output$overall_wt <- renderPlotly({
     wt_tab <- tab_clean_res(cleaned_df$sub, "WEIGHTKG", methods_chosen$m)
-    plot_hist(wt_tab, input$togg_res_count)
+    plot_bar(wt_tab, input$togg_res_count)
   })
   
   output$overall_ht_top_reasons <- renderDataTable({
@@ -1076,6 +1508,16 @@ server <- function(input, output, session) {
   options = list(scrollX = TRUE,
                  pageLength = 5)
   )
+  
+  output$overall_corr_ht <- renderPlotly({
+    plot_methods_corr(cleaned_df$sub, "HEIGHTCM",
+                      methods_chosen = methods_chosen$m)
+  })
+  
+  output$overall_corr_wt <- renderPlotly({
+    plot_methods_corr(cleaned_df$sub, "WEIGHTKG",
+                      methods_chosen = methods_chosen$m)
+  })
   
   # plot individual results ----
   
@@ -1202,6 +1644,100 @@ server <- function(input, output, session) {
       })
     })
   }
+  
+  # plot all individuals heat map ----
+  
+  # give the overall title
+  output$all_indiv_title <- renderUI({
+    HTML(paste0("<center><h3>All ",
+                "Records for ",
+                length(unique(cleaned_df$sub$subj)),
+                " Subjects",
+                "</center></h3>"))
+  })
+  
+  output$one_heat_type_title <- renderUI({
+    type_map <- c(
+      "HEIGHTCM" = "Height (cm)",
+      "WEIGHTKG" = "Weight (kg)"
+    )
+    
+    HTML(paste0("<center><h3>",
+                type_map[input$heat_type],
+                "</center></h3>"))
+  })
+  
+  # render plotly version -- will only render if UI is allocated
+  output$ht_heat_all_plotly <- renderPlotly({
+    plot_result_heat_map(cleaned_df$sub, 
+                         "HEIGHTCM",
+                         methods_chosen = methods_chosen$m,
+                         sort_col = input$heat_sort_col,
+                         hide_agree = input$heat_hide_agree,
+                         sort_dec = input$heat_sort_dec,
+                         interactive = T,
+                         show_y_lab = input$heat_show_y_lab)
+  })
+  
+  # render ggplot version -- will only render if UI is allocated
+  output$ht_heat_all_plot <- renderPlot({
+    plot_result_heat_map(cleaned_df$sub, 
+                         "HEIGHTCM",
+                         methods_chosen = methods_chosen$m,
+                         sort_col = input$heat_sort_col,
+                         hide_agree = input$heat_hide_agree,
+                         sort_dec = input$heat_sort_dec,
+                         interactive = F,
+                         show_y_lab = input$heat_show_y_lab)
+  })
+  
+  # render plotly version -- will only render if UI is allocated
+  output$wt_heat_all_plotly <- renderPlotly({
+    plot_result_heat_map(cleaned_df$sub, 
+                         "WEIGHTKG",
+                         methods_chosen = methods_chosen$m,
+                         sort_col = input$heat_sort_col,
+                         hide_agree = input$heat_hide_agree,
+                         sort_dec = input$heat_sort_dec,
+                         interactive = T,
+                         show_y_lab = input$heat_show_y_lab)
+  })
+  
+  # render ggplot version -- will only render if UI is allocated
+  output$wt_heat_all_plot <- renderPlot({
+    plot_result_heat_map(cleaned_df$sub, 
+                         "WEIGHTKG",
+                         methods_chosen = methods_chosen$m,
+                         sort_col = input$heat_sort_col,
+                         hide_agree = input$heat_hide_agree,
+                         sort_dec = input$heat_sort_dec,
+                         interactive = F,
+                         show_y_lab = input$heat_show_y_lab)
+  })
+  
+  # render plotly version -- will only render if UI is allocated
+  output$one_heat_all_plotly <- renderPlotly({
+    plot_result_heat_map(cleaned_df$sub, 
+                         input$heat_type,
+                         methods_chosen = methods_chosen$m,
+                         sort_col = input$heat_sort_col,
+                         hide_agree = input$heat_hide_agree,
+                         sort_dec = input$heat_sort_dec,
+                         interactive = T,
+                         show_y_lab = input$heat_show_y_lab)
+  })
+  
+  # render ggplot version -- will only render if UI is allocated
+  output$one_heat_all_plot <- renderPlot({
+    plot_result_heat_map(cleaned_df$sub, 
+                         input$heat_type,
+                         methods_chosen = methods_chosen$m,
+                         sort_col = input$heat_sort_col,
+                         hide_agree = input$heat_hide_agree,
+                         sort_dec = input$heat_sort_dec,
+                         interactive = F,
+                         show_y_lab = input$heat_show_y_lab)
+  })
   
   # output run results ----
   
