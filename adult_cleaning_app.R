@@ -924,7 +924,8 @@ ui <- navbarPage(
             uiOutput("indiv_subj_title")
           ),
           fluidRow(
-            column(width = 6, style='padding-right: 20px; border-right: 1px solid black',
+            column(width = 6, 
+                   style='padding-right: 20px; border-right: 1px solid black',
                    HTML("<h3><center>Height Results</center></h3>"),
                    plotlyOutput("subj_ht"),
                    plotOutput("subj_legn_ht", height = "30px"),
@@ -969,7 +970,8 @@ ui <- navbarPage(
             "input.heat_side_by_side == true",
             fluidRow(
               column(
-                width = 6,
+                width = 6, 
+                style='padding-right: 20px; border-right: 1px solid black',
                 HTML("<h3><center>Height (cm)</center></h3>"),
                 conditionalPanel(
                   "input.heat_interactive == true",
