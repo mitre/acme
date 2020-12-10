@@ -760,21 +760,24 @@ ui <- navbarPage(
     sidebarLayout(
       # UI: sidebar options ----
       sidebarPanel(width = 3,
-        HTML("<b>Upload adult EHR data or results and click the corresponding button below to get started!</b> If no data is input, default synthetic data/results will be used. More information on data format can be found in the \"About\" tab.<p>"),
-        fileInput("dat_file", "Upload Data/Results CSV",
-                  accept = c(".csv", ".CSV")),
-        div(style="display:inline-block",
-            actionButton("run_data", "Run data!"),
-            actionButton("upload_res", "Upload Results"),
-            downloadButton("download_results", label = "Download Results")
-        ),
-        hr(),
-        HTML("<b>Click on each box's title below to see the settings for specified plots.</b><p>"),
         bsCollapse(
           id = "settings",
           multiple = T,
+          open = "Start: Run Data/Upload Results",
           bsCollapsePanel(
-            "Settings: All Plots",
+            "Start: Run Data/Upload Results",
+            HTML("<b>Upload adult EHR data or results and click the corresponding button below to get started!</b> If no data is input, default synthetic data/results will be used. More information on data format can be found in the \"About\" tab.<p>"),
+            fileInput("dat_file", "Upload Data/Results CSV",
+                      accept = c(".csv", ".CSV")),
+            div(style="display:inline-block",
+                actionButton("run_data", "Run data!"),
+                actionButton("upload_res", "Upload Results"),
+                downloadButton("download_results", label = "Download Results")
+            ),
+            style = "default"
+          ),
+          bsCollapsePanel(
+            "Options: All Plots",
             textAreaInput("subj_focus", 
                           "Enter subjects to focus on (line separated):",
                           width = "100%",
@@ -796,7 +799,7 @@ ui <- navbarPage(
             style = "default"
           ),
           bsCollapsePanel(
-            "Settings: Overall Plots",
+            "Options: Overall Plots",
             selectInput(
               "togg_res_count",
               label = "Which result would you like to see counted in bar graphs?",
@@ -811,7 +814,7 @@ ui <- navbarPage(
             style = "default"
           ),
           bsCollapsePanel(
-            "Settings: Individual/Individual By Method Plots",
+            "Options: Individual/Individual By Method Plots",
             uiOutput("indiv_choose"),
             div(style="display:inline-block",
                 actionButton("add_subj_focus", "Add Subject to Focus On")
@@ -840,7 +843,7 @@ ui <- navbarPage(
             style = "default"
           ),
           bsCollapsePanel(
-            "Settings: All Individuals Heat Map",
+            "Options: All Individuals Heat Map",
             checkboxInput(
               "heat_side_by_side", 
               HTML("<b>Display both height and weight heat maps side by side?</b>"),
@@ -1336,6 +1339,34 @@ server <- function(input, output, session) {
       
       # initialize subset (cleaned_df holds all subjects)
       cleaned_df$full <- cleaned_df$sub <- c_df
+      
+      # now let the tabs update
+      all_collapse_names <- c(
+        "Start: Run Data/Upload Results",
+        "Options: All Plots", 
+        "Options: Overall Plots", 
+        "Options: Individual/Individual By Method Plots", 
+        "Options: Individual/Individual By Method Plots", 
+        "Options: All Individuals Heat Map"
+      )
+      
+      tab_map_open <- c(
+        "Overall" = "Options: Overall Plots",
+        "Individual" = "Options: Individual/Individual By Method Plots",
+        "Individual by Method" = "Options: Individual/Individual By Method Plots",
+        "All Individuals" = "Options: All Individuals Heat Map",
+        "View Results" = NA
+      )
+      
+      open_settings <- c("Options: All Plots", 
+                         unname(tab_map_open[input$res_tabset]))
+      
+      updateCollapse(
+        session, 
+        id = "settings",
+        open = open_settings,
+        close = all_collapse_names[!all_collapse_names %in% open_settings]
+      )
     })
   })
   
@@ -1417,30 +1448,33 @@ server <- function(input, output, session) {
   # open the options for the given tab with tab opening
   observeEvent(input$res_tabset, {
     all_collapse_names <- c(
-      "Settings: All Plots", 
-      "Settings: Overall Plots", 
-      "Settings: Individual/Individual By Method Plots", 
-      "Settings: Individual/Individual By Method Plots", 
-      "Settings: All Individuals Heat Map"
+      "Start: Run Data/Upload Results",
+      "Options: All Plots", 
+      "Options: Overall Plots", 
+      "Options: Individual/Individual By Method Plots", 
+      "Options: Individual/Individual By Method Plots", 
+      "Options: All Individuals Heat Map"
     )
     
     tab_map_open <- c(
-      "Overall" = "Settings: Overall Plots",
-      "Individual" = "Settings: Individual/Individual By Method Plots",
-      "Individual by Method" = "Settings: Individual/Individual By Method Plots",
-      "All Individuals" = "Settings: All Individuals Heat Map",
+      "Overall" = "Options: Overall Plots",
+      "Individual" = "Options: Individual/Individual By Method Plots",
+      "Individual by Method" = "Options: Individual/Individual By Method Plots",
+      "All Individuals" = "Options: All Individuals Heat Map",
       "View Results" = NA
     )
     
-    open_settings <- c("Settings: All Plots", 
+    open_settings <- c("Options: All Plots", 
                        unname(tab_map_open[input$res_tabset]))
     
-    updateCollapse(
-      session, 
-      id = "settings",
-      open = open_settings,
-      close = all_collapse_names[!all_collapse_names %in% open_settings]
-    )
+    if (nrow(cleaned_df$full) > 0){
+      updateCollapse(
+        session, 
+        id = "settings",
+        open = open_settings,
+        close = all_collapse_names[!all_collapse_names %in% open_settings]
+      )
+    }
   })
   
   # plot overall results ----
