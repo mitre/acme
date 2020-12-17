@@ -138,6 +138,60 @@ plot_bar <- function(t_tab, yval = "Implausible"){
   }
 }
 
+# function to tabulate results as compared to answers for a given height or weight
+tab_answers <- function(cleaned_df, type, methods_chosen = methods_avail){
+  m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
+  
+  if (length(m_for_type) == 0 ||
+      nrow(cleaned_df) == 0 || 
+      !any(grepl("answers", colnames(cleaned_df)))){
+    return(data.frame())
+  }
+  
+  # preallocate final data frame
+  t_tab <- data.frame(matrix(0, 
+                             nrow = length(m_for_type),
+                             ncol = 3))
+  colnames(t_tab) <- c("Method","Count","Percent")
+  t_tab$Method <- simpleCap(m_for_type)
+  
+  # tabulate results
+  rownames(t_tab) <- m_for_type
+  param_log <- cleaned_df$param == type
+  for (m in m_for_type){
+    t_tab[m,"Count"] <- sum(
+      cleaned_df[param_log, "answers"] == 
+        cleaned_df[param_log, paste0(m, "_result")]
+    )
+    t_tab[m,"Percent"] <- t_tab[m,"Count"]/sum(param_log)*100
+  }
+  
+  return(t_tab)
+}
+
+# function to plot check answers bar plot
+plot_answer_bar <- function(t_tab, yval = "Count", total = max(t_tab[,yval])){
+  if (nrow(t_tab) > 0){
+    t_tab$Method <- factor(t_tab$Method, levels = unique(t_tab$Method))
+    
+    ggplotly(
+      ggplot(t_tab, aes_string("Method", yval, fill = "Method"))+
+        geom_bar(stat = "identity")+
+        theme_bw()+
+        scale_fill_manual(values = m_colors)+
+        theme(legend.position = "none")+
+        scale_y_continuous(
+          limits = c(0, total),
+          expand = expansion(mult = c(0,.05))) +
+        ylab(paste(yval, " Correct"))+
+        NULL,
+      tooltip = c("x","y")
+    ) %>% config(displayModeBar = F)
+  } else {
+    ggplotly(ggplot()+theme_bw()) %>% config(displayModeBar = F)
+  }
+}
+
 # function to generate the overall title for each shiny tab
 gen_title <- function(criteria, tab_titl){
   return(
@@ -767,138 +821,149 @@ ui <- navbarPage(
     "Compare",
     sidebarLayout(
       # UI: sidebar options ----
-      sidebarPanel(width = 3,
-                   bsCollapse(
-                     id = "settings",
-                     multiple = T,
-                     open = "Start: Run Data/Upload Results",
-                     bsCollapsePanel(
-                       "Start: Run Data/Upload Results",
-                       HTML("<b>Upload adult EHR data or results and click the corresponding button below to get started!</b> If no data is input, default synthetic data/results will be used. More information on data format can be found in the \"About\" tab.<p>"),
-                       fileInput("dat_file", "Upload Data/Results CSV",
-                                 accept = c(".csv", ".CSV")),
-                       div(style="display:inline-block",
-                           actionButton("run_data", "Run data!"),
-                           actionButton("upload_res", "Upload Results"),
-                           downloadButton("download_results", label = "Download Results")
-                       ),
-                       style = "default"
-                     ),
-                     bsCollapsePanel(
-                       "Options: All Plots",
-                       textAreaInput("subj_focus", 
-                                     "Enter subjects to focus on (line separated):",
-                                     width = "100%",
-                                     height = "100px"),
-                       div(style="display:inline-block",
-                           actionButton("update_subj", "Update Subjects"),
-                           actionButton("reset_subj", "Reset"),
-                           downloadButton("download_focus", label = "Download Subjects")
-                       ),
-                       HTML("<p>"),
-                       checkboxGroupInput(
-                         "togg_methods",
-                         "Choose methods to compare:",
-                         choices = setNames(methods_avail, simpleCap(methods_avail)),
-                         selected = methods_avail,
-                         inline = T
-                       ),
-                       actionButton("update_methods", "Update Methods"),
-                       style = "default"
-                     ),
-                     bsCollapsePanel(
-                       "Options: Overall Plots",
-                       selectInput(
-                         "togg_res_count",
-                         label = "Which result would you like to see counted in bar graphs?",
-                         choices = c("Implausible", "Include"),
-                         selected = "Implausible"
-                       ),
-                       checkboxInput(
-                         "show_reason_count", 
-                         label = HTML("<b>Show counts in reasons for implausible values?</b>"),
-                         value = F
-                       ),
-                       style = "default"
-                     ),
-                     bsCollapsePanel(
-                       "Options: Individual/Individual By Method Plots",
-                       uiOutput("indiv_choose"),
-                       div(style="display:inline-block",
-                           actionButton("add_subj_focus", "Add Subject to Focus On")
-                       ),
-                       HTML("<p>"),
-                       selectInput(
-                         "method_indiv_type",
-                         "Choose which parameter to display in individual by method plots:",
-                         choices = c("Height (cm)" = "HEIGHTCM", "Weight (kg)" = "WEIGHTKG")
-                       ),
-                       checkboxInput(
-                         "show_fit_line",
-                         label = HTML("<b>Show linear fit?</b>"),
-                         value = T
-                       ),
-                       checkboxInput(
-                         "show_sd_shade",
-                         label = HTML("<b>Show standard deviation shading?</b> If fit included, this will be around the fit. Otherwise, this will be added around the points."),
-                         value = T
-                       ),
-                       checkboxInput(
-                         "calc_fit_w_impl",
-                         label = HTML("<b>Calculate fit/standard deviation with implausible values?</b> If unchecked, records with at least one implausible determination are excluded."),
-                         value = F
-                       ),
-                       style = "default"
-                     ),
-                     bsCollapsePanel(
-                       "Options: All Individuals Heat Map",
-                       checkboxInput(
-                         "heat_side_by_side", 
-                         HTML("<b>Display both height and weight heat maps side by side?</b>"),
-                         value = T
-                       ),
-                       selectInput(
-                         "heat_type",
-                         "Choose which parameter to display in all individuals heat map (if displaying only one type):",
-                         choices = c("Height (cm)" = "HEIGHTCM", "Weight (kg)" = "WEIGHTKG")
-                       ),
-                       selectInput(
-                         "heat_sort_col",
-                         "Columns to sort on (in order, \"None\" alone indicates no sorting):",
-                         choices = c(
-                           "None" = "none",
-                           "ID" = "id",
-                           "Subject" = "subj",
-                           "Measurement" = "measurement",
-                           "Age (years)" = "age_years",
-                           "Sex" = "sex"
-                         ),
-                         selected = "none",
-                         multiple = T
-                       ),
-                       checkboxInput(
-                         "heat_sort_dec", 
-                         HTML("<b>Sort decreasing?</b>"),
-                         value = F
-                       ),
-                       checkboxInput(
-                         "heat_hide_agree", 
-                         HTML("<b>Hide rows where all methods include?</b>"),
-                         value = F
-                       ),
-                       checkboxInput(
-                         "heat_interactive", 
-                         HTML("<b>Make interactive?</b> Interactivity will not render if the amount of records and methods selected exceeds 1500."),
-                         value = T
-                       ),
-                       checkboxInput(
-                         "heat_show_y_lab", 
-                         HTML("<b>Show y labels?</b> Will not be shown if the amount of records exceeds 100. Not recommended with long subject labels when plots are interactive and both types are shown side by side."),
-                         value = T
-                       ),
-                       style = "default"
-                     )
-                   )
+      sidebarPanel(
+        width = 3,
+        bsCollapse(
+          id = "settings",
+          multiple = T,
+          open = "Start: Run Data/Upload Results",
+          bsCollapsePanel(
+            "Start: Run Data/Upload Results",
+            HTML("<b>Upload adult EHR data or results and click the corresponding button below to get started!</b> If no data is input, default synthetic data/results will be used. More information on data format can be found in the \"About\" tab.<p>"),
+            fileInput("dat_file", "Upload Data/Results CSV",
+                      accept = c(".csv", ".CSV")),
+            div(style="display:inline-block",
+                actionButton("run_data", "Run data!"),
+                actionButton("upload_res", "Upload Results"),
+                downloadButton("download_results", label = "Download Results")
+            ),
+            style = "default"
+          ),
+          bsCollapsePanel(
+            "Options: All Plots",
+            textAreaInput("subj_focus", 
+                          "Enter subjects to focus on (line separated):",
+                          width = "100%",
+                          height = "100px"),
+            div(style="display:inline-block",
+                actionButton("update_subj", "Update Subjects"),
+                actionButton("reset_subj", "Reset"),
+                downloadButton("download_focus", label = "Download Subjects")
+            ),
+            HTML("<p>"),
+            checkboxGroupInput(
+              "togg_methods",
+              "Choose methods to compare:",
+              choices = setNames(methods_avail, simpleCap(methods_avail)),
+              selected = methods_avail,
+              inline = T
+            ),
+            actionButton("update_methods", "Update Methods"),
+            style = "default"
+          ),
+          bsCollapsePanel(
+            "Options: Overall Plots",
+            selectInput(
+              "togg_res_count",
+              label = "Which result would you like to see counted in bar graphs?",
+              choices = c("Implausible", "Include"),
+              selected = "Implausible"
+            ),
+            checkboxInput(
+              "show_reason_count", 
+              label = HTML("<b>Show counts in reasons for implausible values?</b>"),
+              value = F
+            ),
+            style = "default"
+          ),
+          bsCollapsePanel(
+            "Options: Individual/Individual By Method Plots",
+            uiOutput("indiv_choose"),
+            div(style="display:inline-block",
+                actionButton("add_subj_focus", "Add Subject to Focus On")
+            ),
+            HTML("<p>"),
+            selectInput(
+              "method_indiv_type",
+              "Choose which parameter to display in individual by method plots:",
+              choices = c("Height (cm)" = "HEIGHTCM", "Weight (kg)" = "WEIGHTKG")
+            ),
+            checkboxInput(
+              "show_fit_line",
+              label = HTML("<b>Show linear fit?</b>"),
+              value = T
+            ),
+            checkboxInput(
+              "show_sd_shade",
+              label = HTML("<b>Show standard deviation shading?</b> If fit included, this will be around the fit. Otherwise, this will be added around the points."),
+              value = T
+            ),
+            checkboxInput(
+              "calc_fit_w_impl",
+              label = HTML("<b>Calculate fit/standard deviation with implausible values?</b> If unchecked, records with at least one implausible determination are excluded."),
+              value = F
+            ),
+            style = "default"
+          ),
+          bsCollapsePanel(
+            "Options: All Individuals Heat Map",
+            checkboxInput(
+              "heat_side_by_side", 
+              HTML("<b>Display both height and weight heat maps side by side?</b>"),
+              value = T
+            ),
+            selectInput(
+              "heat_type",
+              "Choose which parameter to display in all individuals heat map (if displaying only one type):",
+              choices = c("Height (cm)" = "HEIGHTCM", "Weight (kg)" = "WEIGHTKG")
+            ),
+            selectInput(
+              "heat_sort_col",
+              "Columns to sort on (in order, \"None\" alone indicates no sorting):",
+              choices = c(
+                "None" = "none",
+                "ID" = "id",
+                "Subject" = "subj",
+                "Measurement" = "measurement",
+                "Age (years)" = "age_years",
+                "Sex" = "sex"
+              ),
+              selected = "none",
+              multiple = T
+            ),
+            checkboxInput(
+              "heat_sort_dec", 
+              HTML("<b>Sort decreasing?</b>"),
+              value = F
+            ),
+            checkboxInput(
+              "heat_hide_agree", 
+              HTML("<b>Hide rows where all methods include?</b>"),
+              value = F
+            ),
+            checkboxInput(
+              "heat_interactive", 
+              HTML("<b>Make interactive?</b> Interactivity will not render if the amount of records and methods selected exceeds 1500."),
+              value = T
+            ),
+            checkboxInput(
+              "heat_show_y_lab", 
+              HTML("<b>Show y labels?</b> Will not be shown if the amount of records exceeds 100. Not recommended with long subject labels when plots are interactive and both types are shown side by side."),
+              value = T
+            ),
+            style = "default"
+          ),
+          bsCollapsePanel(
+            "Options: Check Answers Plots",
+            selectInput(
+              "answer_bar_tab",
+              label = "Which tabulation method would you like to see in bar graphs?",
+              choices = c("Count", "Percent"),
+              selected = "Count"
+            ),
+            style = "default"
+          )
+        )
       ),
       # UI: result visualizations ----
       mainPanel(
@@ -1029,7 +1094,8 @@ ui <- navbarPage(
           tabPanel(
             "Check Results",
             fluidRow(
-              uiOutput("check_res_title")
+              uiOutput("check_res_title"),
+              uiOutput("check_answer_warning")
             ),
             fluidRow(
               column(
@@ -1485,7 +1551,8 @@ server <- function(input, output, session) {
       "Options: Overall Plots", 
       "Options: Individual/Individual By Method Plots", 
       "Options: Individual/Individual By Method Plots", 
-      "Options: All Individuals Heat Map"
+      "Options: All Individuals Heat Map",
+      "Options: Check Answers Plots"
     )
     
     tab_map_open <- c(
@@ -1493,6 +1560,7 @@ server <- function(input, output, session) {
       "Individual" = "Options: Individual/Individual By Method Plots",
       "Individual by Method" = "Options: Individual/Individual By Method Plots",
       "All Individuals" = "Options: All Individuals Heat Map",
+      "Check Results" = "Options: Check Answers Plots",
       "View Results" = NA
     )
     
@@ -1769,6 +1837,37 @@ server <- function(input, output, session) {
                          sort_dec = input$heat_sort_dec,
                          interactive = F,
                          show_y_lab = input$heat_show_y_lab)
+  })
+  
+  # plot check answers ----
+  
+  output$check_res_title <- renderUI({
+    gen_title(nrow(cleaned_df$full) == nrow(cleaned_df$sub), "Check")
+  })
+  
+  output$check_answer_warning <- renderUI({
+    if (length(colnames(cleaned_df$sub)) == 0 ||
+        !grepl("answers", colnames(cleaned_df$sub))){
+      HTML("<center><h4>Checking answers not available, as there is no \"answers\" column in the data. \"answers\" designate whether a record is truly Implausible or Include. For more information on data format, see the \"About\" tab.</h4></center>")
+    }
+  })
+  
+  output$check_ht <- renderPlotly({
+    ht_tab <- tab_answers(cleaned_df$sub, "HEIGHTCM", methods_chosen$m)
+    plot_answer_bar(ht_tab, input$answer_bar_tab, 
+                    total = if (input$answer_bar_tab == "Count"){ 
+                      sum(cleaned_df$sub$param == "HEIGHTCM")
+                    } else {100}
+    )
+  })
+  
+  output$check_wt <- renderPlotly({
+    wt_tab <- tab_answers(cleaned_df$sub, "WEIGHTKG", methods_chosen$m)
+    plot_answer_bar(wt_tab, input$answer_bar_tab, 
+                    total = if (input$answer_bar_tab == "Count"){ 
+                      sum(cleaned_df$sub$param == "WEIGHTKG")
+                    } else {100}
+    )
   })
   
   # output run results ----
