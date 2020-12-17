@@ -30,6 +30,14 @@ dat_res <- read.csv(
   file.path("Data", "Adult_EHR_Cleaning_Results_data_example.csv")
 )
 
+# add "answers" (completely made up), as an example
+seed <- 7
+set.seed(seed)
+dat_answers <- sample(c("Include","Implausible"), 
+                      size = nrow(dat), replace = T, prob = c(75, 25))
+dat <- cbind(dat, "answers" = dat_answers)
+dat_res <- cbind(dat_res, "answers" = dat_answers)
+
 # load requisite functions
 # function below from ?source
 sourceDir <- function(path, trace = TRUE, ...) {
@@ -165,7 +173,7 @@ tab_clean_reason <- function(cleaned_df, type,
     
     tmp_tab <- as.data.frame(
       table(cleaned_df[criteria, paste0(m, "_reason")])
-      )
+    )
     tmp_tab <- tmp_tab[order(tmp_tab$Freq, decreasing = T),]
     
     if (length(tmp_tab) == 0){
@@ -260,7 +268,7 @@ sub_subj_type <- function(cleaned_df, type, subj,
       x_wo <- paste(x_wo, collapse = "\n")
       return(if (x_wo == ": "){""} else {x_wo})
     })
-    
+  
   
   return(clean_df)
 }
@@ -385,7 +393,7 @@ plot_cleaned <- function(cleaned_df, type, subj,
                 size = 1, linetype = "longdash", 
                 color = "#3F8FB4")+
       scale_x_continuous(expand = expansion(mult = c(0,0)))
-      
+    
   }
   
   if (show_sd_shade){
@@ -635,8 +643,8 @@ plot_result_heat_map <- function(cleaned_df, type,
   # only keep the results and necessary sorting
   clean_df <- 
     clean_df[,
-      !(grepl("_reason", colnames(clean_df)) | 
-          grepl("param", colnames(clean_df)))
+             !(grepl("_reason", colnames(clean_df)) | 
+                 grepl("param", colnames(clean_df)))
     ]
   
   # if we choose to remove where they all agree, do so!
@@ -667,10 +675,10 @@ plot_result_heat_map <- function(cleaned_df, type,
     colnames(clean_df[, !(grepl("_result", colnames(clean_df)) | 
                             grepl("Label", colnames(clean_df)))]),
     collapse = " / "
-    )
+  )
   # remove the sort columns
   clean_df <- clean_df[, (grepl("_result", colnames(clean_df)) | 
-                             grepl("Label", colnames(clean_df)))]
+                            grepl("Label", colnames(clean_df)))]
   # rename result columns
   colnames(clean_df)[grepl("_result", colnames(clean_df))] <-
     simpleCap(
@@ -735,9 +743,9 @@ plot_result_heat_map <- function(cleaned_df, type,
         ) %>%
           layout(
             legend = list(orientation = "h",   # show entries horizontally
-                               xanchor = "center",  
-                               x = 0.5,
-                               y = 1.1)) %>% 
+                          xanchor = "center",  
+                          x = 0.5,
+                          y = 1.1)) %>% 
           config(displayModeBar = F)
       })
     }
@@ -760,270 +768,294 @@ ui <- navbarPage(
     sidebarLayout(
       # UI: sidebar options ----
       sidebarPanel(width = 3,
-        bsCollapse(
-          id = "settings",
-          multiple = T,
-          open = "Start: Run Data/Upload Results",
-          bsCollapsePanel(
-            "Start: Run Data/Upload Results",
-            HTML("<b>Upload adult EHR data or results and click the corresponding button below to get started!</b> If no data is input, default synthetic data/results will be used. More information on data format can be found in the \"About\" tab.<p>"),
-            fileInput("dat_file", "Upload Data/Results CSV",
-                      accept = c(".csv", ".CSV")),
-            div(style="display:inline-block",
-                actionButton("run_data", "Run data!"),
-                actionButton("upload_res", "Upload Results"),
-                downloadButton("download_results", label = "Download Results")
-            ),
-            style = "default"
-          ),
-          bsCollapsePanel(
-            "Options: All Plots",
-            textAreaInput("subj_focus", 
-                          "Enter subjects to focus on (line separated):",
-                          width = "100%",
-                          height = "100px"),
-            div(style="display:inline-block",
-                actionButton("update_subj", "Update Subjects"),
-                actionButton("reset_subj", "Reset"),
-                downloadButton("download_focus", label = "Download Subjects")
-            ),
-            HTML("<p>"),
-            checkboxGroupInput(
-              "togg_methods",
-              "Choose methods to compare:",
-              choices = setNames(methods_avail, simpleCap(methods_avail)),
-              selected = methods_avail,
-              inline = T
-            ),
-            actionButton("update_methods", "Update Methods"),
-            style = "default"
-          ),
-          bsCollapsePanel(
-            "Options: Overall Plots",
-            selectInput(
-              "togg_res_count",
-              label = "Which result would you like to see counted in bar graphs?",
-              choices = c("Implausible", "Include"),
-              selected = "Implausible"
-            ),
-            checkboxInput(
-              "show_reason_count", 
-              label = HTML("<b>Show counts in reasons for implausible values?</b>"),
-              value = F
-            ),
-            style = "default"
-          ),
-          bsCollapsePanel(
-            "Options: Individual/Individual By Method Plots",
-            uiOutput("indiv_choose"),
-            div(style="display:inline-block",
-                actionButton("add_subj_focus", "Add Subject to Focus On")
-            ),
-            HTML("<p>"),
-            selectInput(
-              "method_indiv_type",
-              "Choose which parameter to display in individual by method plots:",
-              choices = c("Height (cm)" = "HEIGHTCM", "Weight (kg)" = "WEIGHTKG")
-            ),
-            checkboxInput(
-              "show_fit_line",
-              label = HTML("<b>Show linear fit?</b>"),
-              value = T
-            ),
-            checkboxInput(
-              "show_sd_shade",
-              label = HTML("<b>Show standard deviation shading?</b> If fit included, this will be around the fit. Otherwise, this will be added around the points."),
-              value = T
-            ),
-            checkboxInput(
-              "calc_fit_w_impl",
-              label = HTML("<b>Calculate fit/standard deviation with implausible values?</b> If unchecked, records with at least one implausible determination are excluded."),
-              value = F
-            ),
-            style = "default"
-          ),
-          bsCollapsePanel(
-            "Options: All Individuals Heat Map",
-            checkboxInput(
-              "heat_side_by_side", 
-              HTML("<b>Display both height and weight heat maps side by side?</b>"),
-              value = T
-            ),
-            selectInput(
-              "heat_type",
-              "Choose which parameter to display in all individuals heat map (if displaying only one type):",
-              choices = c("Height (cm)" = "HEIGHTCM", "Weight (kg)" = "WEIGHTKG")
-            ),
-            selectInput(
-              "heat_sort_col",
-              "Columns to sort on (in order, \"None\" alone indicates no sorting):",
-              choices = c(
-                "None" = "none",
-                "ID" = "id",
-                "Subject" = "subj",
-                "Measurement" = "measurement",
-                "Age (years)" = "age_years",
-                "Sex" = "sex"
-              ),
-              selected = "none",
-              multiple = T
-            ),
-            checkboxInput(
-              "heat_sort_dec", 
-              HTML("<b>Sort decreasing?</b>"),
-              value = F
-            ),
-            checkboxInput(
-              "heat_hide_agree", 
-              HTML("<b>Hide rows where all methods include?</b>"),
-              value = F
-            ),
-            checkboxInput(
-              "heat_interactive", 
-              HTML("<b>Make interactive?</b> Interactivity will not render if the amount of records and methods selected exceeds 1500."),
-              value = T
-            ),
-            checkboxInput(
-              "heat_show_y_lab", 
-              HTML("<b>Show y labels?</b> Will not be shown if the amount of records exceeds 100. Not recommended with long subject labels when plots are interactive and both types are shown side by side."),
-              value = T
-            ),
-            style = "default"
-          )
-        )
+                   bsCollapse(
+                     id = "settings",
+                     multiple = T,
+                     open = "Start: Run Data/Upload Results",
+                     bsCollapsePanel(
+                       "Start: Run Data/Upload Results",
+                       HTML("<b>Upload adult EHR data or results and click the corresponding button below to get started!</b> If no data is input, default synthetic data/results will be used. More information on data format can be found in the \"About\" tab.<p>"),
+                       fileInput("dat_file", "Upload Data/Results CSV",
+                                 accept = c(".csv", ".CSV")),
+                       div(style="display:inline-block",
+                           actionButton("run_data", "Run data!"),
+                           actionButton("upload_res", "Upload Results"),
+                           downloadButton("download_results", label = "Download Results")
+                       ),
+                       style = "default"
+                     ),
+                     bsCollapsePanel(
+                       "Options: All Plots",
+                       textAreaInput("subj_focus", 
+                                     "Enter subjects to focus on (line separated):",
+                                     width = "100%",
+                                     height = "100px"),
+                       div(style="display:inline-block",
+                           actionButton("update_subj", "Update Subjects"),
+                           actionButton("reset_subj", "Reset"),
+                           downloadButton("download_focus", label = "Download Subjects")
+                       ),
+                       HTML("<p>"),
+                       checkboxGroupInput(
+                         "togg_methods",
+                         "Choose methods to compare:",
+                         choices = setNames(methods_avail, simpleCap(methods_avail)),
+                         selected = methods_avail,
+                         inline = T
+                       ),
+                       actionButton("update_methods", "Update Methods"),
+                       style = "default"
+                     ),
+                     bsCollapsePanel(
+                       "Options: Overall Plots",
+                       selectInput(
+                         "togg_res_count",
+                         label = "Which result would you like to see counted in bar graphs?",
+                         choices = c("Implausible", "Include"),
+                         selected = "Implausible"
+                       ),
+                       checkboxInput(
+                         "show_reason_count", 
+                         label = HTML("<b>Show counts in reasons for implausible values?</b>"),
+                         value = F
+                       ),
+                       style = "default"
+                     ),
+                     bsCollapsePanel(
+                       "Options: Individual/Individual By Method Plots",
+                       uiOutput("indiv_choose"),
+                       div(style="display:inline-block",
+                           actionButton("add_subj_focus", "Add Subject to Focus On")
+                       ),
+                       HTML("<p>"),
+                       selectInput(
+                         "method_indiv_type",
+                         "Choose which parameter to display in individual by method plots:",
+                         choices = c("Height (cm)" = "HEIGHTCM", "Weight (kg)" = "WEIGHTKG")
+                       ),
+                       checkboxInput(
+                         "show_fit_line",
+                         label = HTML("<b>Show linear fit?</b>"),
+                         value = T
+                       ),
+                       checkboxInput(
+                         "show_sd_shade",
+                         label = HTML("<b>Show standard deviation shading?</b> If fit included, this will be around the fit. Otherwise, this will be added around the points."),
+                         value = T
+                       ),
+                       checkboxInput(
+                         "calc_fit_w_impl",
+                         label = HTML("<b>Calculate fit/standard deviation with implausible values?</b> If unchecked, records with at least one implausible determination are excluded."),
+                         value = F
+                       ),
+                       style = "default"
+                     ),
+                     bsCollapsePanel(
+                       "Options: All Individuals Heat Map",
+                       checkboxInput(
+                         "heat_side_by_side", 
+                         HTML("<b>Display both height and weight heat maps side by side?</b>"),
+                         value = T
+                       ),
+                       selectInput(
+                         "heat_type",
+                         "Choose which parameter to display in all individuals heat map (if displaying only one type):",
+                         choices = c("Height (cm)" = "HEIGHTCM", "Weight (kg)" = "WEIGHTKG")
+                       ),
+                       selectInput(
+                         "heat_sort_col",
+                         "Columns to sort on (in order, \"None\" alone indicates no sorting):",
+                         choices = c(
+                           "None" = "none",
+                           "ID" = "id",
+                           "Subject" = "subj",
+                           "Measurement" = "measurement",
+                           "Age (years)" = "age_years",
+                           "Sex" = "sex"
+                         ),
+                         selected = "none",
+                         multiple = T
+                       ),
+                       checkboxInput(
+                         "heat_sort_dec", 
+                         HTML("<b>Sort decreasing?</b>"),
+                         value = F
+                       ),
+                       checkboxInput(
+                         "heat_hide_agree", 
+                         HTML("<b>Hide rows where all methods include?</b>"),
+                         value = F
+                       ),
+                       checkboxInput(
+                         "heat_interactive", 
+                         HTML("<b>Make interactive?</b> Interactivity will not render if the amount of records and methods selected exceeds 1500."),
+                         value = T
+                       ),
+                       checkboxInput(
+                         "heat_show_y_lab", 
+                         HTML("<b>Show y labels?</b> Will not be shown if the amount of records exceeds 100. Not recommended with long subject labels when plots are interactive and both types are shown side by side."),
+                         value = T
+                       ),
+                       style = "default"
+                     )
+                   )
       ),
       # UI: result visualizations ----
-      mainPanel(width = 9,
+      mainPanel(
+        width = 9,
         tabsetPanel(
-        id = "res_tabset",
-        tabPanel(
-          "Overall",
-          fluidRow(
-            width = 12,
-            uiOutput("overall_subj_title")
-          ),
-          fluidRow(
-            column(width = 6, style='border-right: 1px solid black', 
-              HTML("<h3><center>Height Results</center></h3>"),
-              plotlyOutput("overall_ht"),
-              hr(),
-              HTML("<h4><center><b>Top Reasons for Implausible Values</center></b></h4>"),
-              dataTableOutput("overall_ht_top_reasons"),
-              plotlyOutput("overall_corr_ht", height = "500px")
+          id = "res_tabset",
+          tabPanel(
+            "Overall",
+            fluidRow(
+              width = 12,
+              uiOutput("overall_subj_title")
             ),
-            column(width = 6, 
-              HTML("<h3><center>Weight Results</center></h3>"),
-              plotlyOutput("overall_wt"),
-              hr(),
-              HTML("<h4><center><b>Top Reasons for Implausible Values</center></b></h4>"),
-              dataTableOutput("overall_wt_top_reasons"),
-              plotlyOutput("overall_corr_wt", height = "500px")
+            fluidRow(
+              column(
+                width = 6, style='border-right: 1px solid black', 
+                HTML("<h3><center>Height Results</center></h3>"),
+                plotlyOutput("overall_ht"),
+                hr(),
+                HTML("<h4><center><b>Top Reasons for Implausible Values</center></b></h4>"),
+                dataTableOutput("overall_ht_top_reasons"),
+                plotlyOutput("overall_corr_ht", height = "500px")
+              ),
+              column(
+                width = 6, 
+                HTML("<h3><center>Weight Results</center></h3>"),
+                plotlyOutput("overall_wt"),
+                hr(),
+                HTML("<h4><center><b>Top Reasons for Implausible Values</center></b></h4>"),
+                dataTableOutput("overall_wt_top_reasons"),
+                plotlyOutput("overall_corr_wt", height = "500px")
+              )
             )
-          )
-        ),
-        tabPanel(
-          "Individual",
-          fluidRow(
-            width = 12,
-            uiOutput("indiv_subj_title")
           ),
-          fluidRow(
-            column(width = 6, 
-                   style='padding-right: 20px; border-right: 1px solid black',
-                   HTML("<h3><center>Height Results</center></h3>"),
-                   plotlyOutput("subj_ht"),
-                   plotOutput("subj_legn_ht", height = "30px"),
-                   HTML("<br>Note: shading indicates standard deviations (SD) away from fit/data (darker for 1 SD, lighter for 2 SD)."),
-                   hr(),
-                   fluidRow(
-                     style = "border: 1px #e3e3e3; border-style: solid; border-radius: 10px; background: #f5f5f5; padding: 10px;",
-                     uiOutput("about_subj_ht")
-                   )
+          tabPanel(
+            "Individual",
+            fluidRow(
+              width = 12,
+              uiOutput("indiv_subj_title")
             ),
-            column(width = 6, style = "padding-left: 20px;",
-                   HTML("<h3><center>Weight Results</center></h3>"),
-                   plotlyOutput("subj_wt"),
-                   plotOutput("subj_legn_wt", height = "30px"),
-                   HTML("<br>Note: shading indicates standard deviations (SD) away from fit/data (darker for 1 SD, lighter for 2 SD)."),
-                   hr(),
-                   fluidRow(
-                     style = "border: 1px #e3e3e3; border-style: solid; border-radius: 10px; background: #f5f5f5; padding: 10px;",
-                     uiOutput("about_subj_wt")
-                   )
-            )
-          )
-        ),
-        tabPanel(
-          "Individual by Method",
-          fluidRow(
-            width = 12,
-            uiOutput("method_subj_title")
-          ),
-          fluidRow(
-            width = 12,
-            uiOutput("method_subj_plots")
-          )
-        ),
-        tabPanel(
-          "All Individuals",
-          fluidRow(
-            width = 12,
-            uiOutput("all_indiv_title"),
-          ),
-          conditionalPanel(
-            "input.heat_side_by_side == true",
             fluidRow(
               column(
                 width = 6, 
                 style='padding-right: 20px; border-right: 1px solid black',
-                HTML("<h3><center>Height (cm)</center></h3>"),
-                conditionalPanel(
-                  "input.heat_interactive == true",
-                  plotlyOutput("ht_heat_all_plotly", height = 800)
-                ),
-                conditionalPanel(
-                  "input.heat_interactive == false",
-                  plotOutput("ht_heat_all_plot", height = 800)
+                HTML("<h3><center>Height Results</center></h3>"),
+                plotlyOutput("subj_ht"),
+                plotOutput("subj_legn_ht", height = "30px"),
+                HTML("<br>Note: shading indicates standard deviations (SD) away from fit/data (darker for 1 SD, lighter for 2 SD)."),
+                hr(),
+                fluidRow(
+                  style = "border: 1px #e3e3e3; border-style: solid; border-radius: 10px; background: #f5f5f5; padding: 10px;",
+                  uiOutput("about_subj_ht")
                 )
               ),
               column(
-                width = 6,
-                HTML("<h3><center>Weight (kg)</center></h3>"),
-                conditionalPanel(
-                  "input.heat_interactive == true",
-                  plotlyOutput("wt_heat_all_plotly", height = 800)
-                ),
-                conditionalPanel(
-                  "input.heat_interactive == false",
-                  plotOutput("wt_heat_all_plot", height = 800)
+                width = 6, style = "padding-left: 20px;",
+                HTML("<h3><center>Weight Results</center></h3>"),
+                plotlyOutput("subj_wt"),
+                plotOutput("subj_legn_wt", height = "30px"),
+                HTML("<br>Note: shading indicates standard deviations (SD) away from fit/data (darker for 1 SD, lighter for 2 SD)."),
+                hr(),
+                fluidRow(
+                  style = "border: 1px #e3e3e3; border-style: solid; border-radius: 10px; background: #f5f5f5; padding: 10px;",
+                  uiOutput("about_subj_wt")
                 )
               )
             )
           ),
-          conditionalPanel(
-            "input.heat_side_by_side == false",
-            uiOutput("one_heat_type_title"),
-            conditionalPanel(
-              "input.heat_interactive == true",
-              plotlyOutput("one_heat_all_plotly", height = 800)
+          tabPanel(
+            "Individual by Method",
+            fluidRow(
+              width = 12,
+              uiOutput("method_subj_title")
+            ),
+            fluidRow(
+              width = 12,
+              uiOutput("method_subj_plots")
+            )
+          ),
+          tabPanel(
+            "All Individuals",
+            fluidRow(
+              width = 12,
+              uiOutput("all_indiv_title"),
             ),
             conditionalPanel(
-              "input.heat_interactive == false",
-              plotOutput("one_heat_all_plot", height = 800)
+              "input.heat_side_by_side == true",
+              fluidRow(
+                column(
+                  width = 6, 
+                  style='padding-right: 20px; border-right: 1px solid black',
+                  HTML("<h3><center>Height (cm)</center></h3>"),
+                  conditionalPanel(
+                    "input.heat_interactive == true",
+                    plotlyOutput("ht_heat_all_plotly", height = 800)
+                  ),
+                  conditionalPanel(
+                    "input.heat_interactive == false",
+                    plotOutput("ht_heat_all_plot", height = 800)
+                  )
+                ),
+                column(
+                  width = 6,
+                  HTML("<h3><center>Weight (kg)</center></h3>"),
+                  conditionalPanel(
+                    "input.heat_interactive == true",
+                    plotlyOutput("wt_heat_all_plotly", height = 800)
+                  ),
+                  conditionalPanel(
+                    "input.heat_interactive == false",
+                    plotOutput("wt_heat_all_plot", height = 800)
+                  )
+                )
+              )
+            ),
+            conditionalPanel(
+              "input.heat_side_by_side == false",
+              uiOutput("one_heat_type_title"),
+              conditionalPanel(
+                "input.heat_interactive == true",
+                plotlyOutput("one_heat_all_plotly", height = 800)
+              ),
+              conditionalPanel(
+                "input.heat_interactive == false",
+                plotOutput("one_heat_all_plot", height = 800)
+              )
             )
-          )
-        ),
-        tabPanel(
-          "View Results",
-          uiOutput("res_subj_title"),
-          fluidRow(
-            column(
-              width = 12,
-              dataTableOutput("run_output")
+          ),
+          tabPanel(
+            "Check Results",
+            fluidRow(
+              uiOutput("check_res_title")
+            ),
+            fluidRow(
+              column(
+                width = 6, style='border-right: 1px solid black', 
+                HTML("<h3><center>Height Results</center></h3>"),
+                plotlyOutput("check_ht"),
+              ),
+              column(
+                width = 6, 
+                HTML("<h3><center>Weight Results</center></h3>"),
+                plotlyOutput("check_wt"),
+              )
+            )
+          ),
+          tabPanel(
+            "View Results",
+            uiOutput("res_subj_title"),
+            fluidRow(
+              column(
+                width = 12,
+                dataTableOutput("run_output")
+              )
             )
           )
         )
-      ))
+      )
     )
   ),
   
@@ -1075,7 +1107,7 @@ ui <- navbarPage(
                 "<h3>Muthalagu, et al. (2014)</h3>",
                 "<h4>Cleans: Height Records</h4><p>",
                 "Muthalagu, et al. aims to transform EHR adult height data into \"research-ready\" values using age and height values, deciding implausible values based on median comparisons within age ranges. More information on this method can be found <a href='https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3974252/' target = 'blank'>here</a>. Steps for this method, along with their titles (used in output) and descriptions, are below.<p>"
-                ),
+              ),
               hr(),
               HTML(
                 "<h4>Steps:</h4>",
@@ -1763,8 +1795,8 @@ server <- function(input, output, session) {
   output$about_syn_dat <- renderUI({
     HTML(
       paste0(
-      "<h3>About Synthetic Data</h3><p>",
-      "Synthetic data was generated by <a href='https://synthetichealth.github.io/synthea/' target = 'blank'>Synthea</a> for ", length(unique(dat$subjid)), " subjects and ", nrow(dat), " records, with ages ranging from ", min(dat$age_years), " to ", max(dat$age_years), ". Descriptive data plots are below.<p>"
+        "<h3>About Synthetic Data</h3><p>",
+        "Synthetic data was generated by <a href='https://synthetichealth.github.io/synthea/' target = 'blank'>Synthea</a> for ", length(unique(dat$subjid)), " subjects and ", nrow(dat), " records, with ages ranging from ", min(dat$age_years), " to ", max(dat$age_years), ". Descriptive data plots are below.<p>"
       )
     )
   })
