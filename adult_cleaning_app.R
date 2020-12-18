@@ -138,8 +138,25 @@ plot_bar <- function(t_tab, yval = "Implausible"){
   }
 }
 
+# function to calculate total possible answers
+tot_poss_answers <- function(cleaned_df, type){
+  return(
+    HTML(paste0(
+      "<center><h4>",
+      "Total Possible Correct: ", sum(cleaned_df$param == type), "<br>",
+      "Total Possible Correct, Include: ", 
+      sum(cleaned_df$param == type & cleaned_df$answers == "Include"), "<br>",
+      "Total Possible Correct, Implausible: ",
+      sum(cleaned_df$param == type & cleaned_df$answers == "Implausible"), "<br>",
+      "<h4></center>"
+    ))
+  )
+}
+
 # function to tabulate results as compared to answers for a given height or weight
-tab_answers <- function(cleaned_df, type, methods_chosen = methods_avail){
+tab_answers <- function(cleaned_df, type, 
+                        methods_chosen = methods_avail, 
+                        group = F){
   m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
   
   if (length(m_for_type) == 0 ||
@@ -149,47 +166,114 @@ tab_answers <- function(cleaned_df, type, methods_chosen = methods_avail){
   }
   
   # preallocate final data frame
-  t_tab <- data.frame(matrix(0, 
-                             nrow = length(m_for_type),
-                             ncol = 3))
-  colnames(t_tab) <- c("Method","Count","Percent")
-  t_tab$Method <- simpleCap(m_for_type)
+  t_tab <- data.frame(matrix(
+    0, 
+    nrow = length(m_for_type)*if(group){2} else {1},
+    ncol = if (group){ 4 }else{ 3 }))
+  
+  res_type <- c("Include", "Implausible")
+  
+  if (group){
+    colnames(t_tab) <- c("Method","Answer","Count","Percent")
+    t_tab$Method <- rep(simpleCap(m_for_type), each = 2)
+    t_tab$Answer <- rep(res_type, length(m_for_type))
+    rownames(t_tab) <- paste0(rep(m_for_type, each = 2), "_", t_tab$Answer)
+  } else {
+    colnames(t_tab) <- c("Method","Count","Percent")
+    t_tab$Method <- simpleCap(m_for_type)
+    rownames(t_tab) <- m_for_type
+  }
   
   # tabulate results
-  rownames(t_tab) <- m_for_type
   param_log <- cleaned_df$param == type
   for (m in m_for_type){
-    t_tab[m,"Count"] <- sum(
-      cleaned_df[param_log, "answers"] == 
-        cleaned_df[param_log, paste0(m, "_result")]
-    )
-    t_tab[m,"Percent"] <- t_tab[m,"Count"]/sum(param_log)*100
+    if (group){
+      for (r in res_type){
+        all_log <- param_log & cleaned_df$answers == r
+        
+        t_tab[paste0(m, "_", r),"Count"] <- sum(
+          cleaned_df[all_log, "answers"] == 
+            cleaned_df[all_log, paste0(m, "_result")]
+        )
+        t_tab[paste0(m, "_", r),"Percent"] <- 
+          t_tab[paste0(m, "_", r),"Count"]/sum(all_log)*100
+      }
+    } else {
+      t_tab[m,"Count"] <- sum(
+        cleaned_df[param_log, "answers"] == 
+          cleaned_df[param_log, paste0(m, "_result")]
+      )
+      t_tab[m,"Percent"] <- t_tab[m,"Count"]/sum(param_log)*100
+    }
   }
   
   return(t_tab)
 }
 
 # function to plot check answers bar plot
-plot_answer_bar <- function(t_tab, yval = "Count", total = max(t_tab[,yval])){
+plot_answer_bar <- function(t_tab, yval = "Count", 
+                            group = F, ontop = F, legn = F){
   if (nrow(t_tab) > 0){
     t_tab$Method <- factor(t_tab$Method, levels = unique(t_tab$Method))
     
-    ggplotly(
-      ggplot(t_tab, aes_string("Method", yval, fill = "Method"))+
-        geom_bar(stat = "identity")+
-        theme_bw()+
-        scale_fill_manual(values = m_colors)+
-        theme(legend.position = "none")+
-        scale_y_continuous(
-          limits = c(0, total),
-          expand = expansion(mult = c(0,.05))) +
-        ylab(paste(yval, " Correct"))+
-        NULL,
-      tooltip = c("x","y")
-    ) %>% config(displayModeBar = F)
+    fill_color <-
+      if (group){
+        c("Include" = "#d4d4d4","Implausible" = "#ff9900")
+      } else {
+        m_colors
+      }
+    
+    p <- 
+      if (group){
+        ggplot(t_tab, aes_string("Method", yval, fill = "Answer", color = "Method", group = "Answer"))+
+          theme_bw()+
+          theme(legend.position = "bottom",
+                legend.direction = "horizontal",
+                text = element_text(size = 15))+
+          if (ontop){
+            geom_bar(stat = "identity")
+          } else {
+            geom_bar(stat = "identity", position = position_dodge(.9))
+          }
+      } else {
+        ggplot(t_tab, aes_string("Method", yval, fill = "Method"))+
+          theme_bw()+
+          geom_bar(stat = "identity")+
+          theme(legend.position = "none")
+      }
+    
+    p <- p +
+      scale_color_manual(values = m_colors, guide = F)+
+      scale_fill_manual(values = fill_color)+
+      scale_y_continuous(
+        expand = expansion(mult = c(0,.05))) +
+      ylab(paste(yval, " Correct"))+
+      NULL
+    
+    p <- p + 
+      if (!legn){
+        theme(legend.position = "none")
+      }
+    
+    p <- 
+      if (!legn | !group){
+        ggplotly(
+          p,
+          tooltip = c("x","y","fill")
+        ) %>% config(displayModeBar = F)
+      } else {
+        as.ggplot(g_legend(p))
+      }
   } else {
-    ggplotly(ggplot()+theme_bw()) %>% config(displayModeBar = F)
+    p <- 
+      if (!legn){
+        ggplotly(ggplot()+theme_bw()) %>% config(displayModeBar = F)
+      } else {
+        ggplot()+theme_bw()
+      }
   }
+  
+  return(p)
 }
 
 # function to generate the overall title for each shiny tab
@@ -961,6 +1045,16 @@ ui <- navbarPage(
               choices = c("Count", "Percent"),
               selected = "Count"
             ),
+            checkboxInput(
+              "answer_group",
+              label = HTML("<b>Group bars by Implausible/Include?</b>"), 
+              value = T
+            ),
+            checkboxInput(
+              "answer_stack",
+              label = HTML("<b>If grouped bars, stack bars?</b> Otherwise, will display bars side-by-side. Not recommended for percent tabulation."), 
+              value = F
+            ),
             style = "default"
           )
         )
@@ -1101,12 +1195,16 @@ ui <- navbarPage(
               column(
                 width = 6, style='border-right: 1px solid black', 
                 HTML("<h3><center>Height Results</center></h3>"),
+                uiOutput("check_ht_possible"),
                 plotlyOutput("check_ht"),
+                plotOutput("check_legn_ht", height = "30px")
               ),
               column(
                 width = 6, 
                 HTML("<h3><center>Weight Results</center></h3>"),
+                uiOutput("check_wt_possible"),
                 plotlyOutput("check_wt"),
+                plotOutput("check_legn_wt", height = "30px")
               )
             )
           ),
@@ -1142,7 +1240,7 @@ ui <- navbarPage(
               HTML(
                 "<center><h3>Welcome to the Adult EHR Cleaning Application!</h3></center><p>",
                 paste0("<center><h4>Version ", vers_adult_ehr, "</h4></center>"),
-                "This application seeks to compare different methods of cleaning adult EHR data, implementing a variety of methods. This currently includes Muthalagu, et al., Cheng, et al., Chan, et al., Littman, et al., Breland, et al., and Growthcleanr-naive. To find out more about these methods, please click on their respective tabs. This application is best viewed in a full screen window.<p>",
+                "This application seeks to compare different methods of cleaning adult EHR data, implementing a variety of methods. This currently includes Muthalagu, et al., Cheng, et al., Chan, et al., Littman, et al., Breland, et al., and Growthcleanr-naive. To find out more about these methods, please click on their respective tabs. This application is best viewed in a full screen window.<p><p>",
                 "To start, you'll begin by uploading your data in the sidebar under the 'Compare' tab. This data should be a CSV in the following format:"
               ),
               dataTableOutput("dat_example"),
@@ -1154,8 +1252,9 @@ ui <- navbarPage(
                 "<li><b>measurement:</b> measurement of height or weight, corresponding to the parameter</li>",
                 "<li><b>age_years:</b> age in years</li>",
                 "<li><b>sex:</b> 0 (male) or 1 (female)</li>",
+                "<li><b>answers:</b> (<u>not required</u>) an answer column, indicating whether the value should be Include or Implausible</li>",
                 "</ul><p>",
-                "If no data is input, the app will use synthetic data (to find out more about this example data, click on the 'Synthetic Data' tab). Then click run to get started!<p>",
+                "If no data is input, the app will use synthetic data (to find out more about this example data, click on the 'Synthetic Data' tab). Then click run to get started! Note: \"answers\" included in synthetic data are randomly generated for illustration purposes.<p>",
                 paste0("Version: ", vers_adult_ehr, "<p>")
               ),
               column(width = 3)
@@ -1847,27 +1946,57 @@ server <- function(input, output, session) {
   
   output$check_answer_warning <- renderUI({
     if (length(colnames(cleaned_df$sub)) == 0 ||
-        !grepl("answers", colnames(cleaned_df$sub))){
+        !any(grepl("answers", colnames(cleaned_df$sub)))){
       HTML("<center><h4>Checking answers not available, as there is no \"answers\" column in the data. \"answers\" designate whether a record is truly Implausible or Include. For more information on data format, see the \"About\" tab.</h4></center>")
+    } else {
+      HTML("<center><h4>Note that answers for individual observations can be observed as a visualization in the \"All Individuals\" and \"View Results\" tabs.</h4></center>")
     }
   })
   
+  output$check_ht_possible <- renderUI({
+    tot_poss_answers(cleaned_df$sub, "HEIGHTCM")
+  })
+  
+  output$check_wt_possible <- renderUI({
+    tot_poss_answers(cleaned_df$sub, "WEIGHTKG")
+  })
+  
   output$check_ht <- renderPlotly({
-    ht_tab <- tab_answers(cleaned_df$sub, "HEIGHTCM", methods_chosen$m)
+    ht_tab <- tab_answers(cleaned_df$sub, "HEIGHTCM", methods_chosen$m,
+                          group = input$answer_group)
     plot_answer_bar(ht_tab, input$answer_bar_tab, 
-                    total = if (input$answer_bar_tab == "Count"){ 
-                      sum(cleaned_df$sub$param == "HEIGHTCM")
-                    } else {100}
+                    group = input$answer_group, ontop = input$answer_stack
     )
   })
   
   output$check_wt <- renderPlotly({
-    wt_tab <- tab_answers(cleaned_df$sub, "WEIGHTKG", methods_chosen$m)
+    wt_tab <- tab_answers(cleaned_df$sub, "WEIGHTKG", methods_chosen$m,
+                          group = input$answer_group)
     plot_answer_bar(wt_tab, input$answer_bar_tab, 
-                    total = if (input$answer_bar_tab == "Count"){ 
-                      sum(cleaned_df$sub$param == "WEIGHTKG")
-                    } else {100}
+                    group = input$answer_group, ontop = input$answer_stack
     )
+  })
+  
+  output$check_legn_ht <- renderPlot({
+    if (input$answer_group){
+      ht_tab <- tab_answers(cleaned_df$sub, "HEIGHTCM", methods_chosen$m,
+                            group = input$answer_group)
+      plot_answer_bar(ht_tab, input$answer_bar_tab, 
+                      group = input$answer_group, ontop = input$answer_stack,
+                      legn = T
+      )
+    }
+  })
+  
+  output$check_legn_wt <- renderPlot({
+    if (input$answer_group){
+      wt_tab <- tab_answers(cleaned_df$sub, "WEIGHTKG", methods_chosen$m,
+                            group = input$answer_group)
+      plot_answer_bar(wt_tab, input$answer_bar_tab, 
+                      group = input$answer_group, ontop = input$answer_stack,
+                      legn = T
+      )
+    }
   })
   
   # output run results ----
@@ -1895,7 +2024,7 @@ server <- function(input, output, session) {
     HTML(
       paste0(
         "<h3>About Synthetic Data</h3><p>",
-        "Synthetic data was generated by <a href='https://synthetichealth.github.io/synthea/' target = 'blank'>Synthea</a> for ", length(unique(dat$subjid)), " subjects and ", nrow(dat), " records, with ages ranging from ", min(dat$age_years), " to ", max(dat$age_years), ". Descriptive data plots are below.<p>"
+        "Synthetic data was generated by <a href='https://synthetichealth.github.io/synthea/' target = 'blank'>Synthea</a> for ", length(unique(dat$subjid)), " subjects and ", nrow(dat), " records, with ages ranging from ", min(dat$age_years), " to ", max(dat$age_years), ". Descriptive data plots are below. Note: \"answers\" included in synthetic data are randomly generated for illustration purposes.<p>"
       )
     )
   })
