@@ -749,16 +749,43 @@ plot_result_heat_map <- function(cleaned_df, type,
                                  sort_dec = F,
                                  hide_agree = F, 
                                  interactive = F,
-                                 show_y_lab = F){
+                                 show_y_lab = F,
+                                 show_answers = T,
+                                 hl_incorr = T){
   type_n <- c(
     "HEIGHTCM" = "Height",
     "WEIGHTKG" = "Weight"
   )
   
-  color_map <- c(
-    "Include" = "#d4d4d4",
-    "Implausible" = "#ff9900"
-  )
+  # if show answers is true and there are no answers, fix that
+  if (show_answers & !"answers" %in% colnames(cleaned_df)){
+    show_answers <- F
+  }
+  
+  color_map <- 
+    if (show_answers){
+      # if we're highlighting incorrect answers, make those brighter
+      if (hl_incorr){
+        c(
+          "Include (Incorrect)" = "#d4d4d4",
+          "Include (Correct)" = "#f5f5f5",
+          "Implausible (Incorrect)" = "#ff9900",
+          "Implausible (Correct)" = "#ffd191"
+        )
+      } else {
+        c(
+          "Include (Correct)" = "#d4d4d4",
+          "Include (Incorrect)" = "#f5f5f5",
+          "Implausible (Correct)" = "#ff9900",
+          "Implausible (Incorrect)" = "#ffd191"
+        )
+      }
+    } else {
+      c(
+        "Include" = "#d4d4d4",
+        "Implausible" = "#ff9900"
+      )
+    }
   
   # get the possible methods for this type
   m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
@@ -784,13 +811,37 @@ plot_result_heat_map <- function(cleaned_df, type,
              !(grepl("_reason", colnames(clean_df)) | 
                  grepl("param", colnames(clean_df)))
     ]
+
+  # if we're going to show answers, we want to change the names  
+  if (show_answers){
+    # get the results as compared to the answers
+    ans_res <- 
+      clean_df[, grepl("_result", colnames(clean_df))] == clean_df$answers
+    # add correct/incorrect
+    clean_df[, grepl("_result", colnames(clean_df))][ans_res] <- 
+      paste0(
+        clean_df[, grepl("_result", colnames(clean_df))][ans_res], " (Correct)"
+      )
+    clean_df[, grepl("_result", colnames(clean_df))][!ans_res] <- 
+      paste0(
+        clean_df[, grepl("_result", colnames(clean_df))][!ans_res], " (Incorrect)"
+      )
+  }
   
   # if we choose to remove where they all agree, do so!
   if (hide_agree){
     # result columns
     res_col <- grepl("_result", colnames(clean_df))
     
-    clean_df <- clean_df[rowSums(clean_df[, res_col] != "Include") > 0,]
+    if (!show_answers){
+      clean_df <- clean_df[rowSums(clean_df[, res_col] != "Include") > 0,]
+    } else {
+      clean_df <- 
+        clean_df[rowSums(
+          clean_df[, res_col] != "Include (Correct)" | 
+            clean_df[, res_col] != "Include (Incorrect)"
+        ) > 0,]
+    }
   }
   
   # sort for visualizing
@@ -1014,6 +1065,17 @@ ui <- navbarPage(
               ),
               selected = "none",
               multiple = T
+            ),
+            checkboxInput(
+              "heat_show_answers", 
+              HTML("<b>Show answers, if available?</b>"),
+              value = T
+            ),
+            
+            checkboxInput(
+              "heat_hl_incorr", 
+              HTML("<b>If showing answers, highlight incorrect answers?</b> If selected, incorrect answers will appear brighter than correct answers. Otherwise, correct answers will be highlighted."),
+              value = T
             ),
             checkboxInput(
               "heat_sort_dec", 
@@ -1875,7 +1937,9 @@ server <- function(input, output, session) {
                          hide_agree = input$heat_hide_agree,
                          sort_dec = input$heat_sort_dec,
                          interactive = T,
-                         show_y_lab = input$heat_show_y_lab)
+                         show_y_lab = input$heat_show_y_lab,
+                         show_answers = input$heat_show_answers,
+                         hl_incorr = input$heat_hl_incorr)
   })
   
   # render ggplot version -- will only render if UI is allocated
@@ -1887,7 +1951,9 @@ server <- function(input, output, session) {
                          hide_agree = input$heat_hide_agree,
                          sort_dec = input$heat_sort_dec,
                          interactive = F,
-                         show_y_lab = input$heat_show_y_lab)
+                         show_y_lab = input$heat_show_y_lab,
+                         show_answers = input$heat_show_answers,
+                         hl_incorr = input$heat_hl_incorr)
   })
   
   # render plotly version -- will only render if UI is allocated
@@ -1899,7 +1965,9 @@ server <- function(input, output, session) {
                          hide_agree = input$heat_hide_agree,
                          sort_dec = input$heat_sort_dec,
                          interactive = T,
-                         show_y_lab = input$heat_show_y_lab)
+                         show_y_lab = input$heat_show_y_lab,
+                         show_answers = input$heat_show_answers,
+                         hl_incorr = input$heat_hl_incorr)
   })
   
   # render ggplot version -- will only render if UI is allocated
@@ -1911,7 +1979,9 @@ server <- function(input, output, session) {
                          hide_agree = input$heat_hide_agree,
                          sort_dec = input$heat_sort_dec,
                          interactive = F,
-                         show_y_lab = input$heat_show_y_lab)
+                         show_y_lab = input$heat_show_y_lab,
+                         show_answers = input$heat_show_answers,
+                         hl_incorr = input$heat_hl_incorr)
   })
   
   # render plotly version -- will only render if UI is allocated
