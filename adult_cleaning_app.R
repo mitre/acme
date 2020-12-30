@@ -218,7 +218,7 @@ plot_answer_bar <- function(t_tab, yval = "Count",
     
     fill_color <-
       if (group){
-        c("Include" = "#d4d4d4","Implausible" = "#ff9900")
+        c("Include" = "#b2abd2","Implausible" = "#fdb863")
       } else {
         m_colors
       }
@@ -426,7 +426,7 @@ plot_cleaned <- function(cleaned_df, type, subj,
   # maps for configuring ggplot
   color_map <- c(
     "Include" = "#000000",
-    "Implausible" = "#ff9900"
+    "Implausible" = "#fdb863"
   )
   
   shape_map <- c(
@@ -767,23 +767,23 @@ plot_result_heat_map <- function(cleaned_df, type,
       # if we're highlighting incorrect answers, make those brighter
       if (hl_incorr){
         c(
-          "Include (Incorrect)" = "#d4d4d4",
-          "Include (Correct)" = "#f5f5f5",
-          "Implausible (Incorrect)" = "#ff9900",
-          "Implausible (Correct)" = "#ffd191"
+          "Include (Incorrect)" = "#5e3c99",
+          "Include (Correct)" = "#b2abd2",
+          "Implausible (Incorrect)" = "#e66101",
+          "Implausible (Correct)" = "#fdb863"
         )
       } else {
         c(
-          "Include (Correct)" = "#d4d4d4",
-          "Include (Incorrect)" = "#f5f5f5",
-          "Implausible (Correct)" = "#ff9900",
-          "Implausible (Incorrect)" = "#ffd191"
+          "Include (Correct)" = "#5e3c99",
+          "Include (Incorrect)" = "#b2abd2",
+          "Implausible (Correct)" = "#e66101",
+          "Implausible (Incorrect)" = "#fdb863"
         )
       }
     } else {
       c(
-        "Include" = "#d4d4d4",
-        "Implausible" = "#ff9900"
+        "Include" = "#b2abd2",
+        "Implausible" = "#fdb863"
       )
     }
   
@@ -838,8 +838,8 @@ plot_result_heat_map <- function(cleaned_df, type,
     } else {
       clean_df <- 
         clean_df[rowSums(
-          clean_df[, res_col] != "Include (Correct)" | 
-            clean_df[, res_col] != "Include (Incorrect)"
+          clean_df[, res_col] != "Include (Correct)" & 
+            clean_df[, res_col] != "Implausible (Correct)"
         ) > 0,]
     }
   }
@@ -1074,7 +1074,7 @@ ui <- navbarPage(
             
             checkboxInput(
               "heat_hl_incorr", 
-              HTML("<b>If showing answers, highlight incorrect answers?</b> If selected, incorrect answers will appear brighter than correct answers. Otherwise, correct answers will be highlighted."),
+              HTML("<b>If showing answers, highlight incorrect answers?</b> If selected, incorrect answers will appear darker than correct answers. Otherwise, correct answers will be highlighted."),
               value = T
             ),
             checkboxInput(
@@ -1084,7 +1084,7 @@ ui <- navbarPage(
             ),
             checkboxInput(
               "heat_hide_agree", 
-              HTML("<b>Hide rows where all methods include?</b>"),
+              HTML("<b>Hide rows where all methods include, or are correct (when showing answers)?</b>"),
               value = F
             ),
             checkboxInput(
@@ -1993,7 +1993,9 @@ server <- function(input, output, session) {
                          hide_agree = input$heat_hide_agree,
                          sort_dec = input$heat_sort_dec,
                          interactive = T,
-                         show_y_lab = input$heat_show_y_lab)
+                         show_y_lab = input$heat_show_y_lab,
+                         show_answers = input$heat_show_answers,
+                         hl_incorr = input$heat_hl_incorr)
   })
   
   # render ggplot version -- will only render if UI is allocated
@@ -2005,7 +2007,9 @@ server <- function(input, output, session) {
                          hide_agree = input$heat_hide_agree,
                          sort_dec = input$heat_sort_dec,
                          interactive = F,
-                         show_y_lab = input$heat_show_y_lab)
+                         show_y_lab = input$heat_show_y_lab,
+                         show_answers = input$heat_show_answers,
+                         hl_incorr = input$heat_hl_incorr)
   })
   
   # plot check answers ----
