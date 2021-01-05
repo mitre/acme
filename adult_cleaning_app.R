@@ -1247,7 +1247,7 @@ ui <- navbarPage(
             )
           ),
           tabPanel(
-            "Check Results",
+            "Check Answers",
             fluidRow(
               uiOutput("check_res_title"),
               uiOutput("check_answer_warning")
@@ -1720,7 +1720,7 @@ server <- function(input, output, session) {
       "Individual" = "Options: Individual/Individual By Method Plots",
       "Individual by Method" = "Options: Individual/Individual By Method Plots",
       "All Individuals" = "Options: All Individuals Heat Map",
-      "Check Results" = "Options: Check Answers Plots",
+      "Check Answers" = "Options: Check Answers Plots",
       "View Results" = NA
     )
     
