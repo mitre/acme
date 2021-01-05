@@ -225,7 +225,7 @@ plot_answer_bar <- function(t_tab, yval = "Count",
     
     p <- 
       if (group){
-        ggplot(t_tab, aes_string("Method", yval, fill = "Answer", color = "Method", group = "Answer"))+
+        ggplot(t_tab, aes_string("Method", yval, fill = "Answer", group = "Answer"))+
           theme_bw()+
           theme(legend.position = "bottom",
                 legend.direction = "horizontal",
@@ -243,7 +243,6 @@ plot_answer_bar <- function(t_tab, yval = "Count",
       }
     
     p <- p +
-      scale_color_manual(values = m_colors, guide = F)+
       scale_fill_manual(values = fill_color)+
       scale_y_continuous(
         expand = expansion(mult = c(0,.05))) +
@@ -1114,7 +1113,7 @@ ui <- navbarPage(
             ),
             checkboxInput(
               "answer_stack",
-              label = HTML("<b>If grouped bars, stack bars?</b> Otherwise, will display bars side-by-side. Not recommended for percent tabulation."), 
+              label = HTML("<b>Stack grouped bars?</b> Otherwise, will display bars side-by-side. Not recommended for percent tabulation."), 
               value = F
             ),
             style = "default"
