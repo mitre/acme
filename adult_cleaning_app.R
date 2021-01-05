@@ -30,6 +30,14 @@ dat_res <- read.csv(
   file.path("Data", "Adult_EHR_Cleaning_Results_data_example.csv")
 )
 
+# add "answers" (completely made up), as an example
+seed <- 7
+set.seed(seed)
+dat_answers <- sample(c("Include","Implausible"), 
+                      size = nrow(dat), replace = T, prob = c(75, 25))
+dat <- cbind(dat, "answers" = dat_answers)
+dat_res <- cbind(dat_res, "answers" = dat_answers)
+
 # load requisite functions
 # function below from ?source
 sourceDir <- function(path, trace = TRUE, ...) {
@@ -130,6 +138,143 @@ plot_bar <- function(t_tab, yval = "Implausible"){
   }
 }
 
+# function to calculate total possible answers
+tot_poss_answers <- function(cleaned_df, type){
+  return(
+    HTML(paste0(
+      "<center><h4>",
+      "Total Possible Correct: ", sum(cleaned_df$param == type), "<br>",
+      "Total Possible Correct, Include: ", 
+      sum(cleaned_df$param == type & cleaned_df$answers == "Include"), "<br>",
+      "Total Possible Correct, Implausible: ",
+      sum(cleaned_df$param == type & cleaned_df$answers == "Implausible"), "<br>",
+      "<h4></center>"
+    ))
+  )
+}
+
+# function to tabulate results as compared to answers for a given height or weight
+tab_answers <- function(cleaned_df, type, 
+                        methods_chosen = methods_avail, 
+                        group = F){
+  m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
+  
+  if (length(m_for_type) == 0 ||
+      nrow(cleaned_df) == 0 || 
+      !any(grepl("answers", colnames(cleaned_df)))){
+    return(data.frame())
+  }
+  
+  # preallocate final data frame
+  t_tab <- data.frame(matrix(
+    0, 
+    nrow = length(m_for_type)*if(group){2} else {1},
+    ncol = if (group){ 4 }else{ 3 }))
+  
+  res_type <- c("Include", "Implausible")
+  
+  if (group){
+    colnames(t_tab) <- c("Method","Answer","Count","Percent")
+    t_tab$Method <- rep(simpleCap(m_for_type), each = 2)
+    t_tab$Answer <- rep(res_type, length(m_for_type))
+    rownames(t_tab) <- paste0(rep(m_for_type, each = 2), "_", t_tab$Answer)
+  } else {
+    colnames(t_tab) <- c("Method","Count","Percent")
+    t_tab$Method <- simpleCap(m_for_type)
+    rownames(t_tab) <- m_for_type
+  }
+  
+  # tabulate results
+  param_log <- cleaned_df$param == type
+  for (m in m_for_type){
+    if (group){
+      for (r in res_type){
+        all_log <- param_log & cleaned_df$answers == r
+        
+        t_tab[paste0(m, "_", r),"Count"] <- sum(
+          cleaned_df[all_log, "answers"] == 
+            cleaned_df[all_log, paste0(m, "_result")]
+        )
+        t_tab[paste0(m, "_", r),"Percent"] <- 
+          t_tab[paste0(m, "_", r),"Count"]/sum(all_log)*100
+      }
+    } else {
+      t_tab[m,"Count"] <- sum(
+        cleaned_df[param_log, "answers"] == 
+          cleaned_df[param_log, paste0(m, "_result")]
+      )
+      t_tab[m,"Percent"] <- t_tab[m,"Count"]/sum(param_log)*100
+    }
+  }
+  
+  return(t_tab)
+}
+
+# function to plot check answers bar plot
+plot_answer_bar <- function(t_tab, yval = "Count", 
+                            group = F, ontop = F, legn = F){
+  if (nrow(t_tab) > 0){
+    t_tab$Method <- factor(t_tab$Method, levels = unique(t_tab$Method))
+    
+    fill_color <-
+      if (group){
+        c("Include" = "#b2abd2","Implausible" = "#fdb863")
+      } else {
+        m_colors
+      }
+    
+    p <- 
+      if (group){
+        ggplot(t_tab, aes_string("Method", yval, fill = "Answer", group = "Answer"))+
+          theme_bw()+
+          theme(legend.position = "bottom",
+                legend.direction = "horizontal",
+                text = element_text(size = 15))+
+          if (ontop){
+            geom_bar(stat = "identity")
+          } else {
+            geom_bar(stat = "identity", position = position_dodge(.9))
+          }
+      } else {
+        ggplot(t_tab, aes_string("Method", yval, fill = "Method"))+
+          theme_bw()+
+          geom_bar(stat = "identity")+
+          theme(legend.position = "none")
+      }
+    
+    p <- p +
+      scale_fill_manual(values = fill_color)+
+      scale_y_continuous(
+        expand = expansion(mult = c(0,.05))) +
+      ylab(paste(yval, " Correct"))+
+      NULL
+    
+    p <- p + 
+      if (!legn){
+        theme(legend.position = "none")
+      }
+    
+    p <- 
+      if (!legn | !group){
+        ggplotly(
+          p,
+          tooltip = c("x","y","fill")
+        ) %>% config(displayModeBar = F)
+      } else {
+        as.ggplot(g_legend(p))
+      }
+  } else {
+    p <- 
+      if (!legn){
+        ggplotly(ggplot()+theme_bw()) %>% config(displayModeBar = F)
+      } else {
+        ggplot()+theme_bw()
+      }
+  }
+  
+  return(p)
+}
+
 # function to generate the overall title for each shiny tab
 gen_title <- function(criteria, tab_titl){
   return(
@@ -165,7 +310,7 @@ tab_clean_reason <- function(cleaned_df, type,
     
     tmp_tab <- as.data.frame(
       table(cleaned_df[criteria, paste0(m, "_reason")])
-      )
+    )
     tmp_tab <- tmp_tab[order(tmp_tab$Freq, decreasing = T),]
     
     if (length(tmp_tab) == 0){
@@ -260,7 +405,7 @@ sub_subj_type <- function(cleaned_df, type, subj,
       x_wo <- paste(x_wo, collapse = "\n")
       return(if (x_wo == ": "){""} else {x_wo})
     })
-    
+  
   
   return(clean_df)
 }
@@ -280,7 +425,7 @@ plot_cleaned <- function(cleaned_df, type, subj,
   # maps for configuring ggplot
   color_map <- c(
     "Include" = "#000000",
-    "Implausible" = "#ff9900"
+    "Implausible" = "#fdb863"
   )
   
   shape_map <- c(
@@ -385,7 +530,7 @@ plot_cleaned <- function(cleaned_df, type, subj,
                 size = 1, linetype = "longdash", 
                 color = "#3F8FB4")+
       scale_x_continuous(expand = expansion(mult = c(0,0)))
-      
+    
   }
   
   if (show_sd_shade){
@@ -603,16 +748,43 @@ plot_result_heat_map <- function(cleaned_df, type,
                                  sort_dec = F,
                                  hide_agree = F, 
                                  interactive = F,
-                                 show_y_lab = F){
+                                 show_y_lab = F,
+                                 show_answers = T,
+                                 hl_incorr = T){
   type_n <- c(
     "HEIGHTCM" = "Height",
     "WEIGHTKG" = "Weight"
   )
   
-  color_map <- c(
-    "Include" = "#d4d4d4",
-    "Implausible" = "#ff9900"
-  )
+  # if show answers is true and there are no answers, fix that
+  if (show_answers & !"answers" %in% colnames(cleaned_df)){
+    show_answers <- F
+  }
+  
+  color_map <- 
+    if (show_answers){
+      # if we're highlighting incorrect answers, make those brighter
+      if (hl_incorr){
+        c(
+          "Include (Incorrect)" = "#5e3c99",
+          "Include (Correct)" = "#b2abd2",
+          "Implausible (Incorrect)" = "#e66101",
+          "Implausible (Correct)" = "#fdb863"
+        )
+      } else {
+        c(
+          "Include (Correct)" = "#5e3c99",
+          "Include (Incorrect)" = "#b2abd2",
+          "Implausible (Correct)" = "#e66101",
+          "Implausible (Incorrect)" = "#fdb863"
+        )
+      }
+    } else {
+      c(
+        "Include" = "#b2abd2",
+        "Implausible" = "#fdb863"
+      )
+    }
   
   # get the possible methods for this type
   m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
@@ -635,16 +807,40 @@ plot_result_heat_map <- function(cleaned_df, type,
   # only keep the results and necessary sorting
   clean_df <- 
     clean_df[,
-      !(grepl("_reason", colnames(clean_df)) | 
-          grepl("param", colnames(clean_df)))
+             !(grepl("_reason", colnames(clean_df)) | 
+                 grepl("param", colnames(clean_df)))
     ]
+
+  # if we're going to show answers, we want to change the names  
+  if (show_answers){
+    # get the results as compared to the answers
+    ans_res <- 
+      clean_df[, grepl("_result", colnames(clean_df))] == clean_df$answers
+    # add correct/incorrect
+    clean_df[, grepl("_result", colnames(clean_df))][ans_res] <- 
+      paste0(
+        clean_df[, grepl("_result", colnames(clean_df))][ans_res], " (Correct)"
+      )
+    clean_df[, grepl("_result", colnames(clean_df))][!ans_res] <- 
+      paste0(
+        clean_df[, grepl("_result", colnames(clean_df))][!ans_res], " (Incorrect)"
+      )
+  }
   
   # if we choose to remove where they all agree, do so!
   if (hide_agree){
     # result columns
     res_col <- grepl("_result", colnames(clean_df))
     
-    clean_df <- clean_df[rowSums(clean_df[, res_col] != "Include") > 0,]
+    if (!show_answers){
+      clean_df <- clean_df[rowSums(clean_df[, res_col] != "Include") > 0,]
+    } else {
+      clean_df <- 
+        clean_df[rowSums(
+          clean_df[, res_col] != "Include (Correct)" & 
+            clean_df[, res_col] != "Implausible (Correct)"
+        ) > 0,]
+    }
   }
   
   # sort for visualizing
@@ -667,10 +863,10 @@ plot_result_heat_map <- function(cleaned_df, type,
     colnames(clean_df[, !(grepl("_result", colnames(clean_df)) | 
                             grepl("Label", colnames(clean_df)))]),
     collapse = " / "
-    )
+  )
   # remove the sort columns
   clean_df <- clean_df[, (grepl("_result", colnames(clean_df)) | 
-                             grepl("Label", colnames(clean_df)))]
+                            grepl("Label", colnames(clean_df)))]
   # rename result columns
   colnames(clean_df)[grepl("_result", colnames(clean_df))] <-
     simpleCap(
@@ -735,9 +931,9 @@ plot_result_heat_map <- function(cleaned_df, type,
         ) %>%
           layout(
             legend = list(orientation = "h",   # show entries horizontally
-                               xanchor = "center",  
-                               x = 0.5,
-                               y = 1.1)) %>% 
+                          xanchor = "center",  
+                          x = 0.5,
+                          y = 1.1)) %>% 
           config(displayModeBar = F)
       })
     }
@@ -759,7 +955,8 @@ ui <- navbarPage(
     "Compare",
     sidebarLayout(
       # UI: sidebar options ----
-      sidebarPanel(width = 3,
+      sidebarPanel(
+        width = 3,
         bsCollapse(
           id = "settings",
           multiple = T,
@@ -869,13 +1066,24 @@ ui <- navbarPage(
               multiple = T
             ),
             checkboxInput(
+              "heat_show_answers", 
+              HTML("<b>Show answers, if available?</b>"),
+              value = T
+            ),
+            
+            checkboxInput(
+              "heat_hl_incorr", 
+              HTML("<b>If showing answers, highlight incorrect answers?</b> If selected, incorrect answers will appear darker than correct answers. Otherwise, correct answers will be highlighted."),
+              value = T
+            ),
+            checkboxInput(
               "heat_sort_dec", 
               HTML("<b>Sort decreasing?</b>"),
               value = F
             ),
             checkboxInput(
               "heat_hide_agree", 
-              HTML("<b>Hide rows where all methods include?</b>"),
+              HTML("<b>Hide rows where all methods include, or are correct (when showing answers)?</b>"),
               value = F
             ),
             checkboxInput(
@@ -889,141 +1097,190 @@ ui <- navbarPage(
               value = T
             ),
             style = "default"
+          ),
+          bsCollapsePanel(
+            "Options: Check Answers Plots",
+            selectInput(
+              "answer_bar_tab",
+              label = "Which tabulation method would you like to see in bar graphs?",
+              choices = c("Count", "Percent"),
+              selected = "Count"
+            ),
+            checkboxInput(
+              "answer_group",
+              label = HTML("<b>Group bars by Implausible/Include?</b>"), 
+              value = T
+            ),
+            checkboxInput(
+              "answer_stack",
+              label = HTML("<b>Stack grouped bars?</b> Otherwise, will display bars side-by-side. Not recommended for percent tabulation."), 
+              value = F
+            ),
+            style = "default"
           )
         )
       ),
       # UI: result visualizations ----
-      mainPanel(width = 9,
+      mainPanel(
+        width = 9,
         tabsetPanel(
-        id = "res_tabset",
-        tabPanel(
-          "Overall",
-          fluidRow(
-            width = 12,
-            uiOutput("overall_subj_title")
-          ),
-          fluidRow(
-            column(width = 6, style='border-right: 1px solid black', 
-              HTML("<h3><center>Height Results</center></h3>"),
-              plotlyOutput("overall_ht"),
-              hr(),
-              HTML("<h4><center><b>Top Reasons for Implausible Values</center></b></h4>"),
-              dataTableOutput("overall_ht_top_reasons"),
-              plotlyOutput("overall_corr_ht", height = "500px")
+          id = "res_tabset",
+          tabPanel(
+            "Overall",
+            fluidRow(
+              width = 12,
+              uiOutput("overall_subj_title")
             ),
-            column(width = 6, 
-              HTML("<h3><center>Weight Results</center></h3>"),
-              plotlyOutput("overall_wt"),
-              hr(),
-              HTML("<h4><center><b>Top Reasons for Implausible Values</center></b></h4>"),
-              dataTableOutput("overall_wt_top_reasons"),
-              plotlyOutput("overall_corr_wt", height = "500px")
+            fluidRow(
+              column(
+                width = 6, style='border-right: 1px solid black', 
+                HTML("<h3><center>Height Results</center></h3>"),
+                plotlyOutput("overall_ht"),
+                hr(),
+                HTML("<h4><center><b>Top Reasons for Implausible Values</center></b></h4>"),
+                dataTableOutput("overall_ht_top_reasons"),
+                plotlyOutput("overall_corr_ht", height = "500px")
+              ),
+              column(
+                width = 6, 
+                HTML("<h3><center>Weight Results</center></h3>"),
+                plotlyOutput("overall_wt"),
+                hr(),
+                HTML("<h4><center><b>Top Reasons for Implausible Values</center></b></h4>"),
+                dataTableOutput("overall_wt_top_reasons"),
+                plotlyOutput("overall_corr_wt", height = "500px")
+              )
             )
-          )
-        ),
-        tabPanel(
-          "Individual",
-          fluidRow(
-            width = 12,
-            uiOutput("indiv_subj_title")
           ),
-          fluidRow(
-            column(width = 6, 
-                   style='padding-right: 20px; border-right: 1px solid black',
-                   HTML("<h3><center>Height Results</center></h3>"),
-                   plotlyOutput("subj_ht"),
-                   plotOutput("subj_legn_ht", height = "30px"),
-                   HTML("<br>Note: shading indicates standard deviations (SD) away from fit/data (darker for 1 SD, lighter for 2 SD)."),
-                   hr(),
-                   fluidRow(
-                     style = "border: 1px #e3e3e3; border-style: solid; border-radius: 10px; background: #f5f5f5; padding: 10px;",
-                     uiOutput("about_subj_ht")
-                   )
+          tabPanel(
+            "Individual",
+            fluidRow(
+              width = 12,
+              uiOutput("indiv_subj_title")
             ),
-            column(width = 6, style = "padding-left: 20px;",
-                   HTML("<h3><center>Weight Results</center></h3>"),
-                   plotlyOutput("subj_wt"),
-                   plotOutput("subj_legn_wt", height = "30px"),
-                   HTML("<br>Note: shading indicates standard deviations (SD) away from fit/data (darker for 1 SD, lighter for 2 SD)."),
-                   hr(),
-                   fluidRow(
-                     style = "border: 1px #e3e3e3; border-style: solid; border-radius: 10px; background: #f5f5f5; padding: 10px;",
-                     uiOutput("about_subj_wt")
-                   )
-            )
-          )
-        ),
-        tabPanel(
-          "Individual by Method",
-          fluidRow(
-            width = 12,
-            uiOutput("method_subj_title")
-          ),
-          fluidRow(
-            width = 12,
-            uiOutput("method_subj_plots")
-          )
-        ),
-        tabPanel(
-          "All Individuals",
-          fluidRow(
-            width = 12,
-            uiOutput("all_indiv_title"),
-          ),
-          conditionalPanel(
-            "input.heat_side_by_side == true",
             fluidRow(
               column(
                 width = 6, 
                 style='padding-right: 20px; border-right: 1px solid black',
-                HTML("<h3><center>Height (cm)</center></h3>"),
-                conditionalPanel(
-                  "input.heat_interactive == true",
-                  plotlyOutput("ht_heat_all_plotly", height = 800)
-                ),
-                conditionalPanel(
-                  "input.heat_interactive == false",
-                  plotOutput("ht_heat_all_plot", height = 800)
+                HTML("<h3><center>Height Results</center></h3>"),
+                plotlyOutput("subj_ht"),
+                plotOutput("subj_legn_ht", height = "30px"),
+                HTML("<br>Note: shading indicates standard deviations (SD) away from fit/data (darker for 1 SD, lighter for 2 SD)."),
+                hr(),
+                fluidRow(
+                  style = "border: 1px #e3e3e3; border-style: solid; border-radius: 10px; background: #f5f5f5; padding: 10px;",
+                  uiOutput("about_subj_ht")
                 )
               ),
               column(
-                width = 6,
-                HTML("<h3><center>Weight (kg)</center></h3>"),
-                conditionalPanel(
-                  "input.heat_interactive == true",
-                  plotlyOutput("wt_heat_all_plotly", height = 800)
-                ),
-                conditionalPanel(
-                  "input.heat_interactive == false",
-                  plotOutput("wt_heat_all_plot", height = 800)
+                width = 6, style = "padding-left: 20px;",
+                HTML("<h3><center>Weight Results</center></h3>"),
+                plotlyOutput("subj_wt"),
+                plotOutput("subj_legn_wt", height = "30px"),
+                HTML("<br>Note: shading indicates standard deviations (SD) away from fit/data (darker for 1 SD, lighter for 2 SD)."),
+                hr(),
+                fluidRow(
+                  style = "border: 1px #e3e3e3; border-style: solid; border-radius: 10px; background: #f5f5f5; padding: 10px;",
+                  uiOutput("about_subj_wt")
                 )
               )
             )
           ),
-          conditionalPanel(
-            "input.heat_side_by_side == false",
-            uiOutput("one_heat_type_title"),
-            conditionalPanel(
-              "input.heat_interactive == true",
-              plotlyOutput("one_heat_all_plotly", height = 800)
+          tabPanel(
+            "Individual by Method",
+            fluidRow(
+              width = 12,
+              uiOutput("method_subj_title")
+            ),
+            fluidRow(
+              width = 12,
+              uiOutput("method_subj_plots")
+            )
+          ),
+          tabPanel(
+            "All Individuals",
+            fluidRow(
+              width = 12,
+              uiOutput("all_indiv_title"),
             ),
             conditionalPanel(
-              "input.heat_interactive == false",
-              plotOutput("one_heat_all_plot", height = 800)
+              "input.heat_side_by_side == true",
+              fluidRow(
+                column(
+                  width = 6, 
+                  style='padding-right: 20px; border-right: 1px solid black',
+                  HTML("<h3><center>Height (cm)</center></h3>"),
+                  conditionalPanel(
+                    "input.heat_interactive == true",
+                    plotlyOutput("ht_heat_all_plotly", height = 800)
+                  ),
+                  conditionalPanel(
+                    "input.heat_interactive == false",
+                    plotOutput("ht_heat_all_plot", height = 800)
+                  )
+                ),
+                column(
+                  width = 6,
+                  HTML("<h3><center>Weight (kg)</center></h3>"),
+                  conditionalPanel(
+                    "input.heat_interactive == true",
+                    plotlyOutput("wt_heat_all_plotly", height = 800)
+                  ),
+                  conditionalPanel(
+                    "input.heat_interactive == false",
+                    plotOutput("wt_heat_all_plot", height = 800)
+                  )
+                )
+              )
+            ),
+            conditionalPanel(
+              "input.heat_side_by_side == false",
+              uiOutput("one_heat_type_title"),
+              conditionalPanel(
+                "input.heat_interactive == true",
+                plotlyOutput("one_heat_all_plotly", height = 800)
+              ),
+              conditionalPanel(
+                "input.heat_interactive == false",
+                plotOutput("one_heat_all_plot", height = 800)
+              )
             )
-          )
-        ),
-        tabPanel(
-          "View Results",
-          uiOutput("res_subj_title"),
-          fluidRow(
-            column(
-              width = 12,
-              dataTableOutput("run_output")
+          ),
+          tabPanel(
+            "Check Answers",
+            fluidRow(
+              uiOutput("check_res_title"),
+              uiOutput("check_answer_warning")
+            ),
+            fluidRow(
+              column(
+                width = 6, style='border-right: 1px solid black', 
+                HTML("<h3><center>Height Results</center></h3>"),
+                uiOutput("check_ht_possible"),
+                plotlyOutput("check_ht"),
+                plotOutput("check_legn_ht", height = "30px")
+              ),
+              column(
+                width = 6, 
+                HTML("<h3><center>Weight Results</center></h3>"),
+                uiOutput("check_wt_possible"),
+                plotlyOutput("check_wt"),
+                plotOutput("check_legn_wt", height = "30px")
+              )
+            )
+          ),
+          tabPanel(
+            "View Results",
+            uiOutput("res_subj_title"),
+            fluidRow(
+              column(
+                width = 12,
+                dataTableOutput("run_output")
+              )
             )
           )
         )
-      ))
+      )
     )
   ),
   
@@ -1044,7 +1301,7 @@ ui <- navbarPage(
               HTML(
                 "<center><h3>Welcome to the Adult EHR Cleaning Application!</h3></center><p>",
                 paste0("<center><h4>Version ", vers_adult_ehr, "</h4></center>"),
-                "This application seeks to compare different methods of cleaning adult EHR data, implementing a variety of methods. This currently includes Muthalagu, et al., Cheng, et al., Chan, et al., Littman, et al., Breland, et al., and Growthcleanr-naive. To find out more about these methods, please click on their respective tabs. This application is best viewed in a full screen window.<p>",
+                "This application seeks to compare different methods of cleaning adult EHR data, implementing a variety of methods. This currently includes Muthalagu, et al., Cheng, et al., Chan, et al., Littman, et al., Breland, et al., and Growthcleanr-naive. To find out more about these methods, please click on their respective tabs. This application is best viewed in a full screen window.<p><p>",
                 "To start, you'll begin by uploading your data in the sidebar under the 'Compare' tab. This data should be a CSV in the following format:"
               ),
               dataTableOutput("dat_example"),
@@ -1056,8 +1313,9 @@ ui <- navbarPage(
                 "<li><b>measurement:</b> measurement of height or weight, corresponding to the parameter</li>",
                 "<li><b>age_years:</b> age in years</li>",
                 "<li><b>sex:</b> 0 (male) or 1 (female)</li>",
+                "<li><b>answers:</b> (<u>not required</u>) an answer column, indicating whether the value should be Include or Implausible</li>",
                 "</ul><p>",
-                "If no data is input, the app will use synthetic data (to find out more about this example data, click on the 'Synthetic Data' tab). Then click run to get started!<p>",
+                "If no data is input, the app will use synthetic data (to find out more about this example data, click on the 'Synthetic Data' tab). Then click run to get started! Note: \"answers\" included in synthetic data are randomly generated for illustration purposes.<p>",
                 paste0("Version: ", vers_adult_ehr, "<p>")
               ),
               column(width = 3)
@@ -1075,7 +1333,7 @@ ui <- navbarPage(
                 "<h3>Muthalagu, et al. (2014)</h3>",
                 "<h4>Cleans: Height Records</h4><p>",
                 "Muthalagu, et al. aims to transform EHR adult height data into \"research-ready\" values using age and height values, deciding implausible values based on median comparisons within age ranges. More information on this method can be found <a href='https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3974252/' target = 'blank'>here</a>. Steps for this method, along with their titles (used in output) and descriptions, are below.<p>"
-                ),
+              ),
               hr(),
               HTML(
                 "<h4>Steps:</h4>",
@@ -1453,7 +1711,8 @@ server <- function(input, output, session) {
       "Options: Overall Plots", 
       "Options: Individual/Individual By Method Plots", 
       "Options: Individual/Individual By Method Plots", 
-      "Options: All Individuals Heat Map"
+      "Options: All Individuals Heat Map",
+      "Options: Check Answers Plots"
     )
     
     tab_map_open <- c(
@@ -1461,6 +1720,7 @@ server <- function(input, output, session) {
       "Individual" = "Options: Individual/Individual By Method Plots",
       "Individual by Method" = "Options: Individual/Individual By Method Plots",
       "All Individuals" = "Options: All Individuals Heat Map",
+      "Check Answers" = "Options: Check Answers Plots",
       "View Results" = NA
     )
     
@@ -1676,7 +1936,9 @@ server <- function(input, output, session) {
                          hide_agree = input$heat_hide_agree,
                          sort_dec = input$heat_sort_dec,
                          interactive = T,
-                         show_y_lab = input$heat_show_y_lab)
+                         show_y_lab = input$heat_show_y_lab,
+                         show_answers = input$heat_show_answers,
+                         hl_incorr = input$heat_hl_incorr)
   })
   
   # render ggplot version -- will only render if UI is allocated
@@ -1688,7 +1950,9 @@ server <- function(input, output, session) {
                          hide_agree = input$heat_hide_agree,
                          sort_dec = input$heat_sort_dec,
                          interactive = F,
-                         show_y_lab = input$heat_show_y_lab)
+                         show_y_lab = input$heat_show_y_lab,
+                         show_answers = input$heat_show_answers,
+                         hl_incorr = input$heat_hl_incorr)
   })
   
   # render plotly version -- will only render if UI is allocated
@@ -1700,7 +1964,9 @@ server <- function(input, output, session) {
                          hide_agree = input$heat_hide_agree,
                          sort_dec = input$heat_sort_dec,
                          interactive = T,
-                         show_y_lab = input$heat_show_y_lab)
+                         show_y_lab = input$heat_show_y_lab,
+                         show_answers = input$heat_show_answers,
+                         hl_incorr = input$heat_hl_incorr)
   })
   
   # render ggplot version -- will only render if UI is allocated
@@ -1712,7 +1978,9 @@ server <- function(input, output, session) {
                          hide_agree = input$heat_hide_agree,
                          sort_dec = input$heat_sort_dec,
                          interactive = F,
-                         show_y_lab = input$heat_show_y_lab)
+                         show_y_lab = input$heat_show_y_lab,
+                         show_answers = input$heat_show_answers,
+                         hl_incorr = input$heat_hl_incorr)
   })
   
   # render plotly version -- will only render if UI is allocated
@@ -1724,7 +1992,9 @@ server <- function(input, output, session) {
                          hide_agree = input$heat_hide_agree,
                          sort_dec = input$heat_sort_dec,
                          interactive = T,
-                         show_y_lab = input$heat_show_y_lab)
+                         show_y_lab = input$heat_show_y_lab,
+                         show_answers = input$heat_show_answers,
+                         hl_incorr = input$heat_hl_incorr)
   })
   
   # render ggplot version -- will only render if UI is allocated
@@ -1736,7 +2006,70 @@ server <- function(input, output, session) {
                          hide_agree = input$heat_hide_agree,
                          sort_dec = input$heat_sort_dec,
                          interactive = F,
-                         show_y_lab = input$heat_show_y_lab)
+                         show_y_lab = input$heat_show_y_lab,
+                         show_answers = input$heat_show_answers,
+                         hl_incorr = input$heat_hl_incorr)
+  })
+  
+  # plot check answers ----
+  
+  output$check_res_title <- renderUI({
+    gen_title(nrow(cleaned_df$full) == nrow(cleaned_df$sub), "Check")
+  })
+  
+  output$check_answer_warning <- renderUI({
+    if (length(colnames(cleaned_df$sub)) == 0 ||
+        !any(grepl("answers", colnames(cleaned_df$sub)))){
+      HTML("<center><h4>Checking answers not available, as there is no \"answers\" column in the data. \"answers\" designate whether a record is truly Implausible or Include. For more information on data format, see the \"About\" tab.</h4></center>")
+    } else {
+      HTML("<center><h4>Note that answers for individual observations can be observed as a visualization in the \"All Individuals\" and \"View Results\" tabs.</h4></center>")
+    }
+  })
+  
+  output$check_ht_possible <- renderUI({
+    tot_poss_answers(cleaned_df$sub, "HEIGHTCM")
+  })
+  
+  output$check_wt_possible <- renderUI({
+    tot_poss_answers(cleaned_df$sub, "WEIGHTKG")
+  })
+  
+  output$check_ht <- renderPlotly({
+    ht_tab <- tab_answers(cleaned_df$sub, "HEIGHTCM", methods_chosen$m,
+                          group = input$answer_group)
+    plot_answer_bar(ht_tab, input$answer_bar_tab, 
+                    group = input$answer_group, ontop = input$answer_stack
+    )
+  })
+  
+  output$check_wt <- renderPlotly({
+    wt_tab <- tab_answers(cleaned_df$sub, "WEIGHTKG", methods_chosen$m,
+                          group = input$answer_group)
+    plot_answer_bar(wt_tab, input$answer_bar_tab, 
+                    group = input$answer_group, ontop = input$answer_stack
+    )
+  })
+  
+  output$check_legn_ht <- renderPlot({
+    if (input$answer_group){
+      ht_tab <- tab_answers(cleaned_df$sub, "HEIGHTCM", methods_chosen$m,
+                            group = input$answer_group)
+      plot_answer_bar(ht_tab, input$answer_bar_tab, 
+                      group = input$answer_group, ontop = input$answer_stack,
+                      legn = T
+      )
+    }
+  })
+  
+  output$check_legn_wt <- renderPlot({
+    if (input$answer_group){
+      wt_tab <- tab_answers(cleaned_df$sub, "WEIGHTKG", methods_chosen$m,
+                            group = input$answer_group)
+      plot_answer_bar(wt_tab, input$answer_bar_tab, 
+                      group = input$answer_group, ontop = input$answer_stack,
+                      legn = T
+      )
+    }
   })
   
   # output run results ----
@@ -1763,8 +2096,8 @@ server <- function(input, output, session) {
   output$about_syn_dat <- renderUI({
     HTML(
       paste0(
-      "<h3>About Synthetic Data</h3><p>",
-      "Synthetic data was generated by <a href='https://synthetichealth.github.io/synthea/' target = 'blank'>Synthea</a> for ", length(unique(dat$subjid)), " subjects and ", nrow(dat), " records, with ages ranging from ", min(dat$age_years), " to ", max(dat$age_years), ". Descriptive data plots are below.<p>"
+        "<h3>About Synthetic Data</h3><p>",
+        "Synthetic data was generated by <a href='https://synthetichealth.github.io/synthea/' target = 'blank'>Synthea</a> for ", length(unique(dat$subjid)), " subjects and ", nrow(dat), " records, with ages ranging from ", min(dat$age_years), " to ", max(dat$age_years), ". Descriptive data plots are below. Note: \"answers\" included in synthetic data are randomly generated for illustration purposes.<p>"
       )
     )
   })
