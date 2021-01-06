@@ -21,7 +21,7 @@
 #       or is implausible.
 #     reason, which specifies, for implausible values, the reason for exclusion,
 #       and the step at which exclusion occurred.
-breland_clean_both <- function(df){
+breland_clean_both <- function(df, inter_vals = F){
   # method specific constants ----
   # this includes specified cutoffs, etc.
   

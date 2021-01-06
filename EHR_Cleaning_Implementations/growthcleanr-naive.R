@@ -158,7 +158,7 @@ remove_ewma <- function(subj_df, ewma_cutoff = 2){
 #       or is implausible.
 #     reason, which specifies, for implausible values, the reason for exclusion,
 #       and the step at which exclusion occurred.
-growthcleanr_clean_both <- function(df){
+growthcleanr_clean_both <- function(df, inter_vals = F){
   
   # begin implementation ----
   

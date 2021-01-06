@@ -23,7 +23,7 @@
 #       or is implausible. "unknown" for weight measurements.
 #     reason, which specifies, for implausible values, the reason for exclusion,
 #       and the step at which exclusion occurred.
-muthalagu_clean_ht <- function(df){
+muthalagu_clean_ht <- function(df, inter_vals = F){
   # method specific constants ----
   # this includes specified cutoffs, etc.
   
