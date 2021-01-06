@@ -11,20 +11,21 @@
 
 # function to clean height and weight data by chan, et al.
 # inputs:
-# df: data frame with 7 columns:
+# df: data frame with at least 7 columns:
 #   id: row id, must be unique
 #   subjid: subject id
 #   sex: sex of subject
 #   age_years: age, in years
 #   param: HEIGHTCM or WEIGHTKG
 #   measurement: height or weight measurement
+# inter_vals: boolean, return intermediate 
 # outputs:
 #   df, with additional columns:
 #     result, which specifies whether the height measurement should be included,
 #       or is implausible.
 #     reason, which specifies, for implausible values, the reason for exclusion,
 #       and the step at which exclusion occurred.
-chan_clean_both <- function(df){
+chan_clean_both <- function(df, inter_vals = F){
   # method specific constants ----
   # this includes specified cutoffs, etc.
   
@@ -45,6 +46,10 @@ chan_clean_both <- function(df){
   for (i in unique(df$subjid)){
     slog <- df$subjid == i
     
+    # if using intermediate values, we want to start storing them
+    # keep the ID to collate with the final dataframe
+    inter_df <- df[slog, "subjid"]
+    
     # start with height ----
     h_df <- df[df$param == "HEIGHTCM" & slog,]
     
@@ -61,6 +66,9 @@ chan_clean_both <- function(df){
     criteria <- remove_biv(subj_df, "height", biv_df)
     subj_keep[criteria] <- "Implausible"
     subj_reason[criteria] <- paste0("Implausible, Step ",step)
+    
+    # if using intermediate values
+    # STOP HERE
     
     subj_df <- subj_df[!criteria,]
     
