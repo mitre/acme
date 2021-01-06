@@ -453,7 +453,9 @@ ui <- navbarPage(
             actionButton("run_inter_data", "Run data!"),
             actionButton("upload_inter_res", "Upload Results"),
             downloadButton("download_inter_results", label = "Download Results")
-        )
+        ),
+        hr(),
+        uiOutput("indiv_inter_choose")
       ),
       # UI: intermediate value visualizations ----
       mainPanel(
@@ -811,8 +813,6 @@ server <- function(input, output, session) {
           c_df[,paste0(m, "_", inter_cols)] <- clean_df[, inter_cols]
         }
       }
-      
-      print(head(c_df))
       
       # initialize subset (cleaned_df holds all subjects)
       cleaned_df$full <- cleaned_df$sub <- c_df
@@ -1303,6 +1303,21 @@ server <- function(input, output, session) {
   options = list(scrollX = TRUE,
                  pageLength = 10)
   )
+  
+  # output for 'examine methods' (intermediate steps) tab ----
+  
+  output$indiv_inter_choose <- renderUI({
+    selectInput(
+      "subj",
+      label = HTML("<p style = 'font-weight: normal'><b>Which subject's intermediate steps would you like to examine?</b> Search for subjects by pressing backspace and typing.</p>"),
+      choices = 
+        if (run_clicks$inter > 0 | nrow(cleaned_df$sub) == 0){
+          c()
+        } else {
+          unique(cleaned_df$sub$subjid)
+        }
+    )
+  })
   
   # output for 'about' tab ----
   
