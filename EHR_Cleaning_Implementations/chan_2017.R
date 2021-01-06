@@ -164,6 +164,19 @@ chan_clean_both <- function(df, inter_vals = F){
       subj_reason[as.character(subj_df$id[criteria])] <- 
         paste0("Implausible, Step ",step)
       
+      # if using intermediate values, we want to keep some
+      if(inter_vals){
+        inter_df[as.character(subj_df$id), "Step_2w_Avg_Height"] <- 
+          avg_ht
+        inter_df[as.character(subj_df$id), "Step_2w_BMI"] <- 
+          bmi_df$measurement
+        inter_df[as.character(subj_df$id), "Step_2w_W_BIV_BMI_Low_Compare"] <- 
+          remove_biv_low(bmi_df, "bmi", biv_df, include = T)
+        inter_df[as.character(subj_df$id), "Step_2w_W_BIV_BMI_High_Compare"] <- 
+          remove_biv_high(bmi_df, "bmi", biv_df, include = T)
+        inter_df[as.character(subj_df$id), "Step_2w_Result"] <- criteria
+      }
+      
       subj_df <- subj_df[!criteria,]
     }
     
@@ -182,6 +195,18 @@ chan_clean_both <- function(df, inter_vals = F){
       subj_keep[as.character(subj_df$id)][criteria] <- "Implausible"
       subj_reason[as.character(subj_df$id)][criteria] <- 
         paste0("Implausible, Step ",step)
+      
+      # if using intermediate values, we want to keep some
+      if(inter_vals){
+        inter_df[as.character(subj_df$id), "Step_3w_Difference_from_Mean"] <- 
+          abs(subj_df$measurement - avg_wt)
+        inter_df[as.character(subj_df$id), "Step_3w_3SD"] <- 
+          st_dev_wt
+        inter_df[as.character(subj_df$id), "Step_3w_Mean"] <- 
+          avg_wt
+        inter_df[as.character(subj_df$id), "Step_3w_Result"] <- 
+          criteria
+      }
     }
     
     # add the full calculation
@@ -191,6 +216,11 @@ chan_clean_both <- function(df, inter_vals = F){
     # add results to full dataframe
     df[as.character(w_df$id), "result"] <- w_df$result
     df[as.character(w_df$id), "reason"] <- w_df$reason
+    
+    # if we're using intermediate values, we want to save them
+    if (inter_vals){
+      df[as.character(inter_df$id), colnames(inter_df)[-1]] <- inter_df[,-1]
+    }
   }
   
   return(df)
