@@ -48,7 +48,8 @@ chan_clean_both <- function(df, inter_vals = F){
     
     # if using intermediate values, we want to start storing them
     # keep the ID to collate with the final dataframe
-    inter_df <- df[slog, "subjid"]
+    inter_df <- df[slog, "id", drop = F]
+    rownames(inter_df) <- inter_df$id
     
     # start with height ----
     h_df <- df[df$param == "HEIGHTCM" & slog,]
@@ -67,8 +68,14 @@ chan_clean_both <- function(df, inter_vals = F){
     subj_keep[criteria] <- "Implausible"
     subj_reason[criteria] <- paste0("Implausible, Step ",step)
     
-    # if using intermediate values
-    # STOP HERE
+    # if using intermediate values, we want to keep some
+    if(inter_vals){
+      inter_df[as.character(subj_df$id), "Step_1h_H_BIV_Low_Compare"] <- 
+        remove_biv_low(subj_df, "height", biv_df)
+      inter_df[as.character(subj_df$id), "Step_1h_H_BIV_High_Compare"] <- 
+        remove_biv_high(subj_df, "height", biv_df)
+      inter_df[as.character(subj_df$id), "Step_1h_Result"] <- criteria
+    }
     
     subj_df <- subj_df[!criteria,]
     
@@ -88,6 +95,18 @@ chan_clean_both <- function(df, inter_vals = F){
       subj_keep[as.character(subj_df$id)][criteria] <- "Implausible"
       subj_reason[as.character(subj_df$id)][criteria] <- 
         paste0("Implausible, Step ",step)
+      
+      # if using intermediate values, we want to keep some
+      if(inter_vals){
+        inter_df[as.character(subj_df$id), "Step_2h_Difference_from_Mean"] <- 
+          abs(subj_df$measurement - avg_ht)
+        inter_df[as.character(subj_df$id), "Step_2h_3SD"] <- 
+          st_dev_ht
+        inter_df[as.character(subj_df$id), "Step_2h_Mean"] <- 
+          avg_ht
+        inter_df[as.character(subj_df$id), "Step_2h_Result"] <- 
+          criteria
+      }
     }
     
     # add the full calculation
@@ -115,6 +134,15 @@ chan_clean_both <- function(df, inter_vals = F){
     criteria <- remove_biv(subj_df, "weight", biv_df)
     subj_keep[criteria] <- "Implausible"
     subj_reason[criteria] <- paste0("Implausible, Step ",step)
+    
+    # if using intermediate values, we want to keep some
+    if(inter_vals){
+      inter_df[as.character(subj_df$id), "Step_1w_W_BIV_Low_Compare"] <- 
+        remove_biv_low(subj_df, "weight", biv_df)
+      inter_df[as.character(subj_df$id), "Step_1w_W_BIV_High_Compare"] <- 
+        remove_biv_high(subj_df, "weight", biv_df)
+      inter_df[as.character(subj_df$id), "Step_1w_Result"] <- criteria
+    }
     
     subj_df <- subj_df[!criteria,]
     
