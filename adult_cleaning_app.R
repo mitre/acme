@@ -52,6 +52,8 @@ sourceDir("EHR_Cleaning_Implementations")
 
 # supporting data ----
 
+# regular methods
+
 methods_avail <- c("muthalagu", "cheng", "chan", "littman", "breland", "growthcleanr-naive")
 
 # types cleaned for each method
@@ -68,6 +70,23 @@ methods_func <- list(muthalagu_clean_ht,
                      growthcleanr_clean_both)
 names(methods_func) <- methods_avail
 
+# method colors
+m_colors <- viridisLite::viridis(length(methods_avail))
+names(m_colors) <- simpleCap(methods_avail)
+
+# intermediate methods
+
+methods_inter_avail <- c("chan")
+
+# types cleaned for each method
+m_inter_types <- list(
+  "HEIGHTCM" = methods_avail,
+  "WEIGHTKG" = methods_avail
+)
+
+methods_inter_func <- list(chan_clean_both)
+names(methods_inter_func) <- methods_inter_avail
+
 # capitalize first letter of words, from ?toupper, edited to handle vector
 simpleCap <- function(y) {
   sapply(y, function(x){
@@ -76,10 +95,6 @@ simpleCap <- function(y) {
           sep = "", collapse = " ")
   }, USE.NAMES = F)
 }
-
-# method colors
-m_colors <- viridisLite::viridis(length(methods_avail))
-names(m_colors) <- simpleCap(methods_avail)
 
 # supporting functions ----
 
@@ -93,7 +108,7 @@ ui <- navbarPage(
   # UI: compute and compare results ----
   "Adult EHR Data Cleaning",
   tabPanel(
-    "Compare",
+    "Compare Results",
     sidebarLayout(
       # UI: sidebar options ----
       sidebarPanel(
@@ -424,7 +439,33 @@ ui <- navbarPage(
       )
     )
   ),
-  
+  # UI: intermediate values ----
+  tabPanel(
+    "Examine Methods",
+    sidebarLayout(
+      # UI: intermediate sidebar options ----
+      sidebarPanel(
+        width = 3,
+        HTML("<b>Upload adult EHR data or results and click the corresponding button below to understand intermediate values!</b> If no data is input, default synthetic data/results will be used. More information on data format can be found in the \"About\" tab.<p>"),
+        fileInput("dat_inter_file", "Upload Data/Results CSV",
+                  accept = c(".csv", ".CSV")),
+        div(style="display:inline-block",
+            actionButton("run_inter_data", "Run data!"),
+            actionButton("upload_inter_res", "Upload Results"),
+            downloadButton("download_inter_results", label = "Download Results")
+        )
+      ),
+      # UI: intermediate value visualizations ----
+      mainPanel(
+        width = 9,
+        tabsetPanel(
+          tabPanel(
+            "Chan"
+          )
+        )
+      )
+    )
+  ),
   # UI: documentation ----
   
   tabPanel(
@@ -703,11 +744,36 @@ server <- function(input, output, session) {
     "subj" = c()
   )
   
+  # save run button clicks
+  run_clicks <- reactiveValues(
+    "reg" = 0,
+    "inter" = 0
+  )
+  # create a listener for multiple buttons
+  run_listener <- reactive({
+    if (any(list(input$run_data, input$run_inter_data) > 0)){
+      return(list(input$run_data, input$run_inter_data))
+    } else {
+      return()
+    }
+  })
+  
   # observe button/click inputs ----
   
-  observeEvent(input$run_data, {
+  observeEvent(run_listener(), {
     withProgress(message = "Cleaning data!", value = 0, {
-      tot_increments <- 1+1+length(methods_avail)
+      # check which button got pressed; if it's not the regular, it's the 
+      # intermediate values
+      inter <- !(input$run_data[1] > run_clicks$reg)
+      
+      # update the saved values
+      run_clicks$reg <- input$run_data[1]
+      run_clicks$inter <- input$run_inter_data[1]
+      
+      # which methods are we running?
+      m_run <- if(inter){methods_inter_avail} else {methods_avail}
+      
+      tot_increments <- 1+1+length(m_run)
       
       incProgress(1/tot_increments, 
                   message = "Uploading data!",
@@ -723,18 +789,30 @@ server <- function(input, output, session) {
       
       # run each method and save the results
       c_df <- df
-      for (m in methods_avail){
+      for (m in m_run){
         incProgress(1/tot_increments,
                     message = paste("Running", simpleCap(m)),
                     detail = Sys.time())
         
         # clean data
-        clean_df <- methods_func[[m]](df)
+        m_func <- if (inter){methods_inter_func} else {methods_func}
+        clean_df <- 
+          m_func[[m]](
+            df, inter_vals = inter
+          )
         
         # add the results to the overall dataframe
         c_df[,paste0(m, "_result")] <- clean_df$result
         c_df[,paste0(m, "_reason")] <- clean_df$reason
+        
+        if (inter){
+          # if adding intermediate values, we add those at the end
+          inter_cols <- colnames(clean_df)[grepl("Step_", colnames(clean_df))]
+          c_df[,paste0(m, "_", inter_cols)] <- clean_df[, inter_cols]
+        }
       }
+      
+      print(head(c_df))
       
       # initialize subset (cleaned_df holds all subjects)
       cleaned_df$full <- cleaned_df$sub <- c_df
