@@ -18,7 +18,15 @@ downloaded/cloned this repository):
 3. In the console window (bottom-left corner by default), enter the following to download necessary packages:
 
 ```{r}
-install.packages(c("shiny", "ggplot2", "rstudioapi", "colorspace", "plotly", "viridisLite", "ggplotify", "reshape2", "shinyBS"))
+install.packages(c("shiny", "ggplot2", "rstudioapi", "colorspace", "plotly", "viridisLite", "ggplotify", "reshape2", "shinyBS", "shinyWidgets"))
+```
+
+A package from GitHub is needed as well. To download this package, enter the
+following in the console:
+
+```{r}
+install.packages("devtools")
+devtools::install_github("zeehio/facetscales")
 ```
 
 If you are on a Mac, R also requires the `Cairo` package, which itself requires that
