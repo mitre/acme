@@ -983,7 +983,7 @@ plot_result_heat_map <- function(cleaned_df, type,
 
 # function to plot individual heights and weights for intermediate values at
 # a specific step for a specific method
-plot_inter_cleaned <- function(cleaned_df, type, subj, step,
+plot_inter_cleaned <- function(cleaned_df, subj, step,
                                methods_chosen = methods_inter_avail[1],
                                legn = F){
   # the minimum +/- value around the mean for the y axis to show
@@ -1017,16 +1017,6 @@ plot_inter_cleaned <- function(cleaned_df, type, subj, step,
     "Height (cm)" = "w",
     "Weight (kg)" = "h"
   )
-  
-  # fix type if needed
-  # type <- 
-  #   if (grepl("h", step)){
-  #     "HEIGHTCM"
-  #   } else if (grepl("w", step)){
-  #     "WEIGHTKG"
-  #   } else {
-  #     c("HEIGHTCM", "WEIGHTKG")
-  #   }
   
   type <- c("HEIGHTCM", "WEIGHTKG")
   step_focus <- type_map[
@@ -1062,9 +1052,9 @@ plot_inter_cleaned <- function(cleaned_df, type, subj, step,
     "param" = type_map[clean_df$param],
     "measurement" = clean_df$measurement,
     "step_result" = 
-      if (step == "0"){
+      if (step == "Before"){
         rep("Include", nrow(clean_df))
-      } else if (step == "End"){
+      } else if (step == "After"){
         clean_df$all_result
       } else {
         result_map[
@@ -1075,7 +1065,7 @@ plot_inter_cleaned <- function(cleaned_df, type, subj, step,
       }
   )
   # if it's the end, we want to make all the implausible NA
-  if (step == "End"){
+  if (step == "After"){
     bf_df$step_result[bf_df$step_result == "Implausible"] <- NA
   }
   bf_df$step_result_orig <- bf_df$step_result
@@ -1092,7 +1082,7 @@ plot_inter_cleaned <- function(cleaned_df, type, subj, step,
     )
     last_op_step <- 
       if (length(all_op_steps) == 0) {
-        "0"
+        "Before"
       } else {
         all_steps[all_op_steps[length(all_op_steps)]]
       }
@@ -1101,9 +1091,9 @@ plot_inter_cleaned <- function(cleaned_df, type, subj, step,
     foc_log <- !bf_df$param %in% step_focus
     
     bf_df[foc_log, "step_result"] <- 
-      if (last_op_step == "0"){
+      if (last_op_step == "Before"){
         rep("Include", sum(foc_log))
-      } else if (last_op_step == "End"){
+      } else if (last_op_step == "After"){
         clean_df$all_result[!type_map[clean_df$param] %in% step_focus]
       } else {
         result_map[
@@ -1554,11 +1544,11 @@ ui <- navbarPage(
               "method_step",
               "Choose Step:",
               choices = c(
-                "0",
+                "Before",
                 m_inter_steps[["chan"]],
-                "End"
+                "After"
               ),
-              selected = "0"
+              selected = "Before"
             ),
             HTML("</center>")
           )
@@ -2418,7 +2408,7 @@ server <- function(input, output, session) {
   })
   
   output$inter_plot <- renderPlotly({
-    plot_inter_cleaned(cleaned_df$sub, "HEIGHTCM", input$inter_subj, 
+    plot_inter_cleaned(cleaned_df$sub, input$inter_subj, 
                        step = input$method_step,
                        methods_chosen = tolower(input$inter_tabset))
   })
