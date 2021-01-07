@@ -103,12 +103,26 @@ names(methods_inter_func) <- methods_inter_avail
 
 # list of steps for each method
 m_inter_steps <- list(
+  "chan" = c("1h", "2h", "1w", "2w", "3w")
+)
+
+m_inter_steps_full_title <- list(
   "chan" = c(
-    "1h",
-    "2h",
-    "1w",
-    "2w",
-    "3w"
+    "1h" = "1h: H BIV",
+    "2h" = "2h: H check SD away from mean",
+    "1w" = "1w: W BIV",
+    "2w" = "2w: W BMI BIV",
+    "3w" = "3w: W check SD away from mean"
+  )
+)
+
+m_inter_steps_full_subtitle <- list(
+  "chan" = c(
+    "1h" = "Remove biologically implausible height records. Heights are biologically implausible if less than 121.92 cm (48 in) or greater than 213 cm (84 in).",
+    "2h" = "Exclude heights that were greater than 3 standard deviations from the mean.",
+    "1w" = "Remove biologically implausible weight records. Weights are biologically implausible if less than 22.7 kg or greater than 340.2 kg.",
+    "2w" = "Calculate BMI based on average height for all weight records, then remove biologically implausible weights. BMIs are biologically implausible if less than 10 or greater than 100.",
+    "3w" = "Exclude weights that were greater than 3 standard deviations from the mean."
   )
 )
 
@@ -1614,7 +1628,8 @@ ui <- navbarPage(
           id = "inter_tabset",
           tabPanel(
             "Chan",
-            
+            # HTML("<h3><center>Intermediate Values for Method: Chan</center></h3>"),
+            br(),
             HTML("<center>"),
             sliderTextInput(
               "method_step",
@@ -1627,6 +1642,8 @@ ui <- navbarPage(
               selected = "Before"
             ),
             HTML("</center>"),
+            uiOutput("chan_step_title"),
+            uiOutput("chan_step_subtitle"),
             plotlyOutput("inter_plot"),
             tableOutput("inter_table")
           )
@@ -2498,6 +2515,36 @@ server <- function(input, output, session) {
           unique(cleaned_df$sub$subjid)
         }
     )
+  })
+  
+  output$chan_step_title <- renderUI({
+    HTML(paste0(
+      "<h3><center>",
+      if (input$method_step == "Before"){
+        "Before Method"
+      } else if (input$method_step == "After"){
+        "After Method"
+      } else {
+        paste(
+          "Step", 
+          m_inter_steps_full_title[[tolower(input$inter_tabset)]][
+            input$method_step]
+        )
+      },
+      "</h3></center>"
+    ))
+  })
+  
+  output$chan_step_subtitle <- renderUI({
+    if (!input$method_step %in% c("Before", "After")){
+    HTML(paste0(
+      "<h4><center>",
+      m_inter_steps_full_subtitle[[tolower(input$inter_tabset)]][
+        input$method_step],
+      "</h4></center>"
+      
+    ))
+    }
   })
   
   output$inter_plot <- renderPlotly({
