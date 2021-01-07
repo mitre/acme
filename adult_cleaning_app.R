@@ -1214,7 +1214,6 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
   
   p <- suppressWarnings(
     ggplot(bf_df)+
-      ggtitle(paste0("Method: ", simpleCap(methods_chosen)))+
       geom_line(data = bf_df[complete.cases(bf_df),], 
                 aes(age_years, measurement), color = "grey")+
       geom_point(
@@ -1232,7 +1231,7 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
       # ylim(yaxis_lim)+
       theme(plot.title = element_text(hjust = .5))+
       xlab("Age (Years)")+
-      ylab(ifelse(length(type) > 1, "Measurement", type_map[type]))+
+      ylab("Measurement")+
       facet_grid_sc(rows = vars(param), scales = list(y = scales_y))+
       NULL
   )
@@ -1615,6 +1614,7 @@ ui <- navbarPage(
           id = "inter_tabset",
           tabPanel(
             "Chan",
+            
             HTML("<center>"),
             sliderTextInput(
               "method_step",
@@ -2037,6 +2037,21 @@ server <- function(input, output, session) {
         "Adult_EHR_Cleaning_Results_data_example.csv"
       } else {
         paste0("Adult_EHR_Cleaning_Results_", input$dat_file$name)
+      }
+    },
+    content = function(file) {
+      write.csv(cleaned_df$full, file, row.names = FALSE, na = "")
+    }
+  )
+  
+  # download intermediate data results
+  output$download_inter_results <- downloadHandler(
+    filename = function() {
+      if (is.null(input$dat_inter_file)){
+        "Adult_EHR_Cleaning_Results_w_Intermediate_Values_data_example.csv"
+      } else {
+        paste0("Adult_EHR_Cleaning_Results_w_Intermediate_Values_",
+               input$dat_file$name)
       }
     },
     content = function(file) {
