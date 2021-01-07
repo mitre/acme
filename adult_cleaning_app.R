@@ -334,6 +334,83 @@ sub_subj_type <- function(cleaned_df, type, subj,
   return(clean_df)
 }
 
+# function to build a table of intermediate values depending on a step and 
+# method chosen
+tab_inter_vals <- function(cleaned_df, subj, step,
+                           methods_chosen = methods_inter_avail[1]){
+  type_map <- c(
+    "HEIGHTCM" = "Height (cm)",
+    "WEIGHTKG" = "Weight (kg)"
+  )
+  
+  result_map <- c(
+    "TRUE" = "Implausible",
+    "FALSE" = "Include",
+    "Implausible" = "Implausible",
+    "Include" = "Include"
+  )
+  
+  # values we want to focus on in the table
+  step_focus <- 
+    if (grepl("h", step)){
+      "HEIGHTCM"
+    } else if (grepl("w", step)){
+      "WEIGHTKG"
+    } else {
+      c("HEIGHTCM", "WEIGHTKG")
+    }
+  
+  # subset the data to the subject, type, and methods we care about
+  clean_df <- sub_subj_type(cleaned_df, step_focus, subj, methods_chosen, 
+                            m_types = m_inter_types)
+  
+  if (nrow(clean_df) == 0){
+    return(data.frame())
+  }
+  
+  tab_out <- clean_df[,c("id", "param", "age_years", "measurement")]
+  tab_out <- cbind(
+    tab_out, 
+    if (step == "Before"){
+      rep("Include", nrow(tab_out))
+    } else if (step == "After"){
+      clean_df[, paste0(methods_chosen, "_result")]
+    } else {
+      clean_df[,colnames(clean_df)[
+        grepl(paste0("_Step_", step), colnames(clean_df))]]
+    }
+  )
+  colnames(tab_out)[ncol(tab_out)] <- 
+    paste0(methods_chosen, "_Step_", step, "_Result")
+  
+  # prettify certain columns
+  tab_out[, grepl("_Result", colnames(tab_out))] <- 
+    result_map[as.character(tab_out[, grepl("_Result", colnames(tab_out))])]
+  tab_out$param <- type_map[tab_out$param]
+  tab_out[,sapply(tab_out, class) == "numeric"] <- 
+    round(tab_out[,sapply(tab_out, class) == "numeric"], 3)
+  
+  # transpose for output
+  tab_out <- as.data.frame(t(tab_out))
+  # add a column for names
+  step_names <- gsub(
+    paste0(methods_chosen, " Step ", step, " "), 
+    "",
+    gsub("_", " ", rownames(tab_out)[-c(1:4)])
+  )
+  
+  tab_out <- cbind(
+    "names" = paste0(
+      "<strong><p align = 'right'>",
+      c("ID", "Parameter", "Age (years)", "Measurement", step_names),
+      "</strong></p>"
+    ),
+    tab_out
+  )
+  
+  return(tab_out)
+}
+
 # plotting/output functions ----
 
 # Function to extract legend
@@ -1538,7 +1615,6 @@ ui <- navbarPage(
           id = "inter_tabset",
           tabPanel(
             "Chan",
-            plotlyOutput("inter_plot"),
             HTML("<center>"),
             sliderTextInput(
               "method_step",
@@ -1550,7 +1626,9 @@ ui <- navbarPage(
               ),
               selected = "Before"
             ),
-            HTML("</center>")
+            HTML("</center>"),
+            plotlyOutput("inter_plot"),
+            tableOutput("inter_table")
           )
         )
       )
@@ -2412,6 +2490,17 @@ server <- function(input, output, session) {
                        step = input$method_step,
                        methods_chosen = tolower(input$inter_tabset))
   })
+  
+  output$inter_table <- renderTable({
+    tab_inter_vals(cleaned_df$sub, input$inter_subj, 
+                   step = input$method_step,
+                   methods_chosen = tolower(input$inter_tabset))
+  },  
+  striped = TRUE, 
+  bordered = TRUE,
+  sanitize.text.function = function(x){x},
+  width = '100%',  
+  colnames = FALSE)
   
   # output for 'about' tab ----
   
