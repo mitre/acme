@@ -1928,6 +1928,11 @@ server <- function(input, output, session) {
     "sub" = data.frame()
   )
   
+  cleaned_inter_df <- reactiveValues(
+    "full" = data.frame(),
+    "sub" = data.frame()
+  )
+  
   methods_chosen <- reactiveValues(
     "m" = methods_avail
   )
@@ -2005,7 +2010,11 @@ server <- function(input, output, session) {
       }
       
       # initialize subset (cleaned_df holds all subjects)
-      cleaned_df$full <- cleaned_df$sub <- c_df
+      if (inter){
+        cleaned_inter_df$full <- cleaned_inter_df$sub <- c_df
+      } else {
+        cleaned_df$full <- cleaned_df$sub <- c_df
+      }
       
       # now let the tabs update
       all_collapse_names <- c(
@@ -2079,7 +2088,7 @@ server <- function(input, output, session) {
       }
     },
     content = function(file) {
-      write.csv(cleaned_df$full, file, row.names = FALSE, na = "")
+      write.csv(cleaned_inter_df$full, file, row.names = FALSE, na = "")
     }
   )
   
@@ -2516,10 +2525,10 @@ server <- function(input, output, session) {
       "inter_subj",
       label = HTML("<p style = 'font-weight: normal'><b>Which subject's intermediate steps would you like to examine?</b> Search for subjects by pressing backspace and typing.</p>"),
       choices = 
-        if (run_clicks$inter == 0 | nrow(cleaned_df$sub) == 0){
+        if (run_clicks$inter == 0 | nrow(cleaned_inter_df$sub) == 0){
           c()
         } else {
-          unique(cleaned_df$sub$subjid)
+          unique(cleaned_inter_df$sub$subjid)
         }
     )
   })
@@ -2555,13 +2564,13 @@ server <- function(input, output, session) {
   })
   
   output$inter_plot <- renderPlotly({
-    plot_inter_cleaned(cleaned_df$sub, input$inter_subj, 
+    plot_inter_cleaned(cleaned_inter_df$sub, input$inter_subj, 
                        step = input$method_step,
                        methods_chosen = tolower(input$inter_tabset))
   })
   
   output$inter_table <- renderTable({
-    tab_inter_vals(cleaned_df$sub, input$inter_subj, 
+    tab_inter_vals(cleaned_inter_df$sub, input$inter_subj, 
                    step = input$method_step,
                    methods_chosen = tolower(input$inter_tabset))
   },  
