@@ -5,7 +5,7 @@
 # This implements a prototype application to explore adult EHR cleaning 
 # implementations.
 
-vers_adult_ehr <- "0.2.0"
+vers_adult_ehr <- "0.3.0"
 
 # load libraries, scripts, and data ----
 
@@ -1635,7 +1635,6 @@ ui <- navbarPage(
           id = "inter_tabset",
           tabPanel(
             "Chan",
-            # HTML("<h3><center>Intermediate Values for Method: Chan</center></h3>"),
             br(),
             HTML("<center>"),
             sliderTextInput(
@@ -1977,12 +1976,22 @@ server <- function(input, output, session) {
                   detail = Sys.time())
       
       df <-
-        if (is.null(input$dat_file)){
-          # use example data
-          dat
+        if (inter){
+          if (is.null(input$dat_inter_file)){
+            # use example data
+            dat
+          } else {
+            read.csv(input$dat_inter_file$datapath)
+          }
         } else {
-          read.csv(input$dat_file$datapath)
+          if (is.null(input$dat_file)){
+            # use example data
+            dat
+          } else {
+            read.csv(input$dat_file$datapath)
+          }
         }
+        
       
       # run each method and save the results
       c_df <- df
