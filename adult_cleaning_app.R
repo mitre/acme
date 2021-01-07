@@ -568,7 +568,8 @@ plot_cleaned <- function(cleaned_df, type, subj,
   
   # subset the data to the subject, type, and methods we care about
   # also create necessary counts for plotting and such
-  clean_df <- sub_subj_type(cleaned_df, type, subj, methods_chosen)
+  clean_df <- sub_subj_type(cleaned_df, type, subj, methods_chosen,
+                            m_types = m_types)
   
   # get the possible methods for this type
   m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
@@ -727,7 +728,8 @@ gen_subj_text <- function(cleaned_df, type, subj,
                           methods_chosen = methods_avail,
                           single = F){
   # subset the data to the subject, type, and methods we care about
-  clean_df <- sub_subj_type(cleaned_df, type, subj, methods_chosen)
+  clean_df <- sub_subj_type(cleaned_df, type, subj, methods_chosen,
+                            m_types = m_types)
   
   if (nrow(clean_df) == 0){
     return(HTML(""))
@@ -1139,6 +1141,7 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
   }
   
   bf_df <- data.frame(
+    "id" = clean_df$id,
     "age_years" = clean_df$age_years,
     "param" = type_map[clean_df$param],
     "measurement" = clean_df$measurement,
@@ -1196,6 +1199,9 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
       }
     
     bf_df$step_result_orig[foc_log] <- bf_df$step_result[foc_log]
+    bf_df$step_result_orig[foc_log][
+      bf_df$step_result[foc_log] == "Implausible"] <- 
+      NA
     bf_df[is.na(bf_df$step_result) & foc_log,
           "step_result"] <- "Implausible"
   }
@@ -1235,6 +1241,7 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
           age_years, measurement,
           color = step_result, shape = step_result,
           text = paste0(
+            "ID: ", id,"\n",
             "Step ", step, " Result: ", step_result,"\n"
           )
         )
