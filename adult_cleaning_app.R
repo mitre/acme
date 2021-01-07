@@ -18,6 +18,11 @@ library(viridisLite)
 library(ggplotify)
 library(reshape2)
 library(shinyBS)
+library(shinyWidgets)
+# to install:
+# install.packages(devtools)
+# devtools::install_github("zeehio/facetscales")
+library(facetscales)
 
 #https://stackoverflow.com/questions/3452086/getting-path-of-an-r-script/35842176#35842176
 # set working directory - only works in RStudio (with rstudioapi)
@@ -89,12 +94,23 @@ methods_inter_avail <- c("chan")
 
 # types cleaned for each method
 m_inter_types <- list(
-  "HEIGHTCM" = methods_avail,
-  "WEIGHTKG" = methods_avail
+  "HEIGHTCM" = "chan",
+  "WEIGHTKG" = "chan"
 )
 
 methods_inter_func <- list(chan_clean_both)
 names(methods_inter_func) <- methods_inter_avail
+
+# list of steps for each method
+m_inter_steps <- list(
+  "chan" = c(
+    "1h",
+    "2h",
+    "1w",
+    "2w",
+    "3w"
+  )
+)
 
 # processing functions ----
 
@@ -249,13 +265,16 @@ tab_clean_reason <- function(cleaned_df, type,
 
 # function to subset cleaned data based on subject and type
 sub_subj_type <- function(cleaned_df, type, subj,
-                          methods_chosen = methods_avail){
+                          methods_chosen = methods_avail,
+                          m_types = m_types){
   result_map <- c(
     "TRUE" = "Include",
     "FALSE" = "Implausible"
   )
   
-  m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
+  m_for_type <- unique(
+    unlist(m_types[type])[unlist(m_types[type]) %in% methods_chosen]
+  )
   
   if (length(m_for_type) == 0 | nrow(cleaned_df) == 0){
     return(data.frame())
@@ -263,7 +282,7 @@ sub_subj_type <- function(cleaned_df, type, subj,
   
   # subset the data to the things we care about
   clean_df <- cleaned_df[cleaned_df$subjid == subj & 
-                           cleaned_df$param == type,]
+                           cleaned_df$param %in% type,]
   # subset to only the methods included
   clean_df <- clean_df[
     ,
@@ -962,6 +981,209 @@ plot_result_heat_map <- function(cleaned_df, type,
   return(p)
 }
 
+# function to plot individual heights and weights for intermediate values at
+# a specific step for a specific method
+plot_inter_cleaned <- function(cleaned_df, type, subj, step,
+                               methods_chosen = methods_inter_avail[1],
+                               legn = F){
+  # the minimum +/- value around the mean for the y axis to show
+  min_range_band <- c(
+    "HEIGHTCM" = 3.5,
+    "WEIGHTKG" = 5
+  )
+  
+  # maps for configuring ggplot
+  color_map <- c(
+    "Include" = "#000000",
+    "Implausible" = "#fdb863"
+  )
+  
+  shape_map <- c(
+    "Include" = 16,
+    "Implausible" = 17
+  )
+  
+  type_map <- c(
+    "HEIGHTCM" = "Height (cm)",
+    "WEIGHTKG" = "Weight (kg)"
+  )
+  
+  result_map <- c(
+    "TRUE" = "Implausible",
+    "FALSE" = "Include"
+  )
+  
+  opposite_focus_map <- c(
+    "Height (cm)" = "w",
+    "Weight (kg)" = "h"
+  )
+  
+  # fix type if needed
+  # type <- 
+  #   if (grepl("h", step)){
+  #     "HEIGHTCM"
+  #   } else if (grepl("w", step)){
+  #     "WEIGHTKG"
+  #   } else {
+  #     c("HEIGHTCM", "WEIGHTKG")
+  #   }
+  
+  type <- c("HEIGHTCM", "WEIGHTKG")
+  step_focus <- type_map[
+    if (grepl("h", step)){
+      "HEIGHTCM"
+    } else if (grepl("w", step)){
+      "WEIGHTKG"
+    } else {
+      c("HEIGHTCM", "WEIGHTKG")
+    }
+  ]
+  
+  # subset the data to the subject, type, and methods we care about
+  # also create necessary counts for plotting and such
+  clean_df <- sub_subj_type(cleaned_df, type, subj, methods_chosen, 
+                            m_types = m_inter_types)
+  
+  # get the possible methods for this type
+  m_for_type <- unique(
+    unlist(m_types[type])[unlist(m_types[type]) %in% methods_chosen]
+  )
+  
+  if (nrow(clean_df) == 0){
+    if (legn){
+      return(ggplot()+theme_bw())
+    } else {
+      return(ggplotly(ggplot()+theme_bw()) %>% config(displayModeBar = F))
+    }
+  }
+  
+  bf_df <- data.frame(
+    "age_years" = clean_df$age_years,
+    "param" = type_map[clean_df$param],
+    "measurement" = clean_df$measurement,
+    "step_result" = 
+      if (step == "0"){
+        rep("Include", nrow(clean_df))
+      } else if (step == "End"){
+        clean_df$all_result
+      } else {
+        result_map[
+          as.character(
+            clean_df[, paste0(methods_chosen, "_Step_", step, "_Result")]
+          )
+        ]
+      }
+  )
+  # if it's the end, we want to make all the implausible NA
+  if (step == "End"){
+    bf_df$step_result[bf_df$step_result == "Implausible"] <- NA
+  }
+  bf_df$step_result_orig <- bf_df$step_result
+  bf_df[is.na(bf_df$step_result) & bf_df$param %in% step_focus,
+        "step_result"] <- "Implausible"
+  # for the parameter not in focus, we want the last result
+  if (length(step_focus) == 1){
+    # get all the steps for the method
+    all_steps <- m_inter_steps[[methods_chosen]]
+    all_op_steps <- which(
+      grepl(opposite_focus_map[step_focus], 
+            all_steps[c(1:(which(all_steps == step))-1)]
+      )
+    )
+    last_op_step <- 
+      if (length(all_op_steps) == 0) {
+        "0"
+      } else {
+        all_steps[all_op_steps[length(all_op_steps)]]
+      }
+    
+    # add the values for the last step
+    foc_log <- !bf_df$param %in% step_focus
+    
+    bf_df[foc_log, "step_result"] <- 
+      if (last_op_step == "0"){
+        rep("Include", sum(foc_log))
+      } else if (last_op_step == "End"){
+        clean_df$all_result[!type_map[clean_df$param] %in% step_focus]
+      } else {
+        result_map[
+          as.character(
+            clean_df[!type_map[clean_df$param] %in% step_focus, 
+                     paste0(methods_chosen, "_Step_", last_op_step, "_Result")]
+          )
+        ]
+      }
+    
+    bf_df$step_result_orig[foc_log] <- bf_df$step_result[foc_log]
+    bf_df[is.na(bf_df$step_result) & foc_log,
+          "step_result"] <- "Implausible"
+  }
+  
+  # consider the y range to be, at a minimum, a certain amount around the mean
+  scales_y <- list()
+    # c(
+    #   "Height (cm)" = scale_y_continuous(limits = c(130, 190)),
+    #   "Weight (kg)" = scale_y_continuous(limits = c(0, 600))
+    # )
+  for (t in type){
+    foc_log <- bf_df$param == type_map[t]
+    min_rg <- min(bf_df$measurement[foc_log], na.rm = T)
+    max_rg <- max(bf_df$measurement[foc_log], na.rm = T)
+    yaxis_lim <- 
+      if (diff(c(min_rg, max_rg)) < (min_range_band[t]*2)){
+        c(
+          mean(c(min_rg, max_rg))-min_range_band[t],
+          mean(c(min_rg, max_rg))+min_range_band[t]
+        )
+      } else {
+        c(
+          min_rg-(.01*diff(c(min_rg,max_rg))), 
+          max_rg+(.01*diff(c(min_rg,max_rg)))
+        )
+      }
+    
+    scales_y[[type_map[t]]] <- scale_y_continuous(limits = yaxis_lim)
+  }
+  
+  p <- suppressWarnings(
+    ggplot(bf_df)+
+      ggtitle(paste0("Method: ", simpleCap(methods_chosen)))+
+      geom_line(data = bf_df[complete.cases(bf_df),], 
+                aes(age_years, measurement), color = "grey")+
+      geom_point(
+        aes(
+          age_years, measurement,
+          color = step_result, shape = step_result,
+          text = paste0(
+            "Step ", step, " Result: ", step_result,"\n"
+          )
+        )
+      )+
+      theme_bw()+
+      scale_color_manual("Result", values = color_map, breaks = names(color_map))+
+      scale_shape_manual("Result", values = shape_map, breaks = names(shape_map))+
+      # ylim(yaxis_lim)+
+      theme(plot.title = element_text(hjust = .5))+
+      xlab("Age (Years)")+
+      ylab(ifelse(length(type) > 1, "Measurement", type_map[type]))+
+      facet_grid_sc(rows = vars(param), scales = list(y = scales_y))+
+      NULL
+  )
+  
+  if (legn){
+    p <- p +
+      theme(legend.position = "bottom",
+            text = element_text(size = 15))
+    
+    return(as.ggplot(g_legend(p)))
+  } else {
+    p <- p +
+      theme(legend.position = "none")
+    
+    return(ggplotly(p, tooltip = c("text")) %>% config(displayModeBar = F))
+  }
+}
+
 # UI ----
 
 # TODO: LOOK INTO MODULES
@@ -1323,9 +1545,22 @@ ui <- navbarPage(
       mainPanel(
         width = 9,
         tabsetPanel(
+          id = "inter_tabset",
           tabPanel(
             "Chan",
-            plotlyOutput("inter_plot")
+            plotlyOutput("inter_plot"),
+            HTML("<center>"),
+            sliderTextInput(
+              "method_step",
+              "Choose Step:",
+              choices = c(
+                "0",
+                m_inter_steps[["chan"]],
+                "End"
+              ),
+              selected = "0"
+            ),
+            HTML("</center>")
           )
         )
       )
@@ -2174,7 +2409,7 @@ server <- function(input, output, session) {
       "inter_subj",
       label = HTML("<p style = 'font-weight: normal'><b>Which subject's intermediate steps would you like to examine?</b> Search for subjects by pressing backspace and typing.</p>"),
       choices = 
-        if (run_clicks$inter > 0 | nrow(cleaned_df$sub) == 0){
+        if (run_clicks$inter == 0 | nrow(cleaned_df$sub) == 0){
           c()
         } else {
           unique(cleaned_df$sub$subjid)
@@ -2183,8 +2418,9 @@ server <- function(input, output, session) {
   })
   
   output$inter_plot <- renderPlotly({
-    plot_cleaned(cleaned_df$sub, "HEIGHTCM", input$inter_subj, 
-                 methods_chosen = "chan", single = T)
+    plot_inter_cleaned(cleaned_df$sub, "HEIGHTCM", input$inter_subj, 
+                       step = input$method_step,
+                       methods_chosen = tolower(input$inter_tabset))
   })
   
   # output for 'about' tab ----
