@@ -1096,6 +1096,11 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
     "Implausible" = 17
   )
   
+  size_map <- c(
+    "Include" = 2,
+    "Implausible" = 3
+  )
+  
   type_map <- c(
     "HEIGHTCM" = "Height (cm)",
     "WEIGHTKG" = "Weight (kg)"
@@ -1240,6 +1245,7 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
         aes(
           age_years, measurement,
           color = step_result, shape = step_result,
+          size = step_result,
           text = paste0(
             "ID: ", id,"\n",
             "Step ", step, " Result: ", step_result,"\n"
@@ -1249,7 +1255,7 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
       theme_bw()+
       scale_color_manual("Result", values = color_map, breaks = names(color_map))+
       scale_shape_manual("Result", values = shape_map, breaks = names(shape_map))+
-      # ylim(yaxis_lim)+
+      scale_size_manual("Result", values = size_map, breaks = names(shape_map))+
       theme(plot.title = element_text(hjust = .5))+
       xlab("Age (Years)")+
       ylab("Measurement")+
