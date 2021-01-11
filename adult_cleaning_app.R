@@ -351,7 +351,8 @@ sub_subj_type <- function(cleaned_df, type, subj,
 # function to build a table of intermediate values depending on a step and 
 # method chosen
 tab_inter_vals <- function(cleaned_df, subj, step,
-                           methods_chosen = methods_inter_avail[1]){
+                           methods_chosen = methods_inter_avail[1],
+                           highlt = "none"){
   type_map <- c(
     "HEIGHTCM" = "Height (cm)",
     "WEIGHTKG" = "Weight (kg)"
@@ -421,6 +422,13 @@ tab_inter_vals <- function(cleaned_df, subj, step,
     ),
     tab_out
   )
+  
+  # highlight a specific column
+  if (highlt != "none" & highlt %in% clean_df$id){
+    highlt <- as.character(highlt)
+    tab_out[, highlt] <- 
+      paste0("<strong>", tab_out[,highlt], "</strong>")
+  }
   
   return(tab_out)
 }
@@ -1259,7 +1267,7 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
   }
   
   p <- suppressWarnings(
-    ggplot(bf_df)+
+    ggplot(bf_df, aes(customdata = id))+
       geom_line(data = bf_df[complete.cases(bf_df),], 
                 aes(age_years, measurement), color = "grey")+
       geom_point(
@@ -1294,7 +1302,11 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
     p <- p +
       theme(legend.position = "none")
     
-    return(ggplotly(p, tooltip = c("text")) %>% config(displayModeBar = F))
+    return(
+      ggplotly(p, tooltip = c("text")) %>%
+        config(displayModeBar = F) %>%
+        event_register("plotly_hover")
+    )
   }
 }
 
@@ -1688,7 +1700,7 @@ ui <- navbarPage(
             uiOutput("chan_step_title"),
             uiOutput("chan_step_subtitle"),
             plotlyOutput("inter_plot"),
-            tableOutput("inter_table")
+            div(style = 'overflow-x: scroll', tableOutput('inter_table'))
           )
         )
       )
@@ -2616,14 +2628,18 @@ server <- function(input, output, session) {
   })
   
   output$inter_table <- renderTable({
-    tab_inter_vals(cleaned_inter_df$sub, input$inter_subj, 
+    d <- event_data("plotly_hover")
+    hover_id <- if (!is.null(d)){ d$customdata } else { "none" }
+
+    tab_inter_vals(cleaned_inter_df$sub, input$inter_subj,
                    step = input$method_step,
-                   methods_chosen = tolower(input$inter_tabset))
-  },  
-  striped = TRUE, 
+                   methods_chosen = tolower(input$inter_tabset),
+                   highlt = hover_id)
+  },
+  striped = TRUE,
   bordered = TRUE,
   sanitize.text.function = function(x){x},
-  width = '100%',  
+  width = '100%',
   colnames = FALSE)
   
   # output for 'about' tab ----
