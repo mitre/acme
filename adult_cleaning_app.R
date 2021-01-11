@@ -896,17 +896,17 @@ plot_result_heat_map <- function(cleaned_df, type,
       # if we're highlighting incorrect answers, make those brighter
       if (hl_incorr){
         c(
-          "Include (Incorrect)" = "#5e3c99",
-          "Include (Correct)" = "#b2abd2",
-          "Implausible (Incorrect)" = "#e66101",
-          "Implausible (Correct)" = "#fdb863"
+          "Incorrect: Include (False Negative)" = "#5e3c99",
+          "Correct: Include (True Negative)" = "#b2abd2",
+          "Incorrect: Implausible (False Positive)" = "#e66101",
+          "Correct: Implausible (True Positive)" = "#fdb863"
         )
       } else {
         c(
-          "Include (Correct)" = "#5e3c99",
-          "Include (Incorrect)" = "#b2abd2",
-          "Implausible (Correct)" = "#e66101",
-          "Implausible (Incorrect)" = "#fdb863"
+          "Correct: Include (True Negative)" = "#5e3c99",
+          "Incorrect: Include (False Negative)" = "#b2abd2",
+          "Correct: Implausible (True Positive)" = "#e66101",
+          "Incorrect: Implausible (False Positive)" = "#fdb863"
         )
       }
     } else {
@@ -946,14 +946,37 @@ plot_result_heat_map <- function(cleaned_df, type,
     # get the results as compared to the answers
     ans_res <- 
       clean_df[, grepl("_result", colnames(clean_df))] == clean_df$answers
-    # add correct/incorrect
+    ans_incl <- clean_df$answers == "Include"
+    ans_impl <- clean_df$answers == "Implausible"
+    # add correct/incorrect + fp/tp/fn/tn
     clean_df[, grepl("_result", colnames(clean_df))][ans_res] <- 
       paste0(
-        clean_df[, grepl("_result", colnames(clean_df))][ans_res], " (Correct)"
+        "Correct: ", clean_df[, grepl("_result", colnames(clean_df))][ans_res]
       )
+    clean_df[, grepl("_result", colnames(clean_df))][ans_res & ans_incl] <-
+      paste0(
+        clean_df[, grepl("_result", colnames(clean_df))][ans_res & ans_incl],
+        " (True Negative)"
+      )
+    clean_df[, grepl("_result", colnames(clean_df))][ans_res & ans_impl] <-
+      paste0(
+        clean_df[, grepl("_result", colnames(clean_df))][ans_res & ans_impl],
+        " (True Positive)"
+      )
+    
     clean_df[, grepl("_result", colnames(clean_df))][!ans_res] <- 
       paste0(
-        clean_df[, grepl("_result", colnames(clean_df))][!ans_res], " (Incorrect)"
+        "Incorrect: ", clean_df[, grepl("_result", colnames(clean_df))][!ans_res]
+      )
+    clean_df[, grepl("_result", colnames(clean_df))][(!ans_res) & ans_impl] <-
+      paste0(
+        clean_df[, grepl("_result", colnames(clean_df))][(!ans_res) & ans_impl],
+        " (False Negative)"
+      )
+    clean_df[, grepl("_result", colnames(clean_df))][(!ans_res) & ans_incl] <-
+      paste0(
+        clean_df[, grepl("_result", colnames(clean_df))][(!ans_res) & ans_incl],
+        " (False Positive)"
       )
   }
   
@@ -967,8 +990,8 @@ plot_result_heat_map <- function(cleaned_df, type,
     } else {
       clean_df <- 
         clean_df[rowSums(
-          clean_df[, res_col] != "Include (Correct)" & 
-            clean_df[, res_col] != "Implausible (Correct)"
+          clean_df[, res_col] != "Correct: Include" & 
+            clean_df[, res_col] != "Correct: Implausible"
         ) > 0,]
     }
   }
