@@ -1680,27 +1680,34 @@ ui <- navbarPage(
       # UI: intermediate value visualizations ----
       mainPanel(
         width = 9,
-        tabsetPanel(
-          id = "inter_tabset",
-          tabPanel(
-            "Chan",
-            br(),
-            HTML("<center>"),
-            sliderTextInput(
-              "method_step",
-              "Choose Step:",
-              choices = c(
-                "Before",
-                m_inter_steps[["chan"]],
-                "After"
-              ),
-              selected = "Before"
-            ),
-            HTML("</center>"),
-            uiOutput("chan_step_title"),
-            uiOutput("chan_step_subtitle"),
-            plotlyOutput("inter_plot"),
-            div(style = 'overflow-x: scroll', tableOutput('inter_table'))
+        do.call(
+          tabsetPanel,
+          c(
+            id = "inter_tabset",
+            lapply(methods_inter_avail, function(m_name){
+              tabPanel(
+                simpleCap(m_name),
+                br(),
+                HTML("<center>"),
+                sliderTextInput(
+                  paste0(m_name, "_method_step"),
+                  "Choose Step:",
+                  choices = c(
+                    "Before",
+                    m_inter_steps[[m_name]],
+                    "After"
+                  ),
+                  selected = "Before"
+                ),
+                HTML("</center>"),
+                uiOutput(paste0(m_name, "_step_title")),
+                uiOutput(paste0(m_name, "_step_subtitle")),
+                plotlyOutput(paste0(m_name, "_inter_plot")),
+                div(style = 'overflow-x: scroll', 
+                    tableOutput(paste0(m_name, '_inter_table'))
+                )
+              )
+            })
           )
         )
       )
@@ -2591,56 +2598,69 @@ server <- function(input, output, session) {
     )
   })
   
-  output$chan_step_title <- renderUI({
-    HTML(paste0(
-      "<h3><center>",
-      if (input$method_step == "Before"){
-        "Before Method"
-      } else if (input$method_step == "After"){
-        "After Method"
-      } else {
-        paste(
-          "Step", 
-          m_inter_steps_full_title[[tolower(input$inter_tabset)]][
-            input$method_step]
-        )
-      },
-      "</h3></center>"
-    ))
-  })
-  
-  output$chan_step_subtitle <- renderUI({
-    if (!input$method_step %in% c("Before", "After")){
-    HTML(paste0(
-      "<h4><center>",
-      m_inter_steps_full_subtitle[[tolower(input$inter_tabset)]][
-        input$method_step],
-      "</h4></center>"
+  lapply(paste0(methods_inter_avail, "_step_title"), function(x){
+    output[[x]] <- renderUI({
+      ms <-  input[[paste0(tolower(input$inter_tabset),"_method_step")]]
       
-    ))
-    }
+      HTML(paste0(
+        "<h3><center>",
+        if (ms == "Before"){
+          "Before Method"
+        } else if (ms == "After"){
+          "After Method"
+        } else {
+          paste(
+            "Step", 
+            m_inter_steps_full_title[[tolower(input$inter_tabset)]][ms]
+          )
+        },
+        "</h3></center>"
+      ))
+    })
   })
   
-  output$inter_plot <- renderPlotly({
-    plot_inter_cleaned(cleaned_inter_df$sub, input$inter_subj, 
-                       step = input$method_step,
-                       methods_chosen = tolower(input$inter_tabset))
+  lapply(paste0(methods_inter_avail, "_step_subtitle"), function(x){
+    output[[x]] <- renderUI({
+      if (!input[[paste0(tolower(input$inter_tabset), "_method_step")]] %in%
+          c("Before", "After")){
+        HTML(paste0(
+          "<h4><center>",
+          m_inter_steps_full_subtitle[[tolower(input$inter_tabset)]][
+            input[[paste0(tolower(input$inter_tabset), 
+                          "_method_step")]]],
+          "</h4></center>"
+          
+        ))
+      }
+    })
   })
   
-  output$inter_table <- renderTable({
-    d <- event_data("plotly_hover")
-    hover_id <- if (!is.null(d)){ d$customdata } else { "none" }
-
-    tab_inter_vals(cleaned_inter_df$sub, input$inter_subj,
-                   step = input$method_step,
-                   methods_chosen = tolower(input$inter_tabset),
-                   highlt = hover_id)
-  },
-  striped = TRUE,
-  bordered = TRUE,
-  sanitize.text.function = function(x){x},
-  width = '100%',
-  colnames = FALSE)
+  lapply(paste0(methods_inter_avail, "_inter_plot"), function(x){
+    output[[x]] <- renderPlotly({
+      plot_inter_cleaned(cleaned_inter_df$sub, input$inter_subj, 
+                         step = input[[paste0(tolower(input$inter_tabset), 
+                                              "_method_step")]],
+                         methods_chosen = tolower(input$inter_tabset))
+    })
+  })
+  
+  lapply(paste0(methods_inter_avail, "_inter_table"), function(x){
+    output[[x]] <- renderTable({
+      d <- event_data("plotly_hover")
+      hover_id <- if (!is.null(d)){ d$customdata } else { "none" }
+      
+      tab_inter_vals(cleaned_inter_df$sub, input$inter_subj,
+                     step = input[[paste0(tolower(input$inter_tabset), 
+                                          "_method_step")]],
+                     methods_chosen = tolower(input$inter_tabset),
+                     highlt = hover_id)
+    },
+    striped = TRUE,
+    bordered = TRUE,
+    sanitize.text.function = function(x){x},
+    width = '100%',
+    colnames = FALSE)
+  })
   
   # output for 'about' tab ----
   
