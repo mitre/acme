@@ -36,12 +36,39 @@ chan_clean_both <- function(df, inter_vals = F){
   )
   rownames(biv_df) <- c("height", "weight", "bmi")
   
+  # intermediate value columns
+  inter_cols <- c(
+    "Step_1h_H_BIV_Low_Compare",
+    "Step_1h_H_BIV_High_Compare",
+    "Step_1h_Result",
+    "Step_2h_Difference_from_Mean",
+    "Step_2h_3SD",
+    "Step_2h_Mean",
+    "Step_2h_Result",
+    "Step_1w_W_BIV_Low_Compare",
+    "Step_1w_W_BIV_High_Compare",
+    "Step_1w_Result",
+    "Step_2w_Avg_Height",
+    "Step_2w_BMI",
+    "Step_2w_W_BIV_BMI_Low_Compare",
+    "Step_2w_W_BIV_BMI_High_Compare",
+    "Step_2w_Result",
+    "Step_3w_Difference_from_Mean",
+    "Step_3w_3SD",
+    "Step_3w_Mean",
+    "Step_3w_Result"
+  )
+  
   # begin implementation ----
 
   # preallocate final designation
   df$result <- "Include"
   df$reason <- ""
   rownames(df) <- df$id
+  # if using intermediate values, preallocate values
+  if (inter_vals){
+    df[, inter_cols] <- NA
+  }
   # go through each subject
   for (i in unique(df$subjid)){
     slog <- df$subjid == i

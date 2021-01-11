@@ -1236,28 +1236,26 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
   
   # consider the y range to be, at a minimum, a certain amount around the mean
   scales_y <- list()
-    # c(
-    #   "Height (cm)" = scale_y_continuous(limits = c(130, 190)),
-    #   "Weight (kg)" = scale_y_continuous(limits = c(0, 600))
-    # )
   for (t in type){
     foc_log <- bf_df$param == type_map[t]
-    min_rg <- min(bf_df$measurement[foc_log], na.rm = T)
-    max_rg <- max(bf_df$measurement[foc_log], na.rm = T)
-    yaxis_lim <- 
-      if (diff(c(min_rg, max_rg)) < (min_range_band[t]*2)){
-        c(
-          mean(c(min_rg, max_rg))-min_range_band[t],
-          mean(c(min_rg, max_rg))+min_range_band[t]
-        )
-      } else {
-        c(
-          min_rg-(.01*diff(c(min_rg,max_rg))), 
-          max_rg+(.01*diff(c(min_rg,max_rg)))
-        )
-      }
-    
-    scales_y[[type_map[t]]] <- scale_y_continuous(limits = yaxis_lim)
+    if (sum(foc_log) > 0){
+      min_rg <- min(bf_df$measurement[foc_log], na.rm = T)
+      max_rg <- max(bf_df$measurement[foc_log], na.rm = T)
+      yaxis_lim <- 
+        if (diff(c(min_rg, max_rg)) < (min_range_band[t]*2)){
+          c(
+            mean(c(min_rg, max_rg))-min_range_band[t],
+            mean(c(min_rg, max_rg))+min_range_band[t]
+          )
+        } else {
+          c(
+            min_rg-(.01*diff(c(min_rg,max_rg))), 
+            max_rg+(.01*diff(c(min_rg,max_rg)))
+          )
+        }
+      
+      scales_y[[type_map[t]]] <- scale_y_continuous(limits = yaxis_lim)
+    }
   }
   
   p <- suppressWarnings(
