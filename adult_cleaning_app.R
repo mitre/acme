@@ -1322,6 +1322,11 @@ ui <- navbarPage(
             HTML("<b>Upload adult EHR data or results and click the corresponding button below to get started!</b> If no data is input, default synthetic data/results will be used. More information on data format can be found in the \"About\" tab.<p>"),
             fileInput("dat_file", "Upload Data/Results CSV",
                       accept = c(".csv", ".CSV")),
+            checkboxInput(
+              "run_ex", 
+              HTML("<b>Run example data?</b>"),
+              value = F
+            ),
             div(style="display:inline-block",
                 actionButton("run_data", "Run data!"),
                 actionButton("upload_res", "Upload Results"),
@@ -1649,6 +1654,11 @@ ui <- navbarPage(
         HTML("<b>Upload adult EHR data or results and click the corresponding button below to understand intermediate values!</b> If no data is input, default synthetic data/results will be used. More information on data format can be found in the \"About\" tab.<p>"),
         fileInput("dat_inter_file", "Upload Data/Results CSV",
                   accept = c(".csv", ".CSV")),
+        checkboxInput(
+          "run_inter_ex", 
+          HTML("<b>Run example data?</b>"),
+          value = F
+        ),
         div(style="display:inline-block",
             actionButton("run_inter_data", "Run data!"),
             actionButton("upload_inter_res", "Upload Results"),
@@ -2006,14 +2016,14 @@ server <- function(input, output, session) {
       
       df <-
         if (inter){
-          if (is.null(input$dat_inter_file)){
+          if (is.null(input$dat_inter_file) | input$run_inter_ex){
             # use example data
             dat
           } else {
             read.csv(input$dat_inter_file$datapath)
           }
         } else {
-          if (is.null(input$dat_file)){
+          if (is.null(input$dat_file) | input$run_ex){
             # use example data
             dat
           } else {
