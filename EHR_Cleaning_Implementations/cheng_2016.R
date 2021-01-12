@@ -19,12 +19,14 @@
 #   age_years: age, in years
 #   param: HEIGHTCM or WEIGHTKG
 #   measurement: height or weight measurement
+#   inter_vals: boolean, return intermediate values
 # outputs:
 #   df, with additional columns:
 #     result, which specifies whether the height measurement should be included,
 #       or is implausible.
 #     reason, which specifies, for implausible values, the reason for exclusion,
 #       and the step at which exclusion occurred.
+#     intermediate value columns, if specified
 cheng_clean_both <- function(df, inter_vals = F){
   # method specific constants ----
   # this includes specified cutoffs, etc.
@@ -36,15 +38,47 @@ cheng_clean_both <- function(df, inter_vals = F){
   )
   rownames(biv_df) <- c("height", "weight", "bmi")
   
+  # intermediate value columns
+  inter_cols <- c(
+    "Step_1h_H_BIV_Low_Compare",
+    "Step_1h_H_BIV_High_Compare",
+    "Step_1h_Result",
+    "Step_2h_Difference_from_Mean",
+    "Step_2h_SD",
+    "Step_2h_.025_of_Mean",
+    "Step_2h_Result",
+    "Step_1w_W_BIV_Low_Compare",
+    "Step_1w_W_BIV_High_Compare",
+    "Step_1w_Result",
+    "Step_2w_Range",
+    "Step_2w_Difference_from_Mean",
+    "Step_2w_SD",
+    "Step_2w_.2_of_Mean",
+    "Step_2w_Result",
+    "Step_3_BMI",
+    "Step_3_BMI_BIV_Low_Compare",
+    "Step_3_BMI_BIV_High_Compare",
+    "Step_3_Result"
+  )
+  
   # begin implementation ----
   
   # preallocate final designation
   df$result <- "Include"
   df$reason <- ""
   rownames(df) <- df$id
+  # if using intermediate values, preallocate values
+  if (inter_vals){
+    df[, inter_cols] <- NA
+  }
   # go through each subject
   for (i in unique(df$subjid)){
     slog <- df$subjid == i
+    
+    # if using intermediate values, we want to start storing them
+    # keep the ID to collate with the final dataframe
+    inter_df <- df[slog, "id", drop = F]
+    rownames(inter_df) <- inter_df$id
     
     # start with height ----
     
@@ -64,6 +98,15 @@ cheng_clean_both <- function(df, inter_vals = F){
     subj_keep[criteria] <- "Implausible"
     subj_reason[criteria] <- paste0("Implausible, Step ",step)
     
+    # if using intermediate values, we want to keep some
+    if(inter_vals){
+      inter_df[as.character(subj_df$id), "Step_1h_H_BIV_Low_Compare"] <- 
+        remove_biv_low(subj_df, "height", biv_df)
+      inter_df[as.character(subj_df$id), "Step_1h_H_BIV_High_Compare"] <- 
+        remove_biv_high(subj_df, "height", biv_df)
+      inter_df[as.character(subj_df$id), "Step_1h_Result"] <- criteria
+    }
+    
     subj_df <- subj_df[!criteria,]
     
     if (nrow(subj_df) > 1){
@@ -77,6 +120,7 @@ cheng_clean_both <- function(df, inter_vals = F){
       avg <- mean(subj_df$measurement)
       
       # if the standard deviation is > than 2.5%, we can say something about height
+      excl_ht <- rep(F, nrow(subj_df))
       if (st_dev/avg > .025){
         # criteria (a)
         excl_ht <- sapply(subj_df$measurement, function(x){abs(x-avg) > st_dev})
@@ -84,6 +128,17 @@ cheng_clean_both <- function(df, inter_vals = F){
         subj_keep[as.character(subj_df$id[excl_ht])] <- "Implausible"
         subj_reason[as.character(subj_df$id[excl_ht])] <- 
           paste0("Implausible, Step ",step)
+      }
+      
+      # if using intermediate values, we want to keep some
+      if(inter_vals){
+        inter_df[as.character(subj_df$id), "Step_2h_Difference_from_Mean"] <- 
+          abs(subj_df$measurement - avg)
+        inter_df[as.character(subj_df$id), "Step_2h_SD"] <- 
+          st_dev
+        inter_df[as.character(subj_df$id), "Step_2h_.025_of_Mean"] <- 
+          .025*avg
+        inter_df[as.character(subj_df$id), "Step_2h_Result"] <- excl_ht
       }
     }
     
@@ -111,6 +166,15 @@ cheng_clean_both <- function(df, inter_vals = F){
     criteria <- remove_biv(subj_df, "weight", biv_df)
     subj_keep[criteria] <- "Implausible"
     subj_reason[criteria] <- paste0("Implausible, Step ",step)
+    
+    # if using intermediate values, we want to keep some
+    if(inter_vals){
+      inter_df[as.character(subj_df$id), "Step_1w_W_BIV_Low_Compare"] <- 
+        remove_biv_low(subj_df, "weight", biv_df)
+      inter_df[as.character(subj_df$id), "Step_1w_W_BIV_High_Compare"] <- 
+        remove_biv_high(subj_df, "weight", biv_df)
+      inter_df[as.character(subj_df$id), "Step_1w_Result"] <- criteria
+    }
     
     subj_df <- subj_df[!criteria,]
     
@@ -155,6 +219,19 @@ cheng_clean_both <- function(df, inter_vals = F){
       subj_keep[as.character(subj_df$id[criteria_a | criteria_b])] <- "Implausible"
       subj_reason[as.character(subj_df$id[criteria_a | criteria_b])] <- 
         paste0("Implausible, Step ",step)
+      
+      # if using intermediate values, we want to keep some
+      if(inter_vals){
+        inter_df[as.character(subj_df$id), "Step_2w_Range"] <- 
+          w_range
+        inter_df[as.character(subj_df$id), "Step_2w_Difference_from_Mean"] <- 
+          abs(subj_df$measurement - avg_w)
+        inter_df[as.character(subj_df$id), "Step_2w_SD"] <- 
+          st_dev
+        inter_df[as.character(subj_df$id), "Step_2w_.2_of_Mean"] <- 
+          .2*avg_w
+        inter_df[as.character(subj_df$id), "Step_2w_Result"] <- criteria_a | criteria_b
+      }
     }
     
     w_df$result <- subj_keep
@@ -167,6 +244,12 @@ cheng_clean_both <- function(df, inter_vals = F){
     # 3, BMI BIV ----
     # 3. If BMI for a given set of height/weights is < 12 or > 70, deem implausible
     step <- "3, BMI BIV"
+    
+    # if intermediate values, remove the appended columns
+    if (inter_vals){
+      h_df <- h_df[, !colnames(h_df) %in% inter_cols]
+      w_df <- w_df[, !colnames(w_df) %in% inter_cols]
+    }
     
     # possible removal of height/weights by bmi
     # x = height, y = weight
@@ -193,6 +276,26 @@ cheng_clean_both <- function(df, inter_vals = F){
         df[as.character(comb_df$id.x), "result"] <- comb_df$tot_res
       df[as.character(comb_df$id.y), "reason"] <- 
         df[as.character(comb_df$id.x), "reason"] <- comb_df$tot_reason
+      
+      if(inter_vals){
+        inter_df[as.character(comb_df$id.y), "Step_3_BMI"] <- 
+          inter_df[as.character(comb_df$id.x), "Step_3_BMI"] <- 
+          comb_df$measurement
+        inter_df[as.character(comb_df$id.y), "Step_3_BMI_BIV_Low_Compare"] <- 
+          inter_df[as.character(comb_df$id.x), "Step_3_BMI_BIV_Low_Compare"] <- 
+          remove_biv_low(comb_df, "bmi", biv_df)
+        inter_df[as.character(comb_df$id.y), "Step_3_BMI_BIV_High_Compare"] <- 
+          inter_df[as.character(comb_df$id.x), "Step_3_BMI_BIV_High_Compare"] <- 
+          remove_biv_high(comb_df, "bmi", biv_df)
+        inter_df[as.character(comb_df$id.y), "Step_3_Result"] <- 
+          inter_df[as.character(comb_df$id.x), "Step_3_Result"] <- 
+          bmi_biv
+      }
+    }
+    
+    # if we're using intermediate values, we want to save them
+    if (inter_vals){
+      df[as.character(inter_df$id), colnames(inter_df)[-1]] <- inter_df[,-1]
     }
   }
   

@@ -18,13 +18,14 @@
 #   age_years: age, in years
 #   param: HEIGHTCM or WEIGHTKG
 #   measurement: height or weight measurement
-# inter_vals: boolean, return intermediate 
+#   inter_vals: boolean, return intermediate values
 # outputs:
 #   df, with additional columns:
 #     result, which specifies whether the height measurement should be included,
 #       or is implausible.
 #     reason, which specifies, for implausible values, the reason for exclusion,
 #       and the step at which exclusion occurred.
+#     intermediate value columns, if specified
 chan_clean_both <- function(df, inter_vals = F){
   # method specific constants ----
   # this includes specified cutoffs, etc.

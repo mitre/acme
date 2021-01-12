@@ -90,23 +90,32 @@ names(m_colors) <- simpleCap(methods_avail)
 
 # intermediate methods
 
-methods_inter_avail <- c("chan")
+methods_inter_avail <- c("cheng", "chan")
 
 # types cleaned for each method
 m_inter_types <- list(
-  "HEIGHTCM" = "chan",
-  "WEIGHTKG" = "chan"
+  "HEIGHTCM" = c("cheng", "chan"),
+  "WEIGHTKG" = c("cheng", "chan")
 )
 
-methods_inter_func <- list(chan_clean_both)
+methods_inter_func <- list(cheng_clean_both,
+                           chan_clean_both)
 names(methods_inter_func) <- methods_inter_avail
 
 # list of steps for each method
 m_inter_steps <- list(
+  "cheng" = c("1h", "2h", "1w", "2w", "3"),
   "chan" = c("1h", "2h", "1w", "2w", "3w")
 )
 
 m_inter_steps_full_title <- list(
+  "cheng" = c(
+    "1h" = "1h: H BIV",
+    "2h" = "2h: H compare difference from average to SD",
+    "1w" = "1w: W BIV",
+    "2w" = "2w: W compare difference from average to range or SD",
+    "3" = "3: BMI BIV"
+  ),
   "chan" = c(
     "1h" = "1h: H BIV",
     "2h" = "2h: H check SD away from mean",
@@ -117,6 +126,13 @@ m_inter_steps_full_title <- list(
 )
 
 m_inter_steps_full_subtitle <- list(
+  "cheng" = c(
+    "1h" = "Remove biologically implausible height records. Heights are biologically implausible if less than 111.8 cm or greater than 228.6 cm.",
+    "2h" = "Exclude height if a) absolute difference between that height and average height > standard deviation (SD) AND b) SD > 2.5% of average height.",
+    "1w" = "Remove biologically implausible weight records. Weights are biologically implausible if less than 24.9 kg or greater than 453.6 kg.",
+    "2w" = "Weight was determined to be inaccurate if: a) the range was > 22.7 kg AND absolute difference between recorded weight and avg weight was > 70% of range OR b) SD was >20% of the average weight AND absolute difference between that weight and average weight > the SD.",
+    "3" = "Remove biologically implausible BMI records. If BMI for a given set of height/weights is < 12 or > 70, deem implausible."
+  ),
   "chan" = c(
     "1h" = "Remove biologically implausible height records. Heights are biologically implausible if less than 121.92 cm (48 in) or greater than 213 cm (84 in).",
     "2h" = "Exclude heights that were greater than 3 standard deviations from the mean.",
@@ -1094,10 +1110,10 @@ plot_result_heat_map <- function(cleaned_df, type,
         ggplot()+
           theme_bw()+
           ggtitle(
-            "Too many entries. Reduce the amount of subjects by focusing\non a subset, or remove interactivity in the sidebar."
+            "Too many entries. Reduce the amount of subjects by focusing\non a subset, reduce number of entries in sidebar, or remove\ninteractivity in the sidebar."
           )
       ) %>%
-        layout(margin = list(t = 75)) %>% 
+        layout(margin = list(t = 100)) %>% 
         config(displayModeBar = F)
     } else {
       p <- suppressWarnings({
