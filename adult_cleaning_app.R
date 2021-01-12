@@ -889,7 +889,9 @@ plot_result_heat_map <- function(cleaned_df, type,
                                  interactive = F,
                                  show_y_lab = F,
                                  show_answers = T,
-                                 hl_incorr = T){
+                                 hl_incorr = T,
+                                 reduce_lines = F,
+                                 reduce_amount = nrow(cleaned_df)){
   type_n <- c(
     "HEIGHTCM" = "Height",
     "WEIGHTKG" = "Weight"
@@ -939,7 +941,7 @@ plot_result_heat_map <- function(cleaned_df, type,
          colnames(clean_df) %in% paste0(m_for_type, "_result"))
   ]
   
-  if (nrow(clean_df) == 0){
+  if (nrow(clean_df) == 0 | reduce_amount <= 0){
     return(ggplotly(ggplot()+theme_bw()))
   }
   
@@ -1036,6 +1038,15 @@ plot_result_heat_map <- function(cleaned_df, type,
            colnames(clean_df)[grepl("_result", colnames(clean_df))])
     )
   
+  # reduce lines, if specified
+  if (reduce_lines){
+    if (reduce_amount > nrow(clean_df)){
+      reduce_amount <- nrow(clean_df)
+    }
+    
+    clean_df <- clean_df[1:reduce_amount, ]
+  }
+  
   if (nrow(clean_df) == 0){
     if (interactive){
       return(ggplotly(ggplot()+theme_bw()+ggtitle("No entries.")))
@@ -1083,9 +1094,11 @@ plot_result_heat_map <- function(cleaned_df, type,
         ggplot()+
           theme_bw()+
           ggtitle(
-            "Too many entries. Reduce the amount of subjects or remove interactivity in the sidebar."
+            "Too many entries. Reduce the amount of subjects by focusing\non a subset, or remove interactivity in the sidebar."
           )
-      )
+      ) %>%
+        layout(margin = list(t = 75)) %>% 
+        config(displayModeBar = F)
     } else {
       p <- suppressWarnings({
         ggplotly(
@@ -1415,7 +1428,7 @@ ui <- navbarPage(
             "Options: All Individuals Heat Map",
             checkboxInput(
               "heat_side_by_side", 
-              HTML("<b>Display both height and weight heat maps side by side?</b>"),
+              HTML("<b>Display both height and weight heat maps side by side?</b> Legends may be cut off if checked."),
               value = T
             ),
             selectInput(
@@ -1437,12 +1450,26 @@ ui <- navbarPage(
               selected = "none",
               multiple = T
             ),
+            div(
+              style="display: inline-block;",
+              checkboxInput(
+                "heat_reduce_lines", 
+                HTML("<b>Show first X entries?</b>"),
+                value = T
+              )),
+            div(style="display: inline-block; width: 70px;",
+                numericInput(
+                  "heat_reduce_amount", 
+                  "X:", 
+                  value = 10, 
+                  step = 5,
+                  min = 1)
+            ),
             checkboxInput(
               "heat_show_answers", 
               HTML("<b>Show answers, if available?</b>"),
               value = T
             ),
-            
             checkboxInput(
               "heat_hl_incorr", 
               HTML("<b>If showing answers, highlight incorrect answers?</b> If selected, incorrect answers will appear darker than correct answers. Otherwise, correct answers will be highlighted."),
@@ -1461,7 +1488,7 @@ ui <- navbarPage(
             checkboxInput(
               "heat_interactive", 
               HTML("<b>Make interactive?</b> Interactivity will not render if the amount of records and methods selected exceeds 1500."),
-              value = T
+              value = F
             ),
             checkboxInput(
               "heat_show_y_lab", 
@@ -2437,7 +2464,9 @@ server <- function(input, output, session) {
                          interactive = T,
                          show_y_lab = input$heat_show_y_lab,
                          show_answers = input$heat_show_answers,
-                         hl_incorr = input$heat_hl_incorr)
+                         hl_incorr = input$heat_hl_incorr,
+                         reduce_lines = input$heat_reduce_lines,
+                         reduce_amount = input$heat_reduce_amount)
   })
   
   # render ggplot version -- will only render if UI is allocated
@@ -2451,7 +2480,9 @@ server <- function(input, output, session) {
                          interactive = F,
                          show_y_lab = input$heat_show_y_lab,
                          show_answers = input$heat_show_answers,
-                         hl_incorr = input$heat_hl_incorr)
+                         hl_incorr = input$heat_hl_incorr,
+                         reduce_lines = input$heat_reduce_lines,
+                         reduce_amount = input$heat_reduce_amount)
   })
   
   # render plotly version -- will only render if UI is allocated
@@ -2465,7 +2496,9 @@ server <- function(input, output, session) {
                          interactive = T,
                          show_y_lab = input$heat_show_y_lab,
                          show_answers = input$heat_show_answers,
-                         hl_incorr = input$heat_hl_incorr)
+                         hl_incorr = input$heat_hl_incorr,
+                         reduce_lines = input$heat_reduce_lines,
+                         reduce_amount = input$heat_reduce_amount)
   })
   
   # render ggplot version -- will only render if UI is allocated
@@ -2479,7 +2512,9 @@ server <- function(input, output, session) {
                          interactive = F,
                          show_y_lab = input$heat_show_y_lab,
                          show_answers = input$heat_show_answers,
-                         hl_incorr = input$heat_hl_incorr)
+                         hl_incorr = input$heat_hl_incorr,
+                         reduce_lines = input$heat_reduce_lines,
+                         reduce_amount = input$heat_reduce_amount)
   })
   
   # render plotly version -- will only render if UI is allocated
@@ -2493,7 +2528,9 @@ server <- function(input, output, session) {
                          interactive = T,
                          show_y_lab = input$heat_show_y_lab,
                          show_answers = input$heat_show_answers,
-                         hl_incorr = input$heat_hl_incorr)
+                         hl_incorr = input$heat_hl_incorr,
+                         reduce_lines = input$heat_reduce_lines,
+                         reduce_amount = input$heat_reduce_amount)
   })
   
   # render ggplot version -- will only render if UI is allocated
@@ -2507,7 +2544,9 @@ server <- function(input, output, session) {
                          interactive = F,
                          show_y_lab = input$heat_show_y_lab,
                          show_answers = input$heat_show_answers,
-                         hl_incorr = input$heat_hl_incorr)
+                         hl_incorr = input$heat_hl_incorr,
+                         reduce_lines = input$heat_reduce_lines,
+                         reduce_amount = input$heat_reduce_amount)
   })
   
   # plot check answers ----
