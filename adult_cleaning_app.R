@@ -1455,7 +1455,7 @@ ui <- navbarPage(
               checkboxInput(
                 "heat_reduce_lines", 
                 HTML("<b>Show first X entries?</b>"),
-                value = T
+                value = F
               )),
             div(style="display: inline-block; width: 70px;",
                 numericInput(
@@ -1463,7 +1463,7 @@ ui <- navbarPage(
                   "X:", 
                   value = 10, 
                   step = 5,
-                  min = 1)
+                  min = 0)
             ),
             checkboxInput(
               "heat_show_answers", 
