@@ -483,9 +483,6 @@ plot_answer_bar <- function(t_tab, yval = "Count",
       if (group){
         ggplot(t_tab, aes_string("Method", yval, fill = "Answer", group = "Answer"))+
           theme_bw()+
-          theme(legend.position = "bottom",
-                legend.direction = "horizontal",
-                text = element_text(size = 15))+
           if (ontop){
             geom_bar(stat = "identity")
           } else {
@@ -508,6 +505,10 @@ plot_answer_bar <- function(t_tab, yval = "Count",
     p <- p + 
       if (!legn){
         theme(legend.position = "none")
+      } else {
+        theme(legend.position = "bottom",
+              legend.direction = "horizontal",
+              text = element_text(size = 15))
       }
     
     p <- 
@@ -857,7 +858,7 @@ plot_methods_corr <- function(cleaned_df, type,
                         fill = Correlation,
                         label = Correlation))+
       geom_tile()+
-      geom_text()+
+      geom_text(size = 3)+
       scale_fill_gradient2(
         breaks = c(-1,0,1),
         limits = c(-1,1),
