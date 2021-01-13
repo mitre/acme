@@ -915,7 +915,8 @@ plot_result_heat_map <- function(cleaned_df, type,
                                  show_answers = T,
                                  hl_incorr = T,
                                  reduce_lines = F,
-                                 reduce_amount = nrow(cleaned_df)){
+                                 reduce_amount = nrow(cleaned_df),
+                                 legn = F){
   type_n <- c(
     "HEIGHTCM" = "Height",
     "WEIGHTKG" = "Weight"
@@ -925,6 +926,21 @@ plot_result_heat_map <- function(cleaned_df, type,
   if (show_answers & !"answers" %in% colnames(cleaned_df)){
     show_answers <- F
   }
+  
+  number_map <- 
+    if (show_answers){
+      c(
+        "Incorrect: Include (False Negative)" = 0,
+        "Correct: Include (True Negative)" = 1,
+        "Incorrect: Implausible (False Positive)" = 2,
+        "Correct: Implausible (True Positive)" = 3
+      )
+    } else {
+      c(
+        "Include" = 0,
+        "Implausible" = 1
+      )
+    }
   
   color_map <- 
     if (show_answers){
@@ -950,6 +966,37 @@ plot_result_heat_map <- function(cleaned_df, type,
         "Implausible" = "#fdb863"
       )
     }
+  if (!legn){
+    names(color_map) <- number_map[names(color_map)]
+  }
+  
+  # we're going to make a fake dataset for legend purposes
+  if (legn){
+    df <- data.frame(
+      "fill" = names(color_map),
+      "y" = names(color_map),
+      "x" = rep("a", length(color_map))
+    )
+    
+    p <- ggplot(df, 
+                aes(x, y, fill = fill))+
+      theme_bw()+
+      scale_x_discrete(expand = c(0,0))+
+      scale_y_discrete(expand = c(0,0))+
+      theme(axis.title.x = element_blank(),
+            axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+            legend.position = "top",
+            legend.direction = "horizontal",
+            legend.title = element_blank())+
+      ylab(paste("Record:", lab))+
+      scale_fill_discrete(type = color_map)+ 
+      geom_tile(color = "black") +
+      theme(legend.position = "bottom",
+            legend.direction = "horizontal",
+            text = element_text(size = 15))
+    
+    return(as.ggplot(g_legend(p)))
+  }
   
   # get the possible methods for this type
   m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
@@ -1079,13 +1126,22 @@ plot_result_heat_map <- function(cleaned_df, type,
     }
   }
   
+  # convert the text to numbers
+  clean_df[,-ncol(clean_df)] <- as.data.frame(lapply(
+    clean_df[,-ncol(clean_df)], function(x){number_map[x]}))
+  
   clean_m <- melt(clean_df, id.vars = "Label", variable.name = "Method")
   clean_m$Label <- factor(clean_m$Label, levels = unique(clean_m$Label))
   
   p <- ggplot(clean_m, 
               aes(Method, Label, fill = value))+
     theme_bw()+
-    scale_fill_discrete(type = color_map)+
+    scale_fill_gradientn(
+      colors = color_map, 
+      breaks = as.numeric(names(color_map)),
+      limits = c(min(as.numeric(names(color_map))), 
+                 max(as.numeric(names(color_map))))
+    )+
     scale_x_discrete(expand = c(0,0))+
     scale_y_discrete(expand = c(0,0))+
     theme(axis.title.x = element_blank(),
@@ -1094,6 +1150,7 @@ plot_result_heat_map <- function(cleaned_df, type,
           legend.direction = "horizontal",
           legend.title = element_blank())+
     ylab(paste("Record:", lab))+
+    theme(legend.position = "none")+
     NULL
   
   if (!show_y_lab | length(unique(clean_m$Label)) > 100){
@@ -1629,6 +1686,10 @@ ui <- navbarPage(
             fluidRow(
               width = 12,
               uiOutput("all_indiv_title"),
+            ),
+            fluidRow(
+              width = 12,
+              plotOutput("all_indiv_legn", height = "30px"),
             ),
             conditionalPanel(
               "input.heat_side_by_side == true",
@@ -2479,6 +2540,22 @@ server <- function(input, output, session) {
     HTML(paste0("<center><h3>",
                 type_map[input$heat_type],
                 "</center></h3>"))
+  })
+  
+  output$all_indiv_legn <- renderPlot({
+    plot_result_heat_map(cleaned_df$sub, 
+                         "HEIGHTCM",
+                         methods_chosen = methods_chosen$m,
+                         sort_col = input$heat_sort_col,
+                         hide_agree = input$heat_hide_agree,
+                         sort_dec = input$heat_sort_dec,
+                         interactive = F,
+                         show_y_lab = input$heat_show_y_lab,
+                         show_answers = input$heat_show_answers,
+                         hl_incorr = input$heat_hl_incorr,
+                         reduce_lines = input$heat_reduce_lines,
+                         reduce_amount = input$heat_reduce_amount,
+                         legn = T)
   })
   
   # render plotly version -- will only render if UI is allocated
