@@ -253,7 +253,7 @@ cheng_clean_both <- function(df, inter_vals = F){
     
     # possible removal of height/weights by bmi
     # x = height, y = weight
-    comb_df <- merge(h_df, w_df, by = "age_years", all = T)
+    comb_df <- comb_df_orig <- merge(h_df, w_df, by = "age_years", all = T)
     # remove ones that don't match
     comb_df <- comb_df[complete.cases(comb_df),]
     # also remove ones that are not plausible
@@ -291,6 +291,25 @@ cheng_clean_both <- function(df, inter_vals = F){
           inter_df[as.character(comb_df$id.x), "Step_3_Result"] <- 
           bmi_biv
       }
+    }
+    
+    if (inter_vals){
+      # we also want to add a "not calculated" for ones that didn't have a 
+      # corresponding height/weight
+      comb_df_orig <- comb_df_orig[
+        !(comb_df_orig$result.x == "Include" & comb_df_orig$result.y == "Include") |
+          !complete.cases(comb_df_orig),]
+      # remove any that were both already implausible
+      comb_df_orig <- comb_df_orig[
+        (comb_df_orig$result.x != "Implausible" | 
+           comb_df_orig$result.y != "Implausible") %in% T,
+      ]
+      ind <- as.character(c(
+        comb_df_orig$id.y[comb_df_orig$result.y == "Include"], 
+        comb_df_orig$id.x[comb_df_orig$result.x == "Include"]
+      ))
+      ind <- ind[!is.na(ind)]
+      inter_df[ind, "Step_3_Result"] <- "Not Calculated"
     }
     
     # if we're using intermediate values, we want to save them

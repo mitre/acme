@@ -317,9 +317,11 @@ sub_subj_type <- function(cleaned_df, type, subj,
   clean_df <- clean_df[
     ,
     (!grepl("_result", colnames(clean_df)) &
-       !grepl("_reason", colnames(clean_df))) |
+       !grepl("_reason", colnames(clean_df)) &
+       !grepl("_Step", colnames(clean_df))) |
       (colnames(clean_df) %in% paste0(m_for_type, "_reason") |
-         colnames(clean_df) %in% paste0(m_for_type, "_result"))
+         colnames(clean_df) %in% paste0(m_for_type, "_result") |
+         grepl(paste0(m_for_type, "_Step"), colnames(clean_df)))
   ]
   
   # create counts for plotting
@@ -378,7 +380,8 @@ tab_inter_vals <- function(cleaned_df, subj, step,
     "TRUE" = "Implausible",
     "FALSE" = "Include",
     "Implausible" = "Implausible",
-    "Include" = "Include"
+    "Include" = "Include",
+    "Not Calculated" = "Not Calculated"
   )
   
   # values we want to focus on in the table
@@ -439,11 +442,16 @@ tab_inter_vals <- function(cleaned_df, subj, step,
     tab_out
   )
   
+  # need to remove leading/trailing whitespace
+  tab_out <- as.data.frame(
+    apply(tab_out, 2, function(x){trimws(x, which = "both")})
+  )
+  
   # highlight a specific column
   if (highlt != "none" & highlt %in% clean_df$id){
     highlt <- as.character(highlt)
-    tab_out[, highlt] <- 
-      paste0("<strong>", tab_out[,highlt], "</strong>")
+    tab_out[, tab_out["id",] == highlt] <- 
+      paste0("<strong>", tab_out[, tab_out["id",] == highlt], "</strong>")
   }
   
   return(tab_out)
@@ -1149,16 +1157,19 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
   # maps for configuring ggplot
   color_map <- c(
     "Include" = "#000000",
+    "Not Calculated" = "#000000",
     "Implausible" = "#fdb863"
   )
   
   shape_map <- c(
     "Include" = 16,
+    "Not Calculated" = 16,
     "Implausible" = 17
   )
   
   size_map <- c(
     "Include" = 2,
+    "Not Calculated" = 2,
     "Implausible" = 3
   )
   
@@ -1169,7 +1180,8 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
   
   result_map <- c(
     "TRUE" = "Implausible",
-    "FALSE" = "Include"
+    "FALSE" = "Include",
+    "Not Calculated" = "Not Calculated"
   )
   
   opposite_focus_map <- c(
@@ -1228,7 +1240,6 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
   if (step == "After"){
     bf_df$step_result[bf_df$step_result == "Implausible"] <- NA
   }
-  bf_df$step_result_orig <- bf_df$step_result
   bf_df[is.na(bf_df$step_result) & bf_df$param %in% step_focus,
         "step_result"] <- "Implausible"
   # for the parameter not in focus, we want the last result
@@ -1298,8 +1309,9 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
   
   p <- suppressWarnings(
     ggplot(bf_df, aes(customdata = id))+
-      geom_line(data = bf_df[complete.cases(bf_df),], 
-                aes(age_years, measurement), color = "grey")+
+      geom_line(
+        data = bf_df[bf_df$step_result %in% c("Include", "Not Calculated"),], 
+        aes(age_years, measurement), color = "grey")+
       geom_point(
         aes(
           age_years, measurement,
@@ -2656,7 +2668,9 @@ server <- function(input, output, session) {
   
   lapply(paste0(methods_inter_avail, "_step_title"), function(x){
     output[[x]] <- renderUI({
-      ms <-  input[[paste0(tolower(input$inter_tabset),"_method_step")]]
+      ms <-  as.character(
+        input[[paste0(tolower(input$inter_tabset),"_method_step")]]
+      )
       
       HTML(paste0(
         "<h3><center>",
@@ -2679,11 +2693,12 @@ server <- function(input, output, session) {
     output[[x]] <- renderUI({
       if (!input[[paste0(tolower(input$inter_tabset), "_method_step")]] %in%
           c("Before", "After")){
+        ms <- as.character(input[[paste0(tolower(input$inter_tabset),
+                                           "_method_step")]])
+        
         HTML(paste0(
           "<h4><center>",
-          m_inter_steps_full_subtitle[[tolower(input$inter_tabset)]][
-            input[[paste0(tolower(input$inter_tabset), 
-                          "_method_step")]]],
+          m_inter_steps_full_subtitle[[tolower(input$inter_tabset)]][ms],
           "</h4></center>"
           
         ))
@@ -2694,8 +2709,10 @@ server <- function(input, output, session) {
   lapply(paste0(methods_inter_avail, "_inter_plot"), function(x){
     output[[x]] <- renderPlotly({
       plot_inter_cleaned(cleaned_inter_df$sub, input$inter_subj, 
-                         step = input[[paste0(tolower(input$inter_tabset), 
-                                              "_method_step")]],
+                         step = as.character(
+                           input[[paste0(tolower(input$inter_tabset), 
+                                              "_method_step")]]
+                           ),
                          methods_chosen = tolower(input$inter_tabset))
     })
   })
@@ -2706,8 +2723,10 @@ server <- function(input, output, session) {
       hover_id <- if (!is.null(d)){ d$customdata } else { "none" }
       
       tab_inter_vals(cleaned_inter_df$sub, input$inter_subj,
-                     step = input[[paste0(tolower(input$inter_tabset), 
-                                          "_method_step")]],
+                     step = as.character(
+                       input[[paste0(tolower(input$inter_tabset), 
+                                     "_method_step")]]
+                     ),
                      methods_chosen = tolower(input$inter_tabset),
                      highlt = hover_id)
     },
