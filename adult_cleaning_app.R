@@ -783,6 +783,12 @@ plot_cleaned <- function(cleaned_df, type, subj,
     }
   }
   
+  if (nrow(clean_df) == 1){
+    show_fit_line <- F
+    show_sd_shade <- F
+    calc_fit_w_impl <- F
+  }
+  
   bf_df <- data.frame(
     "age_years" = c(
       clean_df$age_years,
@@ -795,37 +801,39 @@ plot_cleaned <- function(cleaned_df, type, subj,
     )
   )
   
-  # if user wants to show the line fit
-  # add best fit line (padded slightly for plotting prettiness)
-  bf_df$best_fit <- 
-    if (calc_fit_w_impl){
-      predict(lm(measurement ~ age_years, clean_df), bf_df)
-    } else {
-      predict(lm(measurement ~ age_years, clean_df, 
-                 subset = clean_df$all_result == "Include"), 
-              bf_df)
-    }
-  
-  st_dev <- 
-    if (calc_fit_w_impl){
-      sd(clean_df$measurement)
-    } else {
-      sd(clean_df$measurement[clean_df$all_result == "Include"])
-    }
-  
-  
-  if (show_fit_line){
-    bf_df$min_sd1 <- bf_df$best_fit-st_dev
-    bf_df$max_sd1 <- bf_df$best_fit+st_dev
-    bf_df$min_sd2 <- bf_df$best_fit-(2*st_dev)
-    bf_df$max_sd2 <- bf_df$best_fit+(2*st_dev)
-  } else {
-    bf_df$min_sd1 <- bf_df$measurement_orig-st_dev
-    bf_df$max_sd1 <- bf_df$measurement_orig+st_dev
-    bf_df$min_sd2 <- bf_df$measurement_orig-(2*st_dev)
-    bf_df$max_sd2 <- bf_df$measurement_orig+(2*st_dev)
+  if (nrow(clean_df) > 1){
+    # if user wants to show the line fit
+    # add best fit line (padded slightly for plotting prettiness)
+    bf_df$best_fit <- 
+      if (calc_fit_w_impl){
+        predict(lm(measurement ~ age_years, clean_df), bf_df)
+      } else {
+        predict(lm(measurement ~ age_years, clean_df, 
+                   subset = clean_df$all_result == "Include"), 
+                bf_df)
+      }
     
-    bf_df <- bf_df[complete.cases(bf_df),]
+    st_dev <- 
+      if (calc_fit_w_impl){
+        sd(clean_df$measurement)
+      } else {
+        sd(clean_df$measurement[clean_df$all_result == "Include"])
+      }
+    
+    
+    if (show_fit_line){
+      bf_df$min_sd1 <- bf_df$best_fit-st_dev
+      bf_df$max_sd1 <- bf_df$best_fit+st_dev
+      bf_df$min_sd2 <- bf_df$best_fit-(2*st_dev)
+      bf_df$max_sd2 <- bf_df$best_fit+(2*st_dev)
+    } else {
+      bf_df$min_sd1 <- bf_df$measurement_orig-st_dev
+      bf_df$max_sd1 <- bf_df$measurement_orig+st_dev
+      bf_df$min_sd2 <- bf_df$measurement_orig-(2*st_dev)
+      bf_df$max_sd2 <- bf_df$measurement_orig+(2*st_dev)
+      
+      bf_df <- bf_df[complete.cases(bf_df),]
+    }
   }
   
   # consider the y range to be, at a minimum, a certain amount around the mean
@@ -1929,7 +1937,7 @@ ui <- navbarPage(
                 "<li><b>subjid:</b> subject ID</li>",
                 "<li><b>param:</b> parameter for each measurement. must be either HEIGHTCM (height in centimeters) or WEIGHTKG (weight in kilograms)</li>",
                 "<li><b>measurement:</b> measurement of height or weight, corresponding to the parameter</li>",
-                "<li><b>age_years:</b> age in years</li>",
+                "<li><b>age_years:</b> age in years (ages < 18 will be filtered out) (can also be <b>agedays</b>, as in the original growthcleanr format, and will be automatically converted to years)</li>",
                 "<li><b>sex:</b> 0 (male) or 1 (female)</li>",
                 "<li><b>answers:</b> (<u>not required</u>) an answer column, indicating whether the value should be Include or Implausible</li>",
                 "</ul><p>",
@@ -2236,7 +2244,17 @@ server <- function(input, output, session) {
             read.csv(input$dat_file$datapath)
           }
         }
-        
+      
+      # check that df has age_years or age days, preferring age_years
+      if ("agedays" %in% colnames(df) & !"age_years" %in% colnames(df)){
+        df$age_years <- df$agedays /365.25
+      }
+      # fix id if not unique or if it doesn't exist
+      if (is.null(df$id) || length(unique(df$id)) != nrow(df)){
+        df$id <- 1:nrow(df)
+      }
+      # filter out data less than 18
+      df <- df[df$age_years >= 18, ]
       
       # run each method and save the results
       c_df <- df
