@@ -321,7 +321,8 @@ sub_subj_type <- function(cleaned_df, type, subj,
        !grepl("_Step", colnames(clean_df))) |
       (colnames(clean_df) %in% paste0(m_for_type, "_reason") |
          colnames(clean_df) %in% paste0(m_for_type, "_result") |
-         grepl(paste0(m_for_type, "_Step"), colnames(clean_df)))
+         # when using _step, we only ever need the first one
+         grepl(paste0(m_for_type, "_Step")[1], colnames(clean_df)))
   ]
   
   # create counts for plotting
@@ -364,6 +365,173 @@ sub_subj_type <- function(cleaned_df, type, subj,
   
   
   return(clean_df)
+}
+
+# function to create the dataframe for the heatmap
+tab_heat_df <- function(cleaned_df, type,
+                        methods_chosen = methods_avail,
+                        sort_col = "none",
+                        sort_dec = F,
+                        hide_agree = F, 
+                        interactive = F,
+                        show_y_lab = F,
+                        show_answers = T,
+                        hl_incorr = T,
+                        reduce_lines = F,
+                        reduce_amount = nrow(cleaned_df)){
+  # if show answers is true and there are no answers, fix that
+  if (show_answers & !"answers" %in% colnames(cleaned_df)){
+    show_answers <- F
+  }
+  
+  number_map <- 
+    if (show_answers){
+      c(
+        "Incorrect: Include (False Negative)" = 0,
+        "Correct: Include (True Negative)" = 1,
+        "Incorrect: Implausible (False Positive)" = 2,
+        "Correct: Implausible (True Positive)" = 3
+      )
+    } else {
+      c(
+        "Include" = 0,
+        "Implausible" = 1
+      )
+    }
+  
+  # get the possible methods for this type
+  m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
+  
+  # subset the data to the things we care about
+  clean_df <- cleaned_df[cleaned_df$param == type,]
+  # subset to only the methods included
+  clean_df <- clean_df[
+    ,
+    (!grepl("_result", colnames(clean_df)) &
+       !grepl("_reason", colnames(clean_df))) |
+      (colnames(clean_df) %in% paste0(m_for_type, "_reason") |
+         colnames(clean_df) %in% paste0(m_for_type, "_result"))
+  ]
+  
+  if (nrow(clean_df) == 0 | reduce_amount <= 0){
+    return(data.frame())
+  }
+  
+  # only keep the results and necessary sorting
+  clean_df <- 
+    clean_df[,
+             !(grepl("_reason", colnames(clean_df)) | 
+                 grepl("param", colnames(clean_df)))
+    ]
+  
+  # if we're going to show answers, we want to change the names  
+  if (show_answers){
+    # get the results as compared to the answers
+    ans_res <- 
+      clean_df[, grepl("_result", colnames(clean_df))] == clean_df$answers
+    ans_incl <- clean_df$answers == "Include"
+    ans_impl <- clean_df$answers == "Implausible"
+    # add correct/incorrect + fp/tp/fn/tn
+    clean_df[, grepl("_result", colnames(clean_df))][ans_res] <- 
+      paste0(
+        "Correct: ", clean_df[, grepl("_result", colnames(clean_df))][ans_res]
+      )
+    clean_df[, grepl("_result", colnames(clean_df))][ans_res & ans_incl] <-
+      paste0(
+        clean_df[, grepl("_result", colnames(clean_df))][ans_res & ans_incl],
+        " (True Negative)"
+      )
+    clean_df[, grepl("_result", colnames(clean_df))][ans_res & ans_impl] <-
+      paste0(
+        clean_df[, grepl("_result", colnames(clean_df))][ans_res & ans_impl],
+        " (True Positive)"
+      )
+    
+    clean_df[, grepl("_result", colnames(clean_df))][!ans_res] <- 
+      paste0(
+        "Incorrect: ", clean_df[, grepl("_result", colnames(clean_df))][!ans_res]
+      )
+    clean_df[, grepl("_result", colnames(clean_df))][(!ans_res) & ans_impl] <-
+      paste0(
+        clean_df[, grepl("_result", colnames(clean_df))][(!ans_res) & ans_impl],
+        " (False Negative)"
+      )
+    clean_df[, grepl("_result", colnames(clean_df))][(!ans_res) & ans_incl] <-
+      paste0(
+        clean_df[, grepl("_result", colnames(clean_df))][(!ans_res) & ans_incl],
+        " (False Positive)"
+      )
+  }
+  
+  # if we choose to remove where they all agree, do so!
+  if (hide_agree){
+    # result columns
+    res_col <- grepl("_result", colnames(clean_df))
+    
+    if (!show_answers){
+      clean_df <- clean_df[rowSums(clean_df[, res_col] != "Include") > 0,]
+    } else {
+      clean_df <- 
+        clean_df[rowSums(
+          clean_df[, res_col] != "Correct: Include" & 
+            clean_df[, res_col] != "Correct: Implausible"
+        ) > 0,]
+    }
+  }
+  
+  # sort for visualizing
+  if (!"none" %in% sort_col){
+    sort_col <- sort_col[sort_col != "none"]
+    
+    clean_df <- 
+      clean_df[do.call('order', 
+                       c(clean_df[sort_col], list(decreasing = sort_dec))),]
+  }
+  
+  # create label column (combining all the non result columns)
+  clean_df$Label <- trimws(apply(
+    clean_df[, !grepl("_result", colnames(clean_df))],
+    1,
+    paste,
+    collapse = " / "
+  ))
+  lab <- paste(
+    colnames(clean_df[, !(grepl("_result", colnames(clean_df)) | 
+                            grepl("Label", colnames(clean_df)))]),
+    collapse = " / "
+  )
+  # remove the sort columns (keep subject and id)
+  clean_df <- clean_df[, (grepl("_result", colnames(clean_df)) | 
+                            grepl("Label", colnames(clean_df)) |
+                            grepl("subjid", colnames(clean_df)) |
+                            grepl("id", colnames(clean_df)))]
+  # rename result columns
+  colnames(clean_df)[grepl("_result", colnames(clean_df))] <-
+    simpleCap(
+      gsub("_result", "", 
+           colnames(clean_df)[grepl("_result", colnames(clean_df))])
+    )
+  
+  # reduce lines, if specified
+  if (reduce_lines){
+    if (reduce_amount > nrow(clean_df)){
+      reduce_amount <- nrow(clean_df)
+    }
+    
+    clean_df <- clean_df[1:reduce_amount, ]
+  }
+  
+  if (nrow(clean_df) > 0){
+    clean_m <- melt(clean_df, id.vars = c("Label", "subjid", "id"), variable.name = "Method")
+    clean_m$Label <- factor(clean_m$Label, levels = unique(clean_m$Label))
+    
+    # convert the text to numbers
+    clean_m[, "value"] <- number_map[clean_m$value]
+  } else {
+    clean_m <- clean_df
+  }
+  
+  return(clean_m)
 }
 
 # function to build a table of intermediate values depending on a step and 
@@ -941,6 +1109,8 @@ plot_result_heat_map <- function(cleaned_df, type,
         "Implausible" = 1
       )
     }
+  num_to_lab <- names(number_map)
+  names(num_to_lab) <- number_map
   
   color_map <- 
     if (show_answers){
@@ -998,127 +1168,20 @@ plot_result_heat_map <- function(cleaned_df, type,
     return(as.ggplot(g_legend(p)))
   }
   
-  # get the possible methods for this type
-  m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
-  
-  # subset the data to the things we care about
-  clean_df <- cleaned_df[cleaned_df$param == type,]
-  # subset to only the methods included
-  clean_df <- clean_df[
-    ,
-    (!grepl("_result", colnames(clean_df)) &
-       !grepl("_reason", colnames(clean_df))) |
-      (colnames(clean_df) %in% paste0(m_for_type, "_reason") |
-         colnames(clean_df) %in% paste0(m_for_type, "_result"))
-  ]
-  
-  if (nrow(clean_df) == 0 | reduce_amount <= 0){
-    return(ggplotly(ggplot()+theme_bw()))
-  }
-  
-  # only keep the results and necessary sorting
-  clean_df <- 
-    clean_df[,
-             !(grepl("_reason", colnames(clean_df)) | 
-                 grepl("param", colnames(clean_df)))
-    ]
-  
-  # if we're going to show answers, we want to change the names  
-  if (show_answers){
-    # get the results as compared to the answers
-    ans_res <- 
-      clean_df[, grepl("_result", colnames(clean_df))] == clean_df$answers
-    ans_incl <- clean_df$answers == "Include"
-    ans_impl <- clean_df$answers == "Implausible"
-    # add correct/incorrect + fp/tp/fn/tn
-    clean_df[, grepl("_result", colnames(clean_df))][ans_res] <- 
-      paste0(
-        "Correct: ", clean_df[, grepl("_result", colnames(clean_df))][ans_res]
-      )
-    clean_df[, grepl("_result", colnames(clean_df))][ans_res & ans_incl] <-
-      paste0(
-        clean_df[, grepl("_result", colnames(clean_df))][ans_res & ans_incl],
-        " (True Negative)"
-      )
-    clean_df[, grepl("_result", colnames(clean_df))][ans_res & ans_impl] <-
-      paste0(
-        clean_df[, grepl("_result", colnames(clean_df))][ans_res & ans_impl],
-        " (True Positive)"
-      )
-    
-    clean_df[, grepl("_result", colnames(clean_df))][!ans_res] <- 
-      paste0(
-        "Incorrect: ", clean_df[, grepl("_result", colnames(clean_df))][!ans_res]
-      )
-    clean_df[, grepl("_result", colnames(clean_df))][(!ans_res) & ans_impl] <-
-      paste0(
-        clean_df[, grepl("_result", colnames(clean_df))][(!ans_res) & ans_impl],
-        " (False Negative)"
-      )
-    clean_df[, grepl("_result", colnames(clean_df))][(!ans_res) & ans_incl] <-
-      paste0(
-        clean_df[, grepl("_result", colnames(clean_df))][(!ans_res) & ans_incl],
-        " (False Positive)"
-      )
-  }
-  
-  # if we choose to remove where they all agree, do so!
-  if (hide_agree){
-    # result columns
-    res_col <- grepl("_result", colnames(clean_df))
-    
-    if (!show_answers){
-      clean_df <- clean_df[rowSums(clean_df[, res_col] != "Include") > 0,]
-    } else {
-      clean_df <- 
-        clean_df[rowSums(
-          clean_df[, res_col] != "Correct: Include" & 
-            clean_df[, res_col] != "Correct: Implausible"
-        ) > 0,]
-    }
-  }
-  
-  # sort for visualizing
-  if (!"none" %in% sort_col){
-    sort_col <- sort_col[sort_col != "none"]
-    
-    clean_df <- 
-      clean_df[do.call('order', 
-                       c(clean_df[sort_col], list(decreasing = sort_dec))),]
-  }
-  
-  # create label column (combining all the non result columns)
-  clean_df$Label <- trimws(apply(
-    clean_df[, !grepl("_result", colnames(clean_df))],
-    1,
-    paste,
-    collapse = " / "
-  ))
-  lab <- paste(
-    colnames(clean_df[, !(grepl("_result", colnames(clean_df)) | 
-                            grepl("Label", colnames(clean_df)))]),
-    collapse = " / "
-  )
-  # remove the sort columns
-  clean_df <- clean_df[, (grepl("_result", colnames(clean_df)) | 
-                            grepl("Label", colnames(clean_df)))]
-  # rename result columns
-  colnames(clean_df)[grepl("_result", colnames(clean_df))] <-
-    simpleCap(
-      gsub("_result", "", 
-           colnames(clean_df)[grepl("_result", colnames(clean_df))])
-    )
-  
-  # reduce lines, if specified
-  if (reduce_lines){
-    if (reduce_amount > nrow(clean_df)){
-      reduce_amount <- nrow(clean_df)
-    }
-    
-    clean_df <- clean_df[1:reduce_amount, ]
-  }
-  
-  if (nrow(clean_df) == 0){
+  clean_m <- tab_heat_df(cleaned_df = cleaned_df, 
+                         type = type,
+                         methods_chosen = methods_chosen,
+                         sort_col = sort_col,
+                         sort_dec = sort_dec,
+                         hide_agree = hide_agree, 
+                         interactive = interactive,
+                         show_y_lab = show_y_lab,
+                         show_answers = show_answers,
+                         hl_incorr = hl_incorr,
+                         reduce_lines = reduce_lines,
+                         reduce_amount = reduce_amount)
+
+  if (nrow(clean_m) == 0){
     if (interactive){
       return(ggplotly(ggplot()+theme_bw()+ggtitle("No entries.")))
     } else {
@@ -1126,15 +1189,16 @@ plot_result_heat_map <- function(cleaned_df, type,
     }
   }
   
-  # convert the text to numbers
-  clean_df[,-ncol(clean_df)] <- as.data.frame(lapply(
-    clean_df[,-ncol(clean_df)], function(x){number_map[x]}))
-  
-  clean_m <- melt(clean_df, id.vars = "Label", variable.name = "Method")
-  clean_m$Label <- factor(clean_m$Label, levels = unique(clean_m$Label))
+  # get the possible methods for this type
+  m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
   
   p <- ggplot(clean_m, 
-              aes(Method, Label, fill = value))+
+              aes(Method, Label, fill = value,
+                  text = paste0(
+                    "Method: ", Method,"\n",
+                    "Label: ", Label,"\n",
+                    "Result: ", num_to_lab[as.character(value)]
+                  )))+
     theme_bw()+
     scale_fill_gradientn(
       colors = color_map, 
@@ -1162,7 +1226,7 @@ plot_result_heat_map <- function(cleaned_df, type,
   # if there aren't a ton of entries, you can add grids
   if (length(unique(clean_m$Label))*length(m_for_type) < 250*6){
     p <- p + 
-      geom_tile(color = "black")
+      geom_tile(color = "white")
   } else {
     p <- p + 
       geom_tile()
@@ -1183,13 +1247,20 @@ plot_result_heat_map <- function(cleaned_df, type,
     } else {
       p <- suppressWarnings({
         ggplotly(
-          p
+          p,
+          source = paste0(
+            "all_indiv_heat",
+            ifelse(type == "HEIGHTCM", "_ht", "_wt")
+            ),
+          tooltip = c("text")
         ) %>%
           layout(
             legend = list(orientation = "h",   # show entries horizontally
                           xanchor = "center",  
                           x = 0.5,
                           y = 1.1)) %>% 
+          style(xgap = 1, ygap = 1) %>%
+          event_register("plotly_click") %>%
           config(displayModeBar = F)
       })
     }
@@ -1402,7 +1473,7 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
       theme(legend.position = "none")
     
     return(
-      ggplotly(p, tooltip = c("text")) %>%
+      ggplotly(p, tooltip = c("text"), source = "inter_plot") %>%
         config(displayModeBar = F) %>%
         event_register("plotly_hover")
     )
@@ -1573,7 +1644,7 @@ ui <- navbarPage(
             checkboxInput(
               "heat_interactive", 
               HTML("<b>Make interactive?</b> Interactivity will not render if the amount of records and methods selected exceeds 1500."),
-              value = F
+              value = T
             ),
             checkboxInput(
               "heat_show_y_lab", 
@@ -1686,6 +1757,7 @@ ui <- navbarPage(
             fluidRow(
               width = 12,
               uiOutput("all_indiv_title"),
+              HTML("<p align = 'right'>Note: Clicking on a tile will add that subject/measurement to the focus list in both \"Compare Results\" and \"Examine Methods\".</p>"),
             ),
             fluidRow(
               width = 12,
@@ -2291,6 +2363,89 @@ server <- function(input, output, session) {
                         value = "")
   })
   
+  observeEvent(event_data("plotly_click", source = "all_indiv_heat_ht"), {
+      d <- event_data("plotly_click", source = "all_indiv_heat_ht")
+      if(!is.null(d)){
+        dx <- d$x
+        dy <- d$y
+        
+        # get the heatmap df
+        clean_m <- tab_heat_df(cleaned_df$sub, 
+                               "HEIGHTCM",
+                               methods_chosen = methods_chosen$m,
+                               sort_col = input$heat_sort_col,
+                               hide_agree = input$heat_hide_agree,
+                               sort_dec = input$heat_sort_dec,
+                               interactive = F,
+                               show_y_lab = input$heat_show_y_lab,
+                               show_answers = input$heat_show_answers,
+                               hl_incorr = input$heat_hl_incorr,
+                               reduce_lines = input$heat_reduce_lines,
+                               reduce_amount = input$heat_reduce_amount)
+        # get the info we need
+        m <- unique(clean_m$Method)[dx]
+        subjid <- clean_m$subjid[dy]
+        id <- clean_m$id[dy]
+        
+        # add ones that were already there (added through other means)
+        sub_add <- strsplit(input$subj_focus, "\n")[[1]]
+        if (length(sub_add) > 0){
+          subj_focus$subj[(length(subj_focus$subj)+1):
+                            (length(subj_focus$subj)+length(sub_add))] <- sub_add
+        }
+        
+        # now, automatically add the subject to the focus on list
+        subj_focus$subj[length(subj_focus$subj)+1] <- subjid
+        subj_focus$subj <- unique(subj_focus$subj)
+        
+        updateTextAreaInput(session,
+                            "subj_focus",
+                            value = paste(subj_focus$subj, collapse = "\n"))
+      }
+  })
+  
+  observeEvent(event_data("plotly_click", source = "all_indiv_heat_wt"), {
+    d <- event_data("plotly_click", source = "all_indiv_heat_wt")
+    if(!is.null(d)){
+      dx <- d$x
+      dy <- d$y
+      
+      # get the heatmap df
+      clean_m <- tab_heat_df(cleaned_df$sub, 
+                             "WEIGHTKG",
+                             methods_chosen = methods_chosen$m,
+                             sort_col = input$heat_sort_col,
+                             hide_agree = input$heat_hide_agree,
+                             sort_dec = input$heat_sort_dec,
+                             interactive = F,
+                             show_y_lab = input$heat_show_y_lab,
+                             show_answers = input$heat_show_answers,
+                             hl_incorr = input$heat_hl_incorr,
+                             reduce_lines = input$heat_reduce_lines,
+                             reduce_amount = input$heat_reduce_amount)
+      
+      # get the info we need
+      m <- unique(clean_m$Method)[dx]
+      subjid <- clean_m$subjid[dy]
+      id <- clean_m$id[dy]
+      
+      # add ones that were already there (added through other means)
+      sub_add <- strsplit(input$subj_focus, "\n")[[1]]
+      if (length(sub_add) > 0){
+        subj_focus$subj[(length(subj_focus$subj)+1):
+                          (length(subj_focus$subj)+length(sub_add))] <- sub_add
+      }
+      
+      # now, automatically add the subject to the focus on list
+      subj_focus$subj[length(subj_focus$subj)+1] <- subjid
+      subj_focus$subj <- unique(subj_focus$subj)
+      
+      updateTextAreaInput(session,
+                          "subj_focus",
+                          value = paste(subj_focus$subj, collapse = "\n"))
+    }
+  })
+  
   # update output to only focus on specified methods
   observeEvent(input$update_methods, {
     methods_chosen$m <- input$togg_methods
@@ -2298,6 +2453,14 @@ server <- function(input, output, session) {
   
   observeEvent(input$add_subj_focus, {
     subj_focus$subj[length(subj_focus$subj)+1] <- input$subj
+    
+    # add ones that were already there (added through other means)
+    sub_add <- strsplit(input$subj_focus, "\n")[[1]]
+    if (length(sub_add) > 0){
+      subj_focus$subj[(length(subj_focus$subj)+1):
+                        (length(subj_focus$subj)+length(sub_add))] <- sub_add
+    }
+    subj_focus$subj <- unique(subj_focus$subj)
     
     updateTextAreaInput(session,
                         "subj_focus",
@@ -2796,7 +2959,7 @@ server <- function(input, output, session) {
   
   lapply(paste0(methods_inter_avail, "_inter_table"), function(x){
     output[[x]] <- renderTable({
-      d <- event_data("plotly_hover")
+      d <- suppressWarnings(event_data("plotly_hover", source = "inter_plot"))
       hover_id <- if (!is.null(d)){ d$customdata } else { "none" }
       
       tab_inter_vals(cleaned_inter_df$sub, input$inter_subj,
