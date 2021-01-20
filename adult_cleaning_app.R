@@ -1291,6 +1291,7 @@ plot_result_heat_map <- function(cleaned_df, type,
 # a specific step for a specific method
 plot_inter_cleaned <- function(cleaned_df, subj, step,
                                methods_chosen = methods_inter_avail[1],
+                               focus_ids = c(),
                                legn = F){
   # the minimum +/- value around the mean for the y axis to show
   min_range_band <- c(
@@ -1478,6 +1479,18 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
       NULL
   )
   
+  if (sum(bf_df$id %in% focus_ids) > 0){
+    p <- p +
+      geom_point(
+        data = bf_df[bf_df$id %in% focus_ids,],
+        aes(
+          age_years, measurement,
+          color = step_result
+        ), 
+        fill = NA, shape = 21, size = 6#, color = "pink"
+      )
+  }
+  
   if (legn){
     p <- p +
       theme(legend.position = "bottom",
@@ -1515,7 +1528,7 @@ ui <- navbarPage(
           open = "Start: Run Data/Upload Results",
           bsCollapsePanel(
             "Start: Run Data/Upload Results",
-            HTML("<b>Upload adult EHR data or results and click the corresponding button below to get started!</b> If no data is input, default synthetic data/results will be used. More information on data format can be found in the \"About\" tab.<p>"),
+            HTML("<b>Upload adult EHR data or results and click the corresponding button below to get started!</b> If no data is input, default synthetic data/results will be used. More information on data format can be found in the \"About\" tab. Note that this will update data in \"Examine Methods\" tab.<p>"),
             fileInput("dat_file", "Upload Data/Results CSV",
                       accept = c(".csv", ".CSV")),
             checkboxInput(
@@ -1875,7 +1888,7 @@ ui <- navbarPage(
       # UI: intermediate sidebar options ----
       sidebarPanel(
         width = 3,
-        HTML("<b>Upload adult EHR data or results and click the corresponding button below to understand intermediate values!</b> If no data is input, default synthetic data/results will be used. More information on data format can be found in the \"About\" tab.<p>"),
+        HTML("<b>Upload adult EHR data or results and click the corresponding button below to understand intermediate values!</b> If no data is input, default synthetic data/results will be used. More information on data format can be found in the \"About\" tab. Note that this will update data in \"Compare Results\" tab.<p>"),
         fileInput("dat_inter_file", "Upload Data/Results CSV",
                   accept = c(".csv", ".CSV")),
         checkboxInput(
@@ -2321,9 +2334,6 @@ server <- function(input, output, session) {
       cleaned_df$full <- cleaned_df$sub <- 
         c_df[, !grepl("Step_", colnames(c_df))]
       
-      print(head(cleaned_inter_df$full))
-      print(head(cleaned_df$full))
-      
       # now let the tabs update
       all_collapse_names <- c(
         "Start: Run Data/Upload Results",
@@ -2412,14 +2422,15 @@ server <- function(input, output, session) {
   
   # update output to only focus on specified subjects
   observeEvent(input$update_subj, {
-    subj <- strsplit(input$subj_focus, "\n")[[1]]
+    subj <- subj_focus$subj <- strsplit(input$subj_focus, "\n")[[1]]
     cleaned_df$sub <-
       cleaned_df$full[as.character(cleaned_df$full$subj) %in% subj,]
   })
   
   # update output to only focus on specified individual subjects
   observeEvent(input$update_inter_subj, {
-    subj_ids <- strsplit(input$subj_focus, "\n")[[1]]
+    subj_ids <- subj_focus$subj_inter <- 
+      strsplit(input$subj_inter_focus, "\n")[[1]]
     # get the the subjects - ids will be be baked
     subjids <- sapply(strsplit(subj_ids, "/"), `[[`, 1)
     
@@ -3062,7 +3073,7 @@ server <- function(input, output, session) {
   output$indiv_inter_choose <- renderUI({
     selectInput(
       "inter_subj",
-      label = HTML("<p style = 'font-weight: normal'><b>Which subject's intermediate steps would you like to examine?</b> Search for subjects by pressing backspace and typing.</p>"),
+      label = HTML("<p style = 'font-weight: normal'><b>Which subject's intermediate steps would you like to examine?</b> Search for subjects by pressing backspace and typing. Focus IDs, if added to focus list and updated, will circled points in plot.</p>"),
       choices = 
         if (nrow(cleaned_inter_df$sub) == 0){
           c()
@@ -3114,12 +3125,30 @@ server <- function(input, output, session) {
   
   lapply(paste0(methods_inter_avail, "_inter_plot"), function(x){
     output[[x]] <- renderPlotly({
+      # get possible ids to focus on
+      subj_ids <- subj_focus$subj_inter
+      if (length(subj_ids) > 0){
+        subjids <- sapply(strsplit(subj_ids, "/"), `[[`, 1)
+        # take caution if only a subject is entered
+        ids <- sapply(strsplit(subj_ids, "/"), function(x){
+          if (length(x) < 2){ "" } else { x[[2]] }
+        })
+        # get ids to focus on
+        focus_ids <- ids[subjids == input$inter_subj]
+        if (all(focus_ids == "")){
+          focus_ids <- c()
+        }
+      } else {
+        focus_ids <- c()
+      }
+      
       plot_inter_cleaned(cleaned_inter_df$sub, input$inter_subj, 
                          step = as.character(
                            input[[paste0(tolower(input$inter_tabset), 
                                               "_method_step")]]
                            ),
-                         methods_chosen = tolower(input$inter_tabset))
+                         methods_chosen = tolower(input$inter_tabset),
+                         focus_ids = focus_ids)
     })
   })
   
