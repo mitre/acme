@@ -1889,6 +1889,16 @@ ui <- navbarPage(
             downloadButton("download_inter_results", label = "Download Results")
         ),
         hr(),
+        textAreaInput("subj_inter_focus", 
+                      "Enter subjects/record IDs to focus on (line separated,  with / between subject and record ID):",
+                      width = "100%",
+                      height = "100px"),
+        div(style="display:inline-block",
+            actionButton("update_inter_subj", "Update Focus"),
+            actionButton("reset_inter_subj", "Reset"),
+            downloadButton("download_inter_focus", label = "Download Focus")
+        ),
+        p(),
         uiOutput("indiv_inter_choose")
       ),
       # UI: intermediate value visualizations ----
@@ -2207,7 +2217,8 @@ server <- function(input, output, session) {
   )
   
   subj_focus <- reactiveValues(
-    "subj" = c()
+    "subj" = c(),
+    "subj_inter" = c()
   )
   
   # save run button clicks
@@ -2236,8 +2247,10 @@ server <- function(input, output, session) {
       run_clicks$reg <- input$run_data[1]
       run_clicks$inter <- input$run_inter_data[1]
       
-      # which methods are we running?
-      m_run <- if(inter){methods_inter_avail} else {methods_avail}
+      # which methods are we running? -- we're running all of them
+      # idea -> run all so that both datasets are available
+      # m_run <- if(inter){methods_inter_avail} else {methods_avail}
+      m_run <- methods_avail
       
       tot_increments <- 1+1+length(m_run)
       
@@ -2262,6 +2275,10 @@ server <- function(input, output, session) {
           }
         }
       
+      # check that age_years is not "ageyears"
+      if ("ageyears" %in% colnames(df)){
+        colnames(df)[colnames(df) == "ageyears"] <- "age_years"
+      }
       # check that df has age_years or age days, preferring age_years
       if ("agedays" %in% colnames(df) & !"age_years" %in% colnames(df)){
         df$age_years <- df$agedays /365.25
@@ -2281,17 +2298,18 @@ server <- function(input, output, session) {
                     detail = Sys.time())
         
         # clean data
-        m_func <- if (inter){methods_inter_func} else {methods_func}
+        # m_func <- if (inter){methods_inter_func} else {methods_func}
+        m_func <- methods_func
         clean_df <- 
           m_func[[m]](
-            df, inter_vals = inter
+            df, inter_vals = T
           )
         
         # add the results to the overall dataframe
         c_df[,paste0(m, "_result")] <- clean_df$result
         c_df[,paste0(m, "_reason")] <- clean_df$reason
         
-        if (inter){
+        if (m %in% methods_inter_avail){
           # if adding intermediate values, we add those at the end
           inter_cols <- colnames(clean_df)[grepl("Step_", colnames(clean_df))]
           c_df[,paste0(m, "_", inter_cols)] <- clean_df[, inter_cols]
@@ -2299,11 +2317,12 @@ server <- function(input, output, session) {
       }
       
       # initialize subset (cleaned_df holds all subjects)
-      if (inter){
-        cleaned_inter_df$full <- cleaned_inter_df$sub <- c_df
-      } else {
-        cleaned_df$full <- cleaned_df$sub <- c_df
-      }
+      cleaned_inter_df$full <- cleaned_inter_df$sub <- c_df
+      cleaned_df$full <- cleaned_df$sub <- 
+        c_df[, !grepl("Step_", colnames(c_df))]
+      
+      print(head(cleaned_inter_df$full))
+      print(head(cleaned_df$full))
       
       # now let the tabs update
       all_collapse_names <- c(
@@ -2355,10 +2374,16 @@ server <- function(input, output, session) {
   # download data results
   output$download_results <- downloadHandler(
     filename = function() {
-      if (is.null(input$dat_file)){
+      if ((is.null(input$dat_file) & is.null(input$dat_inter_file)) |
+          input$run_inter_ex){
         "Adult_EHR_Cleaning_Results_data_example.csv"
       } else {
-        paste0("Adult_EHR_Cleaning_Results_", input$dat_file$name)
+        fn <- ifelse(is.null(input$dat_file), 
+                     input$dat_inter_file$name,
+                     input$dat_file$name
+        )
+        
+        paste0("Adult_EHR_Cleaning_Results_", fn)
       }
     },
     content = function(file) {
@@ -2369,11 +2394,15 @@ server <- function(input, output, session) {
   # download intermediate data results
   output$download_inter_results <- downloadHandler(
     filename = function() {
-      if (is.null(input$dat_inter_file)){
+      if ((is.null(input$dat_file) & is.null(input$dat_inter_file)) |
+          input$run_inter_ex){
         "Adult_EHR_Cleaning_Results_w_Intermediate_Values_data_example.csv"
       } else {
-        paste0("Adult_EHR_Cleaning_Results_w_Intermediate_Values_",
-               input$dat_file$name)
+        fn <- ifelse(is.null(input$dat_file), 
+                     input$dat_inter_file$name,
+                     input$dat_file$name
+        )
+        paste0("Adult_EHR_Cleaning_Results_w_Intermediate_Values_", fn)
       }
     },
     content = function(file) {
@@ -2388,6 +2417,17 @@ server <- function(input, output, session) {
       cleaned_df$full[as.character(cleaned_df$full$subj) %in% subj,]
   })
   
+  # update output to only focus on specified individual subjects
+  observeEvent(input$update_inter_subj, {
+    subj_ids <- strsplit(input$subj_focus, "\n")[[1]]
+    # get the the subjects - ids will be be baked
+    subjids <- sapply(strsplit(subj_ids, "/"), `[[`, 1)
+    
+    cleaned_inter_df$sub <-
+      cleaned_inter_df$full[
+        as.character(cleaned_inter_df$full$subj) %in% subjids,]
+  })
+  
   # reset output to include all subjects
   observeEvent(input$reset_subj, {
     cleaned_df$sub <- cleaned_df$full
@@ -2398,6 +2438,17 @@ server <- function(input, output, session) {
                         value = "")
   })
   
+  # reset output to include all subjects for examining subjects
+  observeEvent(input$reset_inter_subj, {
+    cleaned_inter_df$sub <- cleaned_inter_df$full
+    subj_focus$subj_inter <- c()
+    
+    updateTextAreaInput(session,
+                        "subj_inter_focus",
+                        value = "")
+  })
+  
+  # click on the height heat map to add subjects and ids to focus
   observeEvent(event_data("plotly_click", source = "all_indiv_heat_ht"), {
       d <- event_data("plotly_click", source = "all_indiv_heat_ht")
       if(!is.null(d)){
@@ -2423,6 +2474,7 @@ server <- function(input, output, session) {
         subjid <- clean_m$subjid[dy]
         id <- clean_m$id[dy]
         
+        # for the regular tab
         # add ones that were already there (added through other means)
         sub_add <- strsplit(input$subj_focus, "\n")[[1]]
         if (length(sub_add) > 0){
@@ -2438,9 +2490,31 @@ server <- function(input, output, session) {
         updateTextAreaInput(session,
                             "subj_focus",
                             value = paste(subj_focus$subj, collapse = "\n"))
+        
+        # add to the individual subject text area
+        
+        # add ones that were already there (added through other means)
+        sub_add <- strsplit(input$subj_inter_focus, "\n")[[1]]
+        if (length(sub_add) > 0){
+          subj_focus$subj_inter <- sub_add
+        } else {
+          subj_focus$subj_inter <- c()
+        }
+        
+        # now, automatically add the subject to the focus on list
+        subj_focus$subj_inter[length(subj_focus$subj_inter)+1] <- 
+          paste0(subjid, "/", id)
+        subj_focus$subj_inter <- unique(subj_focus$subj_inter)
+        
+        updateTextAreaInput(
+          session,
+          "subj_inter_focus",
+          value = paste(subj_focus$subj_inter, collapse = "\n")
+        )
       }
   })
   
+  # click on the weight heat map to add subjects and ids to focus
   observeEvent(event_data("plotly_click", source = "all_indiv_heat_wt"), {
     d <- event_data("plotly_click", source = "all_indiv_heat_wt")
     if(!is.null(d)){
@@ -2482,6 +2556,27 @@ server <- function(input, output, session) {
       updateTextAreaInput(session,
                           "subj_focus",
                           value = paste(subj_focus$subj, collapse = "\n"))
+      
+      # add to the individual subject text area
+      
+      # add ones that were already there (added through other means)
+      sub_add <- strsplit(input$subj_inter_focus, "\n")[[1]]
+      if (length(sub_add) > 0){
+        subj_focus$subj_inter <- sub_add
+      } else {
+        subj_focus$subj_inter <- c()
+      }
+      
+      # now, automatically add the subject to the focus on list
+      subj_focus$subj_inter[length(subj_focus$subj_inter)+1] <- 
+        paste0(subjid, "/", id)
+      subj_focus$subj_inter <- unique(subj_focus$subj_inter)
+      
+      updateTextAreaInput(
+        session,
+        "subj_inter_focus",
+        value = paste(subj_focus$subj_inter, collapse = "\n")
+      )
     }
   })
   
@@ -2509,14 +2604,38 @@ server <- function(input, output, session) {
   
   output$download_focus <- downloadHandler(
     filename = function() {
-      if (is.null(input$dat_file)){
+      if ((is.null(input$dat_file) & is.null(input$dat_inter_file)) |
+          input$run_ex){
         "Adult_EHR_Cleaning_Subject_Focus_List_Example_Data.csv"
       } else {
-        paste0("Adult_EHR_Cleaning_Subject_Focus_List_", input$dat_file$name)
+        fn <- ifelse(is.null(input$dat_file), 
+                     input$dat_inter_file$name,
+                     input$dat_file$name
+                     )
+        paste0("Adult_EHR_Cleaning_Subject_Focus_List_", fn)
       }
     },
     content = function(file) {
       write.csv(data.frame("Focus.Subjects" = subj_focus$subj),
+                file, row.names = FALSE, na = "")
+    }
+  )
+  
+  output$download_inter_focus <- downloadHandler(
+    filename = function() {
+      if ((is.null(input$dat_file) & is.null(input$dat_inter_file)) |
+          input$run_inter_ex){
+        "Adult_EHR_Cleaning_Subject_ID_Focus_List_Example_Data.csv"
+      } else {
+        fn <- ifelse(is.null(input$dat_file), 
+                     input$dat_inter_file$name,
+                     input$dat_file$name
+        )
+        paste0("Adult_EHR_Cleaning_Subject_ID_Focus_List_", fn)
+      }
+    },
+    content = function(file) {
+      write.csv(data.frame("Focus.Subjects.IDs" = subj_focus$subj_inter),
                 file, row.names = FALSE, na = "")
     }
   )
@@ -2945,7 +3064,7 @@ server <- function(input, output, session) {
       "inter_subj",
       label = HTML("<p style = 'font-weight: normal'><b>Which subject's intermediate steps would you like to examine?</b> Search for subjects by pressing backspace and typing.</p>"),
       choices = 
-        if (run_clicks$inter == 0 | nrow(cleaned_inter_df$sub) == 0){
+        if (nrow(cleaned_inter_df$sub) == 0){
           c()
         } else {
           unique(cleaned_inter_df$sub$subjid)
