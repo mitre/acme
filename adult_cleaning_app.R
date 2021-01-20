@@ -378,7 +378,8 @@ tab_heat_df <- function(cleaned_df, type,
                         show_answers = T,
                         hl_incorr = T,
                         reduce_lines = F,
-                        reduce_amount = nrow(cleaned_df)){
+                        reduce_amount = nrow(cleaned_df),
+                        offset_amount = 0){
   # if show answers is true and there are no answers, fix that
   if (show_answers & !"answers" %in% colnames(cleaned_df)){
     show_answers <- F
@@ -505,6 +506,8 @@ tab_heat_df <- function(cleaned_df, type,
                             grepl("Label", colnames(clean_df)) |
                             grepl("subjid", colnames(clean_df)) |
                             grepl("id", colnames(clean_df)))]
+  # add label name
+  clean_df$Label_Name <- lab
   # rename result columns
   colnames(clean_df)[grepl("_result", colnames(clean_df))] <-
     simpleCap(
@@ -517,12 +520,16 @@ tab_heat_df <- function(cleaned_df, type,
     if (reduce_amount > nrow(clean_df)){
       reduce_amount <- nrow(clean_df)
     }
+    if (offset_amount > nrow(clean_df)){
+      offset_amount <- nrow(clean_df) - 1
+      reduce_amount <- nrow(clean_df)
+    }
     
-    clean_df <- clean_df[1:reduce_amount, ]
+    clean_df <- clean_df[(offset_amount+1):(offset_amount+1 + reduce_amount), ]
   }
   
   if (nrow(clean_df) > 0){
-    clean_m <- melt(clean_df, id.vars = c("Label", "subjid", "id"), variable.name = "Method")
+    clean_m <- melt(clean_df, id.vars = c("Label", "subjid", "id", "Label_Name"), variable.name = "Method")
     clean_m$Label <- factor(clean_m$Label, levels = unique(clean_m$Label))
     
     # convert the text to numbers
@@ -1092,6 +1099,7 @@ plot_result_heat_map <- function(cleaned_df, type,
                                  hl_incorr = T,
                                  reduce_lines = F,
                                  reduce_amount = nrow(cleaned_df),
+                                 offset_amount = 0,
                                  legn = F){
   type_n <- c(
     "HEIGHTCM" = "Height",
@@ -1166,7 +1174,6 @@ plot_result_heat_map <- function(cleaned_df, type,
             legend.position = "top",
             legend.direction = "horizontal",
             legend.title = element_blank())+
-      ylab(paste("Record:", lab))+
       scale_fill_discrete(type = color_map)+ 
       geom_tile(color = "black") +
       theme(legend.position = "bottom",
@@ -1187,7 +1194,8 @@ plot_result_heat_map <- function(cleaned_df, type,
                          show_answers = show_answers,
                          hl_incorr = hl_incorr,
                          reduce_lines = reduce_lines,
-                         reduce_amount = reduce_amount)
+                         reduce_amount = reduce_amount,
+                         offset_amount = offset_amount)
 
   if (nrow(clean_m) == 0){
     if (interactive){
@@ -1221,7 +1229,7 @@ plot_result_heat_map <- function(cleaned_df, type,
           legend.position = "top",
           legend.direction = "horizontal",
           legend.title = element_blank())+
-    ylab(paste("Record:", lab))+
+    ylab(paste("Record:", unique(clean_m$Label_Name)))+
     theme(legend.position = "none")+
     NULL
   
@@ -1620,13 +1628,22 @@ ui <- navbarPage(
                 "heat_reduce_lines", 
                 HTML("<b>Show first X entries?</b>"),
                 value = F
-              )),
+              )
+            ),
             div(style="display: inline-block; width: 70px;",
                 numericInput(
                   "heat_reduce_amount", 
                   "X:", 
                   value = 10, 
                   step = 5,
+                  min = 0)
+            ),
+            div(style="display: inline-block; width: 70px;",
+                numericInput(
+                  "heat_offset_amount", 
+                  "Offset?:", 
+                  value = 0, 
+                  step = 10,
                   min = 0)
             ),
             checkboxInput(
@@ -2399,7 +2416,8 @@ server <- function(input, output, session) {
                                show_answers = input$heat_show_answers,
                                hl_incorr = input$heat_hl_incorr,
                                reduce_lines = input$heat_reduce_lines,
-                               reduce_amount = input$heat_reduce_amount)
+                               reduce_amount = input$heat_reduce_amount,
+                               offset_amount = input$heat_offset_amount)
         # get the info we need
         m <- unique(clean_m$Method)[dx]
         subjid <- clean_m$subjid[dy]
@@ -2408,8 +2426,9 @@ server <- function(input, output, session) {
         # add ones that were already there (added through other means)
         sub_add <- strsplit(input$subj_focus, "\n")[[1]]
         if (length(sub_add) > 0){
-          subj_focus$subj[(length(subj_focus$subj)+1):
-                            (length(subj_focus$subj)+length(sub_add))] <- sub_add
+          subj_focus$subj <- sub_add
+        } else {
+          subj_focus$subj <- c()
         }
         
         # now, automatically add the subject to the focus on list
@@ -2440,18 +2459,20 @@ server <- function(input, output, session) {
                              show_answers = input$heat_show_answers,
                              hl_incorr = input$heat_hl_incorr,
                              reduce_lines = input$heat_reduce_lines,
-                             reduce_amount = input$heat_reduce_amount)
+                             reduce_amount = input$heat_reduce_amount,
+                             offset_amount = input$heat_offset_amount)
       
       # get the info we need
       m <- unique(clean_m$Method)[dx]
       subjid <- clean_m$subjid[dy]
       id <- clean_m$id[dy]
       
-      # add ones that were already there (added through other means)
+      # replace ones that were already there (added through other means)
       sub_add <- strsplit(input$subj_focus, "\n")[[1]]
       if (length(sub_add) > 0){
-        subj_focus$subj[(length(subj_focus$subj)+1):
-                          (length(subj_focus$subj)+length(sub_add))] <- sub_add
+        subj_focus$subj <- sub_add
+      } else {
+        subj_focus$subj <- c()
       }
       
       # now, automatically add the subject to the focus on list
@@ -2470,14 +2491,15 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$add_subj_focus, {
-    subj_focus$subj[length(subj_focus$subj)+1] <- input$subj
-    
     # add ones that were already there (added through other means)
     sub_add <- strsplit(input$subj_focus, "\n")[[1]]
     if (length(sub_add) > 0){
-      subj_focus$subj[(length(subj_focus$subj)+1):
-                        (length(subj_focus$subj)+length(sub_add))] <- sub_add
+      subj_focus$subj <- sub_add
+    } else {
+      subj_focus$subj <- c()
     }
+    
+    subj_focus$subj[length(subj_focus$subj)+1] <- input$subj
     subj_focus$subj <- unique(subj_focus$subj)
     
     updateTextAreaInput(session,
@@ -2736,6 +2758,7 @@ server <- function(input, output, session) {
                          hl_incorr = input$heat_hl_incorr,
                          reduce_lines = input$heat_reduce_lines,
                          reduce_amount = input$heat_reduce_amount,
+                         offset_amount = input$heat_offset_amount,
                          legn = T)
   })
   
@@ -2752,7 +2775,8 @@ server <- function(input, output, session) {
                          show_answers = input$heat_show_answers,
                          hl_incorr = input$heat_hl_incorr,
                          reduce_lines = input$heat_reduce_lines,
-                         reduce_amount = input$heat_reduce_amount)
+                         reduce_amount = input$heat_reduce_amount,
+                         offset_amount = input$heat_offset_amount)
   })
   
   # render ggplot version -- will only render if UI is allocated
@@ -2768,7 +2792,8 @@ server <- function(input, output, session) {
                          show_answers = input$heat_show_answers,
                          hl_incorr = input$heat_hl_incorr,
                          reduce_lines = input$heat_reduce_lines,
-                         reduce_amount = input$heat_reduce_amount)
+                         reduce_amount = input$heat_reduce_amount,
+                         offset_amount = input$heat_offset_amount)
   })
   
   # render plotly version -- will only render if UI is allocated
@@ -2784,7 +2809,8 @@ server <- function(input, output, session) {
                          show_answers = input$heat_show_answers,
                          hl_incorr = input$heat_hl_incorr,
                          reduce_lines = input$heat_reduce_lines,
-                         reduce_amount = input$heat_reduce_amount)
+                         reduce_amount = input$heat_reduce_amount,
+                         offset_amount = input$heat_offset_amount)
   })
   
   # render ggplot version -- will only render if UI is allocated
@@ -2800,7 +2826,8 @@ server <- function(input, output, session) {
                          show_answers = input$heat_show_answers,
                          hl_incorr = input$heat_hl_incorr,
                          reduce_lines = input$heat_reduce_lines,
-                         reduce_amount = input$heat_reduce_amount)
+                         reduce_amount = input$heat_reduce_amount,
+                         offset_amount = input$heat_offset_amount)
   })
   
   # render plotly version -- will only render if UI is allocated
@@ -2816,7 +2843,8 @@ server <- function(input, output, session) {
                          show_answers = input$heat_show_answers,
                          hl_incorr = input$heat_hl_incorr,
                          reduce_lines = input$heat_reduce_lines,
-                         reduce_amount = input$heat_reduce_amount)
+                         reduce_amount = input$heat_reduce_amount,
+                         offset_amount = input$heat_offset_amount)
   })
   
   # render ggplot version -- will only render if UI is allocated
@@ -2832,7 +2860,8 @@ server <- function(input, output, session) {
                          show_answers = input$heat_show_answers,
                          hl_incorr = input$heat_hl_incorr,
                          reduce_lines = input$heat_reduce_lines,
-                         reduce_amount = input$heat_reduce_amount)
+                         reduce_amount = input$heat_reduce_amount,
+                         offset_amount = input$heat_offset_amount)
   })
   
   # plot check answers ----
