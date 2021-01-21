@@ -5,7 +5,7 @@
 # This implements a prototype application to explore adult EHR cleaning 
 # implementations.
 
-vers_adult_ehr <- "0.3.1"
+vers_adult_ehr <- "0.3.3"
 
 # load libraries, scripts, and data ----
 
@@ -545,7 +545,14 @@ tab_heat_df <- function(cleaned_df, type,
 # method chosen
 tab_inter_vals <- function(cleaned_df, subj, step,
                            methods_chosen = methods_inter_avail[1],
-                           highlt = "none"){
+                           highlt = "none",
+                           color_ans = T){
+  # if color answers is true and there are no answers, fix that
+  if (nrow(cleaned_df) > 0 && 
+      color_ans && !"answers" %in% colnames(cleaned_df)){
+    color_ans <- F
+  }
+  
   type_map <- c(
     "HEIGHTCM" = "Height (cm)",
     "WEIGHTKG" = "Weight (kg)"
@@ -577,7 +584,8 @@ tab_inter_vals <- function(cleaned_df, subj, step,
     return(data.frame())
   }
   
-  tab_out <- clean_df[,c("id", "param", "age_years", "measurement")]
+  tab_out <- clean_df[,c("id", "param", "age_years", "measurement",
+                         ifelse(color_ans, "answers", c()))]
   tab_out <- cbind(
     tab_out, 
     if (step == "Before"){
@@ -605,13 +613,15 @@ tab_inter_vals <- function(cleaned_df, subj, step,
   step_names <- gsub(
     paste0(methods_chosen, " Step ", step, " "), 
     "",
-    gsub("_", " ", rownames(tab_out)[-c(1:4)])
+    gsub("_", " ", rownames(tab_out)[-c(1:ifelse(color_ans, 5, 4))])
   )
   
   tab_out <- cbind(
     "names" = paste0(
       "<strong><p align = 'right'>",
-      c("ID", "Parameter", "Age (years)", "Measurement", step_names),
+      c("ID", "Parameter", "Age (years)", "Measurement", 
+        ifelse(color_ans, "Answers", c()),
+        step_names),
       "</strong></p>"
     ),
     tab_out
@@ -1292,7 +1302,14 @@ plot_result_heat_map <- function(cleaned_df, type,
 plot_inter_cleaned <- function(cleaned_df, subj, step,
                                methods_chosen = methods_inter_avail[1],
                                focus_ids = c(),
+                               color_ans = T,
                                legn = F){
+  # if color answers is true and there are no answers, fix that
+  if (nrow(cleaned_df) > 0 && 
+      color_ans && !"answers" %in% colnames(cleaned_df)){
+    color_ans <- F
+  }
+  
   # the minimum +/- value around the mean for the y axis to show
   min_range_band <- c(
     "HEIGHTCM" = 3.5,
@@ -1300,11 +1317,33 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
   )
   
   # maps for configuring ggplot
-  color_map <- c(
-    "Include" = "#000000",
-    "Not Calculated" = "#000000",
-    "Implausible" = "#fdb863"
-  )
+  color_map <- 
+    if (color_ans){
+      # if we're highlighting incorrect answers, make those brighter
+      if (T){#(hl_incorr){ FIX LATER
+        c(
+          "Incorrect: Include (False Negative)" = "#5e3c99",
+          "Correct: Include (True Negative)" = "#b2abd2",
+          "Incorrect: Implausible (False Positive)" = "#e66101",
+          "Correct: Implausible (True Positive)" = "#fdb863",
+          "Not Calculated" = "#000000"
+        )
+      } else {
+        c(
+          "Correct: Include (True Negative)" = "#5e3c99",
+          "Incorrect: Include (False Negative)" = "#b2abd2",
+          "Correct: Implausible (True Positive)" = "#e66101",
+          "Incorrect: Implausible (False Positive)" = "#fdb863",
+          "Not Calculated" = "#000000"
+        )
+      }
+    } else {
+      c(
+        "Include" = "#000000",
+        "Not Calculated" = "#000000",
+        "Implausible" = "#fdb863"
+      )
+    }
   
   shape_map <- c(
     "Include" = 16,
@@ -1428,6 +1467,48 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
           "step_result"] <- "Implausible"
   }
   
+  # for ease of coloring
+  bf_df$step_result_color <- bf_df$step_result
+  # if we're going to show answers, we want to change the names  
+  if (color_ans){
+    # get the results as compared to the answers
+    ans_res <- bf_df$step_result_color == clean_df$answers
+    # do not get the not calculated
+    ans_nnc <- bf_df$step_result_color != "Not Calculated"
+    ans_incl <- clean_df$answers == "Include"
+    ans_impl <- clean_df$answers == "Implausible"
+    # add correct/incorrect + fp/tp/fn/tn
+    bf_df$step_result_color[ans_res & ans_nnc] <- 
+      paste0(
+        "Correct: ", bf_df$step_result_color[ans_res & ans_nnc]
+      )
+    bf_df$step_result_color[ans_res & ans_nnc & ans_incl] <-
+      paste0(
+        bf_df$step_result_color[ans_res & ans_nnc & ans_incl],
+        " (True Negative)"
+      )
+    bf_df$step_result_color[ans_res & ans_nnc & ans_impl] <-
+      paste0(
+        bf_df$step_result_color[ans_res & ans_nnc & ans_impl],
+        " (True Positive)"
+      )
+    
+    bf_df$step_result_color[!ans_res & ans_nnc] <- 
+      paste0(
+        "Incorrect: ", bf_df$step_result_color[!ans_res & ans_nnc]
+      )
+    bf_df$step_result_color[(!ans_res) & ans_nnc & ans_impl] <-
+      paste0(
+        bf_df$step_result_color[(!ans_res) & ans_nnc & ans_impl],
+        " (False Negative)"
+      )
+    bf_df$step_result_color[(!ans_res) & ans_nnc & ans_incl] <-
+      paste0(
+        bf_df$step_result_color[(!ans_res) & ans_nnc & ans_incl],
+        " (False Positive)"
+      )
+  }
+  
   # consider the y range to be, at a minimum, a certain amount around the mean
   scales_y <- list()
   for (t in type){
@@ -1460,18 +1541,19 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
       geom_point(
         aes(
           age_years, measurement,
-          color = step_result, shape = step_result,
+          color = step_result_color, shape = step_result,
           size = step_result,
           text = paste0(
             "ID: ", id,"\n",
-            "Step ", step, " Result: ", step_result,"\n"
+            "Step ", step, " Result: ", step_result,"\n",
+            if(color_ans){paste0("Answer: ", step_result_color)} else {""}
           )
         )
       )+
       theme_bw()+
-      scale_color_manual("Result", values = color_map, breaks = names(color_map))+
-      scale_shape_manual("Result", values = shape_map, breaks = names(shape_map))+
-      scale_size_manual("Result", values = size_map, breaks = names(shape_map))+
+      scale_color_manual("Result Color", values = color_map, breaks = names(color_map))+
+      scale_shape_manual("Result Shape", values = shape_map, breaks = names(shape_map))+
+      scale_size_manual("Result Shape", values = size_map, breaks = names(shape_map))+
       theme(plot.title = element_text(hjust = .5))+
       xlab("Age (Years)")+
       ylab("Measurement")+
@@ -1485,15 +1567,16 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
         data = bf_df[bf_df$id %in% focus_ids,],
         aes(
           age_years, measurement,
-          color = step_result
+          color = step_result_color
         ), 
-        fill = NA, shape = 21, size = 6#, color = "pink"
+        fill = NA, shape = 21, size = 6
       )
   }
   
   if (legn){
     p <- p +
       theme(legend.position = "bottom",
+            legend.direction = "horizontal",
             text = element_text(size = 15))
     
     return(as.ggplot(g_legend(p)))
@@ -1912,7 +1995,12 @@ ui <- navbarPage(
             downloadButton("download_inter_focus", label = "Download Focus")
         ),
         p(),
-        uiOutput("indiv_inter_choose")
+        uiOutput("indiv_inter_choose"),
+        checkboxInput(
+          "inter_color_ans",
+          HTML("<b>Show answers (if available)?</b>"),
+          value = T
+        )
       ),
       # UI: intermediate value visualizations ----
       mainPanel(
@@ -1940,6 +2028,7 @@ ui <- navbarPage(
                 uiOutput(paste0(m_name, "_step_title")),
                 uiOutput(paste0(m_name, "_step_subtitle")),
                 plotlyOutput(paste0(m_name, "_inter_plot")),
+                plotOutput(paste0(m_name, "_inter_plot_legn"), height = 50),
                 div(style = 'overflow-x: scroll', 
                     tableOutput(paste0(m_name, '_inter_table'))
                 )
@@ -3148,7 +3237,22 @@ server <- function(input, output, session) {
                                               "_method_step")]]
                            ),
                          methods_chosen = tolower(input$inter_tabset),
-                         focus_ids = focus_ids)
+                         focus_ids = focus_ids,
+                         color_ans = input$inter_color_ans)
+    })
+  })
+  
+  lapply(paste0(methods_inter_avail, "_inter_plot_legn"), function(x){
+    output[[x]] <- renderPlot({
+      plot_inter_cleaned(cleaned_inter_df$sub, input$inter_subj, 
+                         step = as.character(
+                           input[[paste0(tolower(input$inter_tabset), 
+                                         "_method_step")]]
+                         ),
+                         methods_chosen = tolower(input$inter_tabset),
+                         focus_ids = c(),
+                         color_ans = input$inter_color_ans,
+                         legn = T)
     })
   })
   
