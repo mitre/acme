@@ -5,7 +5,7 @@
 # This implements a prototype application to explore adult EHR cleaning 
 # implementations.
 
-vers_adult_ehr <- "0.3.3"
+vers_adult_ehr <- "0.3.4"
 
 # load libraries, scripts, and data ----
 
