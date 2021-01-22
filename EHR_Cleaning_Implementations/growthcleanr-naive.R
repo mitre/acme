@@ -102,13 +102,16 @@ ewma <- function(agedays, z, ewma.exp = 1.5, ewma.adjacent = T) {
 #   are .5 less.
 # outputs:
 #  logical indicating whether to exclude a record
-remove_ewma <- function(subj_df, ewma_cutoff = 2){
+remove_ewma <- function(subj_df, ewma_cutoff = 2, 
+                        inter_vals = F, inter_df = data.frame(),
+                        type = "h"){
   orig_subj_df <- subj_df
   
   # all three need to be beyond a cutoff for exclusion
   # exclude the most extreme, then recalculate again and again
   rem_ids <- c()
   change <- T
+  iter <- 1
   while (change){
     # calculate ewma
     ewma_res <- ewma(subj_df$age_days, subj_df$z)
@@ -122,6 +125,23 @@ remove_ewma <- function(subj_df, ewma_cutoff = 2){
          dewma$dewma.after > ewma_cutoff - .5 & 
          abs(subj_df$z) > ewma_cutoff)
     
+    
+    # if using intermediate values, we want to keep some
+    if (inter_vals){
+      inter_df[as.character(subj_df$id), 
+               paste0("Step_1", type, "_Iter_", iter, "_Delta_EWMA_All")] <-
+        dewma$dewma.all
+      inter_df[as.character(subj_df$id), 
+               paste0("Step_1", type, "_Iter_", iter, "_Delta_EWMA_Before")] <-
+        dewma$dewma.before
+      inter_df[as.character(subj_df$id), 
+               paste0("Step_1", type, "_Iter_", iter, "_Delta_EWMA_After")] <-
+        dewma$dewma.after
+      inter_df[as.character(subj_df$id), 
+               paste0("Step_1", type, "_Iter_", iter, "_Result")] <-
+        criteria_new
+    }
+    
     if (all(!criteria_new)){
       # if none of them are to be removed
       change <- F
@@ -131,14 +151,19 @@ remove_ewma <- function(subj_df, ewma_cutoff = 2){
       # keep the ids that failed and remove
       rem_ids[length(rem_ids)+1] <- subj_df[criteria_new,][to_rem, "id"]
       subj_df <- subj_df[subj_df$id != rem_ids[length(rem_ids)],]
+      # update iteration
+      iter <- iter + 1
     }
   }
   
   # form results into a logical vector
-  criteria <- rep(F, nrow(subj_df))
+  criteria <- rep(F, nrow(orig_subj_df))
   criteria[orig_subj_df$id %in% rem_ids] <- T
   
-  return(criteria)
+  return(list(
+    "criteria" = criteria,
+    "inter_df" = inter_df
+  ))
 }
 
 # implement growthcleanr-naive ----
@@ -160,15 +185,34 @@ remove_ewma <- function(subj_df, ewma_cutoff = 2){
 #       and the step at which exclusion occurred.
 growthcleanr_clean_both <- function(df, inter_vals = F){
   
+  # intermediate value columns -- only ones that are common among all
+  inter_cols <- c(
+    "Step_1h_Age_days",
+    "Step_1h_Z-Score",
+    "Step_1h_Result",
+    "Step_1w_Age_days",
+    "Step_1w_Z-Score",
+    "Step_1w_Result"
+  )
+  
   # begin implementation ----
   
   # preallocate final designation
   df$result <- "Include"
   df$reason <- ""
   rownames(df) <- df$id
+  # if using intermediate values, preallocate values
+  if (inter_vals){
+    df[, inter_cols] <- NA
+  }
   # go through each subject
   for (i in unique(df$subjid)){
     slog <- df$subjid == i
+    
+    # if using intermediate values, we want to start storing them
+    # keep the ID to collate with the final dataframe
+    inter_df <- df[slog, "id", drop = F]
+    rownames(inter_df) <- inter_df$id
     
     # start with height ----
     h_df <- df[df$param == "HEIGHTCM" & slog,]
@@ -189,6 +233,12 @@ growthcleanr_clean_both <- function(df, inter_vals = F){
     # convert age years to days
     subj_df$age_days <- subj_df$age_years*365.2425
     
+    # if using intermediate values, we want to keep some
+    if (inter_vals){
+      inter_df[as.character(subj_df$id), "Step_1h_Age_days"] <-
+        subj_df$age_days
+    }
+    
     # sort by age
     subj_df <- subj_df[order(subj_df$age_days),]
     
@@ -197,11 +247,27 @@ growthcleanr_clean_both <- function(df, inter_vals = F){
       subj_df$z <- (subj_df$measurement - mean(subj_df$measurement))/
         sd(subj_df$measurement)
       
+      # if using intermediate values, we want to keep some
+      if (inter_vals){
+        inter_df[as.character(subj_df$id), "Step_1h_Z-Score"] <-
+          subj_df$z
+      }
+      
       # calculate the criteria to remove the ewma
-      criteria <- remove_ewma(subj_df, ewma_cutoff = 2)
+      criteria_list <- remove_ewma(subj_df, ewma_cutoff = 2,
+                              inter_vals = inter_vals, inter_df = inter_df,
+                              type = "h")
+      criteria <- criteria_list$criteria
+      inter_df <- criteria_list$inter_df
       
       subj_keep[criteria] <- "Implausible"
       subj_reason[criteria] <- paste0("Implausible, Step ",step)
+      
+      # if using intermediate values, we want to keep some
+      if (inter_vals){
+        inter_df[as.character(subj_df$id), "Step_1h_Result"] <-
+          criteria
+      }
     }
     
     # add results to full dataframe
@@ -228,6 +294,12 @@ growthcleanr_clean_both <- function(df, inter_vals = F){
     # convert age years to days
     subj_df$age_days <- subj_df$age_years*365.2425
     
+    # if using intermediate values, we want to keep some
+    if (inter_vals){
+      inter_df[as.character(subj_df$id), "Step_1w_Age_days"] <-
+        subj_df$age_days
+    }
+    
     # sort by age
     subj_df <- subj_df[order(subj_df$age_days),]
     
@@ -236,16 +308,37 @@ growthcleanr_clean_both <- function(df, inter_vals = F){
       subj_df$z <- (subj_df$measurement - mean(subj_df$measurement))/
         sd(subj_df$measurement)
       
+      # if using intermediate values, we want to keep some
+      if (inter_vals){
+        inter_df[as.character(subj_df$id), "Step_1w_Z-Score"] <-
+          subj_df$z
+      }
+      
       # calculate the criteria to remove the ewma
-      criteria <- remove_ewma(subj_df, ewma_cutoff = 2)
+      criteria_list <- remove_ewma(subj_df, ewma_cutoff = 2,
+                                   inter_vals = inter_vals, inter_df = inter_df,
+                                   type = "w")
+      criteria <- criteria_list$criteria
+      inter_df <- criteria_list$inter_df
       
       subj_keep[criteria] <- "Implausible"
       subj_reason[criteria] <- paste0("Implausible, Step ",step)
+      
+      # if using intermediate values, we want to keep some
+      if (inter_vals){
+        inter_df[as.character(subj_df$id), "Step_1w_Result"] <-
+          criteria
+      }
     }
     
     # add results to full dataframe
     df[names(subj_keep), "result"] <- subj_keep
     df[names(subj_reason), "reason"] <- subj_reason
+    
+    # if we're using intermediate values, we want to save them
+    if (inter_vals){
+      df[as.character(inter_df$id), colnames(inter_df)[-1]] <- inter_df[,-1]
+    }
   }
   
   return(df)

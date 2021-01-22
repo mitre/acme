@@ -90,24 +90,26 @@ names(m_colors) <- simpleCap(methods_avail)
 
 # intermediate methods
 
-methods_inter_avail <- c("cheng", "chan", "breland")
+methods_inter_avail <- c("cheng", "chan", "breland", "growthcleanr-naive")
 
 # types cleaned for each method
 m_inter_types <- list(
-  "HEIGHTCM" = c("cheng", "chan", "breland"),
-  "WEIGHTKG" = c("cheng", "chan", "breland")
+  "HEIGHTCM" = c("cheng", "chan", "breland", "growthcleanr-naive"),
+  "WEIGHTKG" = c("cheng", "chan", "breland", "growthcleanr-naive")
 )
 
 methods_inter_func <- list(cheng_clean_both,
                            chan_clean_both,
-                           breland_clean_both)
+                           breland_clean_both,
+                           growthcleanr_clean_both)
 names(methods_inter_func) <- methods_inter_avail
 
 # list of steps for each method
 m_inter_steps <- list(
   "cheng" = c("1h", "2h", "1w", "2w", "3"),
   "chan" = c("1h", "2h", "1w", "2w", "3w"),
-  "breland" = c("Preprocessing", "1h", "1w", "2w")
+  "breland" = c("Preprocessing", "1h", "1w", "2w"),
+  "growthcleanr-naive" = c("1h", "1w")
 )
 
 m_inter_steps_full_title <- list(
@@ -130,6 +132,10 @@ m_inter_steps_full_title <- list(
     "1h" = "1h: H BIV",
     "1w" = "1w: W BIV",
     "2w" = "2w: W compare weight trajectory ratios"
+  ),
+  "growthcleanr-naive" = c(
+    "1h" = "1h: H calculate ewma",
+    "1w" = "1w: W calculate ewma"
   )
 )
 
@@ -157,6 +163,10 @@ m_inter_steps_full_subtitle <- list(
         if ratio <= 1.50, indicator = 1<br>
         else, indicator = 0<br>
     Set record to missing if both ratios are -1 OR both ratios are 1."
+  ),
+  "growthcleanr-naive" = c(
+    "1h" = "Exclude extreme errors by calculating the exponentially weighted moving average and removing by a specified cutoff (2 for all, 1.5 for before/after). If record(s) is/are found to be extreme, remove the most extreme one and recalculate. Repeat until this no more values are found to be extreme.",
+    "1w" = "Exclude extreme errors by calculating the exponentially weighted moving average and removing by a specified cutoff (2 for all, 1.5 for before/after). If record(s) is/are found to be extreme, remove the most extreme one and recalculate. Repeat until this no more values are found to be extreme."
   )
 )
 
@@ -615,12 +625,21 @@ tab_inter_vals <- function(cleaned_df, subj, step,
         grepl(paste0("_Step_", step), colnames(clean_df))]]
     }
   )
-  colnames(tab_out)[ncol(tab_out)] <- 
-    paste0(methods_chosen, "_Step_", step, "_Result")
+  if (step == "Before" | step == "After"){
+    colnames(tab_out)[ncol(tab_out)] <- 
+      paste0(methods_chosen, "_Step_", step, "_Result")
+  }
+  
+  # if there are only NAs in a column, remove it 
+  # (this will happen in growthcleanr)
+  tab_out <- tab_out[, sapply(tab_out, function(x){ !all(is.na(x)) })]
   
   # prettify certain columns
   tab_out[, grepl("_Result", colnames(tab_out))] <- 
-    result_map[as.character(tab_out[, grepl("_Result", colnames(tab_out))])]
+    as.data.frame(
+      lapply(tab_out[, grepl("_Result", colnames(tab_out))],
+           function(x){result_map[as.character(x)]})
+    )
   tab_out$param <- type_map[tab_out$param]
   tab_out[,sapply(tab_out, class) == "numeric"] <- 
     round(tab_out[,sapply(tab_out, class) == "numeric"], 3)
