@@ -90,22 +90,24 @@ names(m_colors) <- simpleCap(methods_avail)
 
 # intermediate methods
 
-methods_inter_avail <- c("cheng", "chan")
+methods_inter_avail <- c("cheng", "chan", "breland")
 
 # types cleaned for each method
 m_inter_types <- list(
-  "HEIGHTCM" = c("cheng", "chan"),
-  "WEIGHTKG" = c("cheng", "chan")
+  "HEIGHTCM" = c("cheng", "chan", "breland"),
+  "WEIGHTKG" = c("cheng", "chan", "breland")
 )
 
 methods_inter_func <- list(cheng_clean_both,
-                           chan_clean_both)
+                           chan_clean_both,
+                           breland_clean_both)
 names(methods_inter_func) <- methods_inter_avail
 
 # list of steps for each method
 m_inter_steps <- list(
   "cheng" = c("1h", "2h", "1w", "2w", "3"),
-  "chan" = c("1h", "2h", "1w", "2w", "3w")
+  "chan" = c("1h", "2h", "1w", "2w", "3w"),
+  "breland" = c("Preprocessing", "1h", "1w", "2w")
 )
 
 m_inter_steps_full_title <- list(
@@ -122,6 +124,12 @@ m_inter_steps_full_title <- list(
     "1w" = "1w: W BIV",
     "2w" = "2w: W BMI BIV",
     "3w" = "3w: W check SD away from mean"
+  ),
+  "breland" = c(
+    "Preprocessing" = "Preprocessing: Convert to U.S. measurements",
+    "1h" = "1h: H BIV",
+    "1w" = "1w: W BIV",
+    "2w" = "2w: W compare weight trajectory ratios"
   )
 )
 
@@ -139,6 +147,16 @@ m_inter_steps_full_subtitle <- list(
     "1w" = "Remove biologically implausible weight records. Weights are biologically implausible if less than 22.7 kg or greater than 340.2 kg.",
     "2w" = "Calculate BMI based on average height for all weight records, then remove biologically implausible weights. BMIs are biologically implausible if less than 10 or greater than 100.",
     "3w" = "Exclude weights that were greater than 3 standard deviations from the mean."
+  ),
+  "breland" = c(
+    "Preprocessing" = "Convert all heights to inches and weights to pounds. Round height to the nearest whole inch. Round weight to the nearest hundreth pound.",
+    "1h" = "Remove biologically implausible height records. Heights are biologically implausible if less than 48 in or greater than 84 in.",
+    "1w" = "Remove biologically implausible weight records. Weights are biologically implausible if less than 75 lbs or greater than 700 lbs.",
+    "2w" = "Compute ratios of weight trajectories (ratio 1: current record/prior record, ratio 2: current record/next record). Compute indicator variables based on the ratios:<br>
+        if ratio <= .67, indicator = -1<br>
+        if ratio <= 1.50, indicator = 1<br>
+        else, indicator = 0<br>
+    Set record to missing if both ratios are -1 OR both ratios are 1."
   )
 )
 
@@ -3162,7 +3180,7 @@ server <- function(input, output, session) {
   output$indiv_inter_choose <- renderUI({
     selectInput(
       "inter_subj",
-      label = HTML("<p style = 'font-weight: normal'><b>Which subject's intermediate steps would you like to examine?</b> Search for subjects by pressing backspace and typing. Focus IDs, if added to focus list and updated, will circled points in plot.</p>"),
+      label = HTML("<p style = 'font-weight: normal'><b>Which subject's intermediate steps would you like to examine?</b> Search for subjects by pressing backspace and typing. Focus IDs, if added to focus list and updated, will be circled points in plot.</p>"),
       choices = 
         if (nrow(cleaned_inter_df$sub) == 0){
           c()
