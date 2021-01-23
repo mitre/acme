@@ -613,7 +613,7 @@ tab_inter_vals <- function(cleaned_df, subj, step,
   }
   
   tab_out <- clean_df[,c("id", "param", "age_years", "measurement",
-                         ifelse(color_ans, "answers", c()))]
+                         if (color_ans) {"answers"} else {c()})]
   tab_out <- cbind(
     tab_out, 
     if (step == "Before"){
@@ -657,7 +657,7 @@ tab_inter_vals <- function(cleaned_df, subj, step,
     "names" = paste0(
       "<strong><p align = 'right'>",
       c("ID", "Parameter", "Age (years)", "Measurement", 
-        ifelse(color_ans, "Answers", c()),
+        if (color_ans) {"Answers"} else {c()},
         step_names),
       "</strong></p>"
     ),
