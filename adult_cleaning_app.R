@@ -637,7 +637,7 @@ tab_inter_vals <- function(cleaned_df, subj, step,
   # prettify certain columns
   tab_out[, grepl("_Result", colnames(tab_out))] <- 
     as.data.frame(
-      lapply(tab_out[, grepl("_Result", colnames(tab_out))],
+      lapply(tab_out[, grepl("_Result", colnames(tab_out)), drop = F],
            function(x){result_map[as.character(x)]})
     )
   tab_out$param <- type_map[tab_out$param]
