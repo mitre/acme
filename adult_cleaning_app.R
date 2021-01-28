@@ -574,6 +574,7 @@ tab_heat_df <- function(cleaned_df, type,
 tab_inter_vals <- function(cleaned_df, subj, step,
                            methods_chosen = methods_inter_avail[1],
                            highlt = "none",
+                           iter_step = 1,
                            color_ans = T){
   # if color answers is true and there are no answers, fix that
   if (nrow(cleaned_df) > 0 && 
@@ -621,8 +622,14 @@ tab_inter_vals <- function(cleaned_df, subj, step,
     } else if (step == "After"){
       clean_df[, paste0(methods_chosen, "_result")]
     } else {
-      clean_df[,colnames(clean_df)[
-        grepl(paste0("_Step_", step), colnames(clean_df))]]
+      if (methods_chosen != "growthcleanr-naive"){
+        clean_df[,colnames(clean_df)[
+          grepl(paste0("_Step_", step), colnames(clean_df))]]
+      } else {
+        clean_df[,colnames(clean_df)[
+          grepl(paste0("_Step_", step, "_Iter_", iter_step), 
+                colnames(clean_df))]]
+      }
     }
   )
   if (step == "Before" | step == "After"){
@@ -1340,6 +1347,7 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
                                methods_chosen = methods_inter_avail[1],
                                focus_ids = c(),
                                color_ans = T,
+                               iter_step = 1,
                                legn = F){
   # if color answers is true and there are no answers, fix that
   if (nrow(cleaned_df) > 0 && 
@@ -1450,11 +1458,20 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
       } else if (step == "After"){
         clean_df$all_result
       } else {
-        result_map[
-          as.character(
-            clean_df[, paste0(methods_chosen, "_Step_", step, "_Result")]
-          )
-        ]
+        if (methods_chosen != "growthcleanr-naive"){
+          result_map[
+            as.character(
+              clean_df[, paste0(methods_chosen, "_Step_", step, "_Result")]
+            )
+          ]
+        } else {
+          result_map[
+            as.character(
+              clean_df[, paste0(methods_chosen, "_Step_", step, 
+                                "_Iter_", iter_step, "_Result")]
+            )
+          ]
+        }
       }
   )
   # if it's the end, we want to make all the implausible NA
@@ -1582,7 +1599,10 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
           size = step_result,
           text = paste0(
             "ID: ", id,"\n",
-            "Step ", step, " Result: ", step_result,"\n",
+            "Step ", step, 
+            if (methods_chosen == "growthcleanr-naive"){ 
+              paste0(" Iter ", iter_step) } else {""},
+            " Result: ", step_result,"\n",
             if(color_ans){paste0("Answer: ", step_result_color)} else {""}
           )
         )
@@ -2061,6 +2081,7 @@ ui <- navbarPage(
                   ),
                   selected = "Before"
                 ),
+                uiOutput(paste0(m_name, "_iter_step_ui")),
                 HTML("</center>"),
                 uiOutput(paste0(m_name, "_step_title")),
                 uiOutput(paste0(m_name, "_step_subtitle")),
@@ -3209,6 +3230,68 @@ server <- function(input, output, session) {
     )
   })
   
+  # we're only going to render the iteration steps for growthcleanr naive
+  output[["growthcleanr-naive_iter_step_ui"]] <- renderUI({
+    sliderInput(
+      "growthcleanr-naive_iter_step",
+      "Choose Iteration:",
+      min = 1,
+      max = 1,
+      value = 1
+    )
+  })
+  
+  # update the iteration count
+  observeEvent(input[["growthcleanr-naive_method_step"]], {
+    if (input[["growthcleanr-naive_method_step"]] %in% c("Before", "After")){
+      updateSliderInput(
+        session,
+        "growthcleanr-naive_iter_step",
+        "Choose Iteration:",
+        min = 1,
+        max = 1,
+        value = 1
+      )
+    } else {
+      # get the maximum iterations
+      step <- as.character(input[["growthcleanr-naive_method_step"]])
+      # values we want to focus on in the table
+      step_focus <- 
+        if (grepl("h", step)){
+          "HEIGHTCM"
+        } else if (grepl("w", step)){
+          "WEIGHTKG"
+        } else {
+          c("HEIGHTCM", "WEIGHTKG")
+        }
+      
+      # subset the data to the subject, type, and methods we care about
+      clean_df <- sub_subj_type(cleaned_inter_df$sub,  
+                                step_focus, input$inter_subj,
+                                "growthcleanr-naive", 
+                                m_types = m_inter_types)
+      tab_out <- clean_df[,colnames(clean_df)[
+        grepl("_Iter_", colnames(clean_df))]]
+      # remove all NA columns
+      tab_out <- tab_out[, sapply(tab_out, function(x){ !all(is.na(x)) })]
+      # get all possible iterations
+      iters <- as.numeric(substring(
+        gsub(paste0("growthcleanr-naive_Step_", step,"_Iter_"), 
+             "", colnames(tab_out)), 
+        1, 1))
+      
+      updateSliderInput(
+        session,
+        "growthcleanr-naive_iter_step",
+        "Choose Iteration:",
+        min = 1,
+        max = max(iters),
+        step = 1,
+        value = 1
+      )
+    }
+  })
+  
   lapply(paste0(methods_inter_avail, "_step_title"), function(x){
     output[[x]] <- renderUI({
       ms <-  as.character(
@@ -3275,7 +3358,12 @@ server <- function(input, output, session) {
                            ),
                          methods_chosen = tolower(input$inter_tabset),
                          focus_ids = focus_ids,
-                         color_ans = input$inter_color_ans)
+                         color_ans = input$inter_color_ans,
+                         iter_step = 
+                           if (tolower(input$inter_tabset) == 
+                               "growthcleanr-naive"){
+                             input[["growthcleanr-naive_iter_step"]]
+                           } else {1})
     })
   })
   
@@ -3289,6 +3377,11 @@ server <- function(input, output, session) {
                          methods_chosen = tolower(input$inter_tabset),
                          focus_ids = c(),
                          color_ans = input$inter_color_ans,
+                         iter_step = 
+                           if (tolower(input$inter_tabset) == 
+                               "growthcleanr-naive"){
+                             input[["growthcleanr-naive_iter_step"]]
+                           } else {1},
                          legn = T)
     })
   })
@@ -3304,7 +3397,13 @@ server <- function(input, output, session) {
                                      "_method_step")]]
                      ),
                      methods_chosen = tolower(input$inter_tabset),
-                     highlt = hover_id)
+                     highlt = hover_id,
+                     color_ans = input$inter_color_ans,
+                     iter_step = ifelse(
+                       tolower(input$inter_tabset) == "growthcleanr-naive",
+                       input[["growthcleanr-naive_iter_step"]],
+                       1
+                       ))
     },
     striped = TRUE,
     bordered = TRUE,

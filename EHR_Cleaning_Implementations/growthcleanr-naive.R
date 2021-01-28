@@ -137,17 +137,31 @@ remove_ewma <- function(subj_df, ewma_cutoff = 2,
       inter_df[as.character(subj_df$id), 
                paste0("Step_1", type, "_Iter_", iter, "_Delta_EWMA_After")] <-
         dewma$dewma.after
-      inter_df[as.character(subj_df$id), 
-               paste0("Step_1", type, "_Iter_", iter, "_Result")] <-
-        criteria_new
     }
     
     if (all(!criteria_new)){
       # if none of them are to be removed
       change <- F
+      # if using intermediate values, we want to keep some
+      if (inter_vals){
+        inter_df[as.character(subj_df$id), 
+                 paste0("Step_1", type, "_Iter_", iter, "_Result")] <-
+          criteria_new
+      }
     } else {
       # figure out the most extreme value and remove it and rerun
       to_rem <- which.max(abs(dewma$dewma.all)[criteria_new])
+      # if using intermediate values, we want to keep some
+      if (inter_vals){
+        inter_df[as.character(subj_df$id), 
+                 paste0("Step_1", type, "_Iter_", iter, "_Result")] <-
+          F
+        # update only the most extreme value to be removed
+        inter_df[as.character(subj_df[criteria_new,][to_rem, "id"]), 
+                 paste0("Step_1", type, "_Iter_", iter, "_Result")] <-
+          T
+      }
+      
       # keep the ids that failed and remove
       rem_ids[length(rem_ids)+1] <- subj_df[criteria_new,][to_rem, "id"]
       subj_df <- subj_df[subj_df$id != rem_ids[length(rem_ids)],]
