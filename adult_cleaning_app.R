@@ -90,16 +90,17 @@ names(m_colors) <- simpleCap(methods_avail)
 
 # intermediate methods
 
-methods_inter_avail <- c("cheng", "chan", "breland", "growthcleanr-naive")
+methods_inter_avail <- c("cheng", "chan", "littman", "breland", "growthcleanr-naive")
 
 # types cleaned for each method
 m_inter_types <- list(
-  "HEIGHTCM" = c("cheng", "chan", "breland", "growthcleanr-naive"),
-  "WEIGHTKG" = c("cheng", "chan", "breland", "growthcleanr-naive")
+  "HEIGHTCM" = c("cheng", "chan", "littman", "breland", "growthcleanr-naive"),
+  "WEIGHTKG" = c("cheng", "chan", "littman", "breland", "growthcleanr-naive")
 )
 
 methods_inter_func <- list(cheng_clean_both,
                            chan_clean_both,
+                           littman_clean_both,
                            breland_clean_both,
                            growthcleanr_clean_both)
 names(methods_inter_func) <- methods_inter_avail
@@ -108,6 +109,7 @@ names(methods_inter_func) <- methods_inter_avail
 m_inter_steps <- list(
   "cheng" = c("1h", "2h", "1w", "2w", "3"),
   "chan" = c("1h", "2h", "1w", "2w", "3w"),
+  "littman" = c("1h", "1wa", "1wb", "1bmi", "2w", "2h", "3h"),
   "breland" = c("Preprocessing", "1h", "1w", "2w"),
   "growthcleanr-naive" = c("1h", "1w")
 )
@@ -126,6 +128,15 @@ m_inter_steps_full_title <- list(
     "1w" = "1w: W BIV",
     "2w" = "2w: W BMI BIV",
     "3w" = "3w: W check SD away from mean"
+  ),
+  "littman" = c(
+    "1h" = "1h: H BIV", 
+    "1wa" = "1wa: W BIV cutoffs", 
+    "1wb" = "1wb: W BIV rate change", 
+    "1bmi" = "1bmi: BMI BIV", 
+    "2w" = "2w: W compare difference from average to SD", 
+    "2h" = "2h: H compare difference from average to SD", 
+    "3h" = "3h: H compare difference to SD, with most deviant height dropped"
   ),
   "breland" = c(
     "Preprocessing" = "Preprocessing: Convert to U.S. measurements",
@@ -153,6 +164,15 @@ m_inter_steps_full_subtitle <- list(
     "1w" = "Remove biologically implausible weight records. Weights are biologically implausible if less than 22.7 kg or greater than 340.2 kg.",
     "2w" = "Calculate BMI based on average height for all weight records, then remove biologically implausible weights. BMIs are biologically implausible if less than 10 or greater than 100.",
     "3w" = "Exclude weights that were greater than 3 standard deviations from the mean."
+  ),
+  "littman" = c(
+    "1h" = "Remove biologically implausible height records. Heights are biologically implausible if less than 49 in (124.46 cm) or greater than 94 in (238.76 cm).", 
+    "1wa" = "Remove biologically implausible weight records. Weights are biologically implausible if less than 75 lbs (34.0194 kg) or greater than 600 lbs (272.1552 kg).", 
+    "1wb" = "Remove biologically implausible weight records based on rate of weight change over time. Weights are biologically implausible if the weight change per week is greater than 2 lbs (0.907184 kg) and greater than 50 lbs (22.6796 kg) overall, OR the rate of weight change is greater than 100 lbs (45.3592 kg).", 
+    "1bmi" = "Remove biologically implausible BMI records. If BMI for a given set of height/weights is > 80, deem implausible.", 
+    "2w" = "Exclude any weight measurements where: 1) difference between mean weight and recorded weight was greater than the standard deviation (SD) AND 2) the SD was greater than 10% of the mean.", 
+    "2h" = "Exclude any height measurements where: 1) difference between mean height and recorded height was greater than SD AND 2) SD was greater than 2.5% of mean.", 
+    "3h" = "Run step 2h again, but with the most deviant height dropped to see if there are any more implausible values."
   ),
   "breland" = c(
     "Preprocessing" = "Convert all heights to inches and weights to pounds. Round height to the nearest whole inch. Round weight to the nearest hundreth pound.",
