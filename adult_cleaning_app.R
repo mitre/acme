@@ -90,15 +90,18 @@ names(m_colors) <- simpleCap(methods_avail)
 
 # intermediate methods
 
-methods_inter_avail <- c("cheng", "chan", "littman", "breland", "growthcleanr-naive")
+methods_inter_avail <- c("muthalagu", "cheng", "chan", "littman", "breland", "growthcleanr-naive")
 
 # types cleaned for each method
 m_inter_types <- list(
-  "HEIGHTCM" = c("cheng", "chan", "littman", "breland", "growthcleanr-naive"),
-  "WEIGHTKG" = c("cheng", "chan", "littman", "breland", "growthcleanr-naive")
+  "HEIGHTCM" = c("muthalagu", "cheng", "chan", "littman", "breland",
+                 "growthcleanr-naive"),
+  "WEIGHTKG" = c("muthalagu", "cheng", "chan", "littman", "breland",
+                 "growthcleanr-naive")
 )
 
-methods_inter_func <- list(cheng_clean_both,
+methods_inter_func <- list(muthalagu_clean_ht,
+                           cheng_clean_both,
                            chan_clean_both,
                            littman_clean_both,
                            breland_clean_both,
@@ -107,6 +110,7 @@ names(methods_inter_func) <- methods_inter_avail
 
 # list of steps for each method
 m_inter_steps <- list(
+  "muthalagu" = c("1h", "2ha", "2hb", "2hc"),
   "cheng" = c("1h", "2h", "1w", "2w", "3"),
   "chan" = c("1h", "2h", "1w", "2w", "3w"),
   "littman" = c("1h", "1wa", "1wb", "1bmi", "2w", "2h", "3h"),
@@ -115,6 +119,12 @@ m_inter_steps <- list(
 )
 
 m_inter_steps_full_title <- list(
+  "muthalagu" = c(
+    "1h" = "1h: H BIV",
+    "2ha" = "2ha: H age range check",
+    "2hb" = "2hb: H median check",
+    "2hc"= "2hc: H erroneous and indeterminate median check"
+  ),
   "cheng" = c(
     "1h" = "1h: H BIV",
     "2h" = "2h: H compare difference from average to SD",
@@ -151,6 +161,12 @@ m_inter_steps_full_title <- list(
 )
 
 m_inter_steps_full_subtitle <- list(
+  "muthalagu" = c(
+    "1h" = "1: Remove biologically implausible height records. Heights are biologically implausible if less than 100 cm or greater than 250 cm.",
+    "2ha" = "2a: If height range < 3.5 cm, all heights in that bucket are plausible.",
+    "2hb" = "2b: If the height range is > 3.5 cm, calculate median height at each age. Compare with prior and next median. If height at current age differs by > 3.5 cm compared to prior and next median, flag as potentially erroneous. If only two valid medians and differ by > 3.5 cm, flag both as indeterminate. First and last records by age in bucket are indeterminate.",
+    "2hc"= "2c: For erroneous and indeterminate medians, assign correct medians within 3 year period. Then compare all other recorded heights to the median at that age. If the recorded height for any age differs > 3.5 cm (for erroneous) or > 6 cm (for indeterminate) from cleaned median height for that age, the value is erroneous."
+  ),
   "cheng" = c(
     "1h" = "Remove biologically implausible height records. Heights are biologically implausible if less than 111.8 cm or greater than 228.6 cm.",
     "2h" = "Exclude height if a) absolute difference between that height and average height > standard deviation (SD) AND b) SD > 2.5% of average height.",
@@ -612,7 +628,8 @@ tab_inter_vals <- function(cleaned_df, subj, step,
     "FALSE" = "Include",
     "Implausible" = "Implausible",
     "Include" = "Include",
-    "Not Calculated" = "Not Calculated"
+    "Not Calculated" = "Not Calculated",
+    "Unknown" = "Unknown"
   )
   
   # values we want to focus on in the table
@@ -1391,7 +1408,8 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
           "Correct: Include (True Negative)" = "#b2abd2",
           "Incorrect: Implausible (False Positive)" = "#e66101",
           "Correct: Implausible (True Positive)" = "#fdb863",
-          "Not Calculated" = "#000000"
+          "Not Calculated" = "#000000",
+          "Unknown" = "#000000"
         )
       } else {
         c(
@@ -1399,13 +1417,15 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
           "Incorrect: Include (False Negative)" = "#b2abd2",
           "Correct: Implausible (True Positive)" = "#e66101",
           "Incorrect: Implausible (False Positive)" = "#fdb863",
-          "Not Calculated" = "#000000"
+          "Not Calculated" = "#000000",
+          "Unknown" = "#000000"
         )
       }
     } else {
       c(
         "Include" = "#000000",
         "Not Calculated" = "#000000",
+        "Unknown" = "#000000",
         "Implausible" = "#fdb863"
       )
     }
@@ -1413,12 +1433,14 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
   shape_map <- c(
     "Include" = 16,
     "Not Calculated" = 16,
+    "Unknown" = 16,
     "Implausible" = 17
   )
   
   size_map <- c(
     "Include" = 2,
     "Not Calculated" = 2,
+    "Unknown" = 2,
     "Implausible" = 3
   )
   
@@ -1430,7 +1452,8 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
   result_map <- c(
     "TRUE" = "Implausible",
     "FALSE" = "Include",
-    "Not Calculated" = "Not Calculated"
+    "Not Calculated" = "Not Calculated",
+    "Unknoq" = "Unknown"
   )
   
   opposite_focus_map <- c(
@@ -1478,17 +1501,24 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
       } else if (step == "After"){
         clean_df$all_result
       } else {
-        if (methods_chosen != "growthcleanr-naive"){
+        if (!methods_chosen %in% c("growthcleanr-naive", "muthalagu")){
           result_map[
             as.character(
               clean_df[, paste0(methods_chosen, "_Step_", step, "_Result")]
+            )
+          ]
+        } else if (methods_chosen == "growthcleanr-naive") {
+          result_map[
+            as.character(
+              clean_df[, paste0(methods_chosen, "_Step_", step, 
+                                "_Iter_", iter_step, "_Result")]
             )
           ]
         } else {
           result_map[
             as.character(
               clean_df[, paste0(methods_chosen, "_Step_", step, 
-                                "_Iter_", iter_step, "_Result")]
+                                "_Bucket_", iter_step, "_Result")]
             )
           ]
         }
@@ -1548,7 +1578,7 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
     # get the results as compared to the answers
     ans_res <- bf_df$step_result_color == clean_df$answers
     # do not get the not calculated
-    ans_nnc <- bf_df$step_result_color != "Not Calculated"
+    ans_nnc <- !bf_df$step_result_color %in% c("Not Calculated", "Unknown")
     ans_incl <- clean_df$answers == "Include"
     ans_impl <- clean_df$answers == "Implausible"
     # add correct/incorrect + fp/tp/fn/tn
@@ -1610,7 +1640,8 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
   p <- suppressWarnings(
     ggplot(bf_df, aes(customdata = id))+
       geom_line(
-        data = bf_df[bf_df$step_result %in% c("Include", "Not Calculated"),], 
+        data = bf_df[bf_df$step_result %in% 
+                       c("Include", "Not Calculated", "Unknown"),], 
         aes(age_years, measurement), color = "grey")+
       geom_point(
         aes(

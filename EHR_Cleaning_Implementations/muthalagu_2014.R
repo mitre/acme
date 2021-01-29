@@ -48,7 +48,56 @@ muthalagu_clean_ht <- function(df, inter_vals = F){
     "high" = c(25, 50, Inf)
   )
   
+  # intermediate value columns ... so many!
+  inter_cols <- c(
+    "Step_1h_H_BIV_Low_Compare",
+    "Step_1h_H_BIV_High_Compare",
+    "Step_1h_Result",
+    "Step_2ha_Bucket_18-25_Height_Range",
+    "Step_2ha_Bucket_18-25_Result",
+    "Step_2hb_Bucket_18-25_Rounded_Age",
+    "Step_2hb_Bucket_18-25_Median_Height",
+    "Step_2hb_Bucket_18-25_Difference_from_Prior_Median",
+    "Step_2hb_Bucket_18-25_Difference_from_Next_Median",
+    "Step_2hb_Bucket_18-25_Flags",
+    "Step_2hb_Bucket_18-25_Result",
+    "Step_2hc_Bucket_18-25_Rounded_Age",
+    "Step_2hc_Bucket_18-25_Corrected_Median",
+    "Step_2hc_Bucket_18-25_Max_Difference_Between_Recorded_Heights_and_Median",
+    "Step_2hc_Bucket_18-25_Result",
+    "Step_2ha_Bucket_25-50_Height_Range",
+    "Step_2ha_Bucket_25-50_Result",
+    "Step_2hb_Bucket_25-50_Rounded_Age",
+    "Step_2hb_Bucket_25-50_Median_Height",
+    "Step_2hb_Bucket_25-50_Difference_from_Prior_Median",
+    "Step_2hb_Bucket_25-50_Difference_from_Next_Median",
+    "Step_2hb_Bucket_25-50_Flags",
+    "Step_2hb_Bucket_25-50_Result",
+    "Step_2hc_Bucket_25-50_Rounded_Age",
+    "Step_2hc_Bucket_25-50_Corrected_Median",
+    "Step_2hc_Bucket_25-50_Max_Difference_Between_Recorded_Heights_and_Median",
+    "Step_2hc_Bucket_25-50_Result",
+    "Step_2ha_Bucket_50-Inf_Height_Range",
+    "Step_2ha_Bucket_50-Inf_Result",
+    "Step_2hb_Bucket_50-Inf_Rounded_Age",
+    "Step_2hb_Bucket_50-Inf_Median_Height",
+    "Step_2hb_Bucket_50-Inf_Difference_from_Prior_Median",
+    "Step_2hb_Bucket_50-Inf_Difference_from_Next_Median",
+    "Step_2hb_Bucket_50-Inf_Flags",
+    "Step_2hb_Bucket_50-Inf_Result",
+    "Step_2hc_Bucket_50-Inf_Rounded_Age",
+    "Step_2hc_Bucket_50-Inf_Corrected_Median",
+    "Step_2hc_Bucket_50-Inf_Max_Difference_Between_Recorded_Heights_and_Median",
+    "Step_2hc_Bucket_50-Inf_Result"
+  )
+  
   # begin implementation ----
+  
+  # if using intermediate values, preallocate values
+  if (inter_vals){
+    df[, inter_cols] <- NA
+    rownames(df) <- df$id
+  }
   
   h_df <- df[df$param == "HEIGHTCM",]
   h_df <- h_df[order(h_df$subjid),]
@@ -60,6 +109,11 @@ muthalagu_clean_ht <- function(df, inter_vals = F){
   for (i in unique(h_df$subjid)){
     # since we're going to do this a fair bit
     slog <- h_df$subjid == i
+    
+    # if using intermediate values, we want to start storing them
+    # keep the ID to collate with the final dataframe
+    inter_df <- h_df[slog, "id", drop = F]
+    rownames(inter_df) <- inter_df$id
     
     subj_keep <- rep("Include", sum(slog))
     subj_reason <- rep("", sum(slog))
@@ -74,6 +128,15 @@ muthalagu_clean_ht <- function(df, inter_vals = F){
     criteria <- remove_biv(subj_df, "height", biv_df)
     subj_keep[criteria] <- "Implausible"
     subj_reason[criteria] <- paste0("Erroneous, Step ",step)
+    
+    # if using intermediate values, we want to keep some
+    if(inter_vals){
+      inter_df[as.character(subj_df$id), "Step_1h_H_BIV_Low_Compare"] <- 
+        remove_biv_low(subj_df, "height", biv_df)
+      inter_df[as.character(subj_df$id), "Step_1h_H_BIV_High_Compare"] <- 
+        remove_biv_high(subj_df, "height", biv_df)
+      inter_df[as.character(subj_df$id), "Step_1h_Result"] <- criteria
+    }
     
     subj_df <- subj_df[!criteria,]
     
@@ -93,6 +156,25 @@ muthalagu_clean_ht <- function(df, inter_vals = F){
         next
       }
       
+      age_low <- age_ranges$low[ab]
+      age_high <- age_ranges$high[ab]
+      
+      # if using intermediate values, we want to keep some
+      if(inter_vals){
+        rnge <- abs(max(subj_df_age$measurement) - min(subj_df_age$measurement))
+        inter_df[as.character(subj_df_age$id), 
+                 paste0("Step_2ha_Bucket_", age_low, "-", age_high,
+                       "_Height_Range")] <- 
+          rnge
+        inter_df[as.character(subj_df_age$id),  
+                 paste0("Step_2ha_Bucket_", age_low, "-", age_high,
+                       "_Result")] <- 
+          rnge >= btwn_range_cutoff
+        inter_df[as.character(subj_df_age$id),  
+                 paste0("Step_2ha_Bucket_", age_low, "-", age_high,
+                       "_Result")][rnge >= btwn_range_cutoff] <- "Unknown"
+      }
+      
       if (abs(max(subj_df_age$measurement) - min(subj_df_age$measurement)) >= 
           btwn_range_cutoff){
         # 2b, H median check ----
@@ -107,6 +189,14 @@ muthalagu_clean_ht <- function(df, inter_vals = F){
           subj_keep[as.character(subj_df_age$id)] <- "Implausible"
           subj_reason[as.character(subj_df_age$id)] <- 
             paste0("Indeterminate, Step ", step)
+          
+          # if using intermediate values, we want to keep some
+          if(inter_vals){
+            inter_df[as.character(subj_df_age$id),  
+                     paste0("Step_2hb_Bucket_", age_low, "-", age_high,
+                           "_Result")] <- 
+              T
+          }
         } else {
           # calculate median heights per age (rounded to nearest year) in bucket
           # note: for duplicate rounded ages, this will propagate the same median to
@@ -128,6 +218,49 @@ muthalagu_clean_ht <- function(df, inter_vals = F){
                            if(!all(mid_compare)){which(!mid_compare)+1}, 
                            length(med_hts))
           
+          # if using intermediate values, we want to keep some
+          if(inter_vals){
+            mid_before <- sapply(2:(length(med_hts)-1), function(x){
+              abs(med_hts[x] - med_hts[x-1])
+            })
+            mid_next <- sapply(2:(length(med_hts)-1), function(x){
+              abs(med_hts[x] - med_hts[x+1])
+            })
+            
+            inter_df[as.character(subj_df_age$id),  
+                     paste0("Step_2hb_Bucket_", age_low, "-", age_high,
+                           "_Rounded_Age")] <- 
+              round(subj_df_age$age_years)
+            inter_df[as.character(subj_df_age$id),  
+                     paste0("Step_2hb_Bucket_", age_low, "-", age_high,
+                           "_Median_Height")] <- 
+              med_hts
+            inter_df[as.character(subj_df_age$id),  
+                     paste0("Step_2hb_Bucket_", age_low, "-", age_high,
+                           "_Difference_from_Prior_Median")] <- 
+              c(NA, mid_before, NA)
+            inter_df[as.character(subj_df_age$id),  
+                     paste0("Step_2hb_Bucket_", age_low, "-", age_high,
+                           "_Difference_from_Next_Median")] <- 
+              c(NA, mid_next, NA)
+            inter_df[as.character(subj_df_age$id)[err_hts_idx],  
+                     paste0("Step_2hb_Bucket_", age_low, "-", age_high,
+                           "_Flags")] <- 
+              "Erroneous"
+            inter_df[as.character(subj_df_age$id)[c(1,length(med_hts))],  
+                     paste0("Step_2hb_Bucket_", age_low, "-", age_high,
+                           "_Flags")] <- 
+              "Indeterminate"
+            inter_df[as.character(subj_df_age$id),  
+                     paste0("Step_2hb_Bucket_", age_low, "-", age_high,
+                           "_Result")] <- 
+              c(F, !mid_compare, F)
+            inter_df[as.character(subj_df_age$id)[!c(F, mid_compare, F)],  
+                     paste0("Step_2hb_Bucket_", age_low, "-", age_high,
+                           "_Result")] <- 
+              "Unknown"
+          }
+          
           # 2c, H erroneous and indeterminate median check ----
           # 2c: For erroneous and indeterminate medians, assign correct medians within
           # 3 year period. Then compare all other recorded heights to the median at 
@@ -141,13 +274,32 @@ muthalagu_clean_ht <- function(df, inter_vals = F){
             subj_keep[as.character(subj_df_age$id[err_hts_idx])] <- "Implausible"
             subj_reason[as.character(subj_df_age$id[err_hts_idx])] <- 
               paste0("Indeterminate, Step ", step)
+            
+            # if using intermediate values, we want to keep some
+            if(inter_vals){
+              inter_df[as.character(subj_df_age$id[err_hts_idx]),  
+                       paste0("Step_2hc_Bucket_", age_low, "-", age_high,
+                             "_Result")] <- 
+                T
+            }
           } else {
-            chg_err_med <- sapply(err_hts_idx, function(x){
+            if(inter_vals){
+              inter_df[
+                as.character(subj_df_age$id[
+                  !(c(1:length(subj_df_age$id)) %in% err_hts_idx)]),  
+                paste0("Step_2hc_Bucket_", age_low, "-", age_high,
+                      "_Result")] <- 
+                F
+            }
+            
+            chg_err_med <- c() #sapply(err_hts_idx, function(x){
+            for (x in err_hts_idx){
               # get all the correct medians within a 3 year window
               sub_df <- subj_df_age[-err_hts_idx,] # do not incorrect ages
               avail_med <- 
-                med_hts[-err_hts_idx][sub_df$age_years <= (sub_df$age_years[x]+1.5) |
-                                        sub_df$age_years >= (sub_df$age_years[x]-1.5)]
+                med_hts[-err_hts_idx][
+                  sub_df$age_years <= (subj_df_age$age_years[x]+1.5) |
+                    sub_df$age_years >= (subj_df_age$age_years[x]-1.5)]
               
               # nothing to compare to within 3 years: indeterminate
               if (length(avail_med) == 0){
@@ -159,22 +311,51 @@ muthalagu_clean_ht <- function(df, inter_vals = F){
               
               # compare cleaned median to all recorded heights
               compare <- abs(subj_df_age$measurement[-x]-new_med)
+              
               # for end points, they have a wider range
-              if (x == 1 | x == length(med_hts)){
-                if(any(compare > 6)){
-                  return("Erroneous")
+              ret_val <-
+                if (x == 1 | x == length(med_hts)){
+                  if(any(compare > 6)){
+                    "Erroneous"
+                  } else {
+                    "Include"
+                  }
                 } else {
-                  return("Include")
+                  if(any(compare >= btwn_range_cutoff)){
+                    "Erroneous"
+                  } else {
+                    "Include"
+                  }
                 }
-              } else {
-                if(any(compare >= btwn_range_cutoff)){
-                  return("Erroneous")
-                } else {
-                  return("Include")
-                }
+              
+              # if using intermediate values, we want to keep some
+              if (inter_vals){
+                res_map <- c(
+                  "Erroneous" = T,
+                  "Include"= F
+                )
+                
+                inter_df[as.character(subj_df_age$id)[x],  
+                         paste0("Step_2hc_Bucket_", age_low, "-", age_high,
+                                "_Rounded_Age")] <- 
+                  round(subj_df_age$age_years)[x]
+                inter_df[as.character(subj_df_age$id)[x],  
+                         paste0("Step_2hc_Bucket_", age_low, "-", age_high,
+                                "_Corrected_Median")] <- 
+                  new_med
+                inter_df[
+                  as.character(subj_df_age$id)[x],  
+                  paste0("Step_2hc_Bucket_", age_low, "-", age_high,
+                         "_Max_Difference_Between_Recorded_Heights_and_Median")] <- 
+                  max(compare)
+                inter_df[as.character(subj_df_age$id)[x],  
+                         paste0("Step_2hc_Bucket_", age_low, "-", age_high,
+                                "_Result")] <- 
+                  res_map[ret_val]
               }
               
-            })
+              chg_err_med <- c(chg_err_med, ret_val)
+            }
             
             # adjust the errored/indeterminate heights accordingly
             # make the names consistent across different methods
@@ -192,6 +373,11 @@ muthalagu_clean_ht <- function(df, inter_vals = F){
     # record results
     out <- c(out, subj_keep)
     out_reason <- c(out_reason, subj_reason)
+    
+    # if we're using intermediate values, we want to save them
+    if (inter_vals){
+      df[as.character(inter_df$id), colnames(inter_df)[-1]] <- inter_df[,-1]
+    }
   }
   
   # add results to overall data frame
