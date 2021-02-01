@@ -659,19 +659,57 @@ tab_inter_vals <- function(cleaned_df, subj, step,
     } else if (step == "After"){
       clean_df[, paste0(methods_chosen, "_result")]
     } else {
-      if (methods_chosen != "growthcleanr-naive"){
+      if (!methods_chosen %in% c("growthcleanr-naive", "muthalagu")){
         clean_df[,colnames(clean_df)[
           grepl(paste0("_Step_", step), colnames(clean_df))]]
-      } else {
+      } else if (methods_chosen == "growthcleanr-naive") {
         clean_df[,colnames(clean_df)[
           grepl(paste0("_Step_", step, "_Iter_", iter_step), 
                 colnames(clean_df))]]
+      } else {
+        if (grepl("2", step)){ # we only need the bucket for step 2
+          clean_df[, colnames(clean_df)[
+            grepl(paste0("_Step_", step, "_Bucket_", iter_step),
+                  colnames(clean_df))]]
+        } else {
+          clean_df[, colnames(clean_df)[
+            grepl(paste0("_Step_", step),
+                  colnames(clean_df))]]
+        }
       }
     }
   )
   if (step == "Before" | step == "After"){
     colnames(tab_out)[ncol(tab_out)] <- 
       paste0(methods_chosen, "_Step_", step, "_Result")
+  }
+  # if it's muthalagu, we want to remove all the ages not in the bucket
+  if (methods_chosen == "muthalagu" & grepl("2", step)){
+    ages <- as.numeric(unlist(strsplit(iter_step, "-")))
+    age_low <- ages[1]
+    age_high <- ages[2]
+    
+    tab_out <- tab_out[tab_out$age_years >= age_low & 
+                         tab_out$age_years < age_high,]
+    
+    if (nrow(tab_out) == 0){
+      return(data.frame())
+    }
+    
+    # if the step is 2b+, we need to check if they're all NA (which means they
+    # weren't processed for that step)
+    if (step %in% c("2hb", "2hc")){
+      if (all(is.na(tab_out[, paste0(methods_chosen, "_Step_", step, 
+                                      "_Bucket_", iter_step, "_Result")]))){
+        tab_out[, paste0(methods_chosen, "_Step_", step, 
+                         "_Bucket_", iter_step, "_Result")] <- "Include"
+      }
+    }
+  }
+  # for muthalagu, we also want to remove all the weights
+  if (methods_chosen == "muthalagu"){
+    # filter out all the weights
+    tab_out <- tab_out[tab_out$param == "HEIGHTCM",]
   }
   
   # if there are only NAs in a column, remove it 
@@ -1453,7 +1491,7 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
     "TRUE" = "Implausible",
     "FALSE" = "Include",
     "Not Calculated" = "Not Calculated",
-    "Unknoq" = "Unknown"
+    "Unknown" = "Unknown"
   )
   
   opposite_focus_map <- c(
@@ -1515,15 +1553,59 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
             )
           ]
         } else {
-          result_map[
-            as.character(
-              clean_df[, paste0(methods_chosen, "_Step_", step, 
-                                "_Bucket_", iter_step, "_Result")]
-            )
-          ]
+          if (grepl("2", step)){ # we only need the bucket for step 2
+            result_map[
+              as.character(
+                clean_df[, paste0(methods_chosen, "_Step_", step, 
+                                  "_Bucket_", iter_step, "_Result")]
+              )
+            ]
+          } else {
+            result_map[
+              as.character(
+                clean_df[, paste0(methods_chosen, "_Step_", step, "_Result")]
+              )
+            ]
+          }
         }
       }
   )
+  add_title <- ""
+  # if it's muthalagu, we want to remove all the ages not in the bucket
+  if (methods_chosen == "muthalagu" & grepl("2", step)){
+    ages <- as.numeric(unlist(strsplit(iter_step, "-")))
+    age_low <- ages[1]
+    age_high <- ages[2]
+    
+    bf_df <- bf_df[bf_df$age_years >= age_low & bf_df$age_years < age_high,]
+    
+    if (nrow(bf_df) == 0){
+      if (legn){
+        return(ggplot()+theme_bw())
+      } else {
+        return(ggplotly(ggplot()+
+                          theme_bw()+
+                          ggtitle("No ages in selected bucket.")) %>% 
+                 config(displayModeBar = F))
+      }
+    }
+    
+    # if the step is 2b+, we need to check if they're all NA (which means they
+    # weren't processed for that step)
+    if (step %in% c("2hb", "2hc")){
+      if (all(is.na(bf_df$step_result))){
+        bf_df$step_result <- "Include"
+        add_title <- "All records included in step 2ha."
+      }
+    }
+  }
+  # for muthalagu, we also want to remove all the weights
+  # if (methods_chosen == "muthalagu"){
+  #   # filter out all the weights
+  #   bf_df <- bf_df[bf_df$param == "Height (cm)",]
+  # }
+  
+  
   # if it's the end, we want to make all the implausible NA
   if (step == "After"){
     bf_df$step_result[bf_df$step_result == "Implausible"] <- NA
@@ -1576,11 +1658,12 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
   # if we're going to show answers, we want to change the names  
   if (color_ans){
     # get the results as compared to the answers
-    ans_res <- bf_df$step_result_color == clean_df$answers
+    ans_res <- bf_df$step_result_color == 
+      clean_df$answers[clean_df$id %in% bf_df$id]
     # do not get the not calculated
     ans_nnc <- !bf_df$step_result_color %in% c("Not Calculated", "Unknown")
-    ans_incl <- clean_df$answers == "Include"
-    ans_impl <- clean_df$answers == "Implausible"
+    ans_incl <- clean_df$answers[clean_df$id %in% bf_df$id] == "Include"
+    ans_impl <- clean_df$answers[clean_df$id %in% bf_df$id] == "Implausible"
     # add correct/incorrect + fp/tp/fn/tn
     bf_df$step_result_color[ans_res & ans_nnc] <- 
       paste0(
@@ -1666,8 +1749,20 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
       xlab("Age (Years)")+
       ylab("Measurement")+
       facet_grid_sc(rows = vars(param), scales = list(y = scales_y))+
-      NULL
+      if (methods_chosen == "muthalagu"){
+        ggtitle(add_title)
+      }
   )
+  
+  # # keep if necessary
+  # if (length(unique(bf_df$param)) > 1){
+  #   p <- p +
+  #     facet_grid_sc(rows = vars(param), scales = list(y = scales_y))
+  # } else {
+  #   p <- p +
+  #     ylim(yaxis_lim)+
+  #     ylab(unique(bf_df$param))
+  # }
   
   if (sum(bf_df$id %in% focus_ids) > 0){
     p <- p +
@@ -2133,6 +2228,7 @@ ui <- navbarPage(
                   selected = "Before"
                 ),
                 uiOutput(paste0(m_name, "_iter_step_ui")),
+                uiOutput(paste0(m_name, "_bucket_step_ui")),
                 HTML("</center>"),
                 uiOutput(paste0(m_name, "_step_title")),
                 uiOutput(paste0(m_name, "_step_subtitle")),
@@ -3343,6 +3439,16 @@ server <- function(input, output, session) {
     }
   })
   
+  # we're only going to render the bucket steps for muthalgu
+  output[["muthalagu_bucket_step_ui"]] <- renderUI({
+    sliderTextInput(
+      "muthalagu_bucket_step",
+      "Choose Age Bucket:",
+      choices = c("18-25", "25-50", "50-Inf"),
+      selected = "18-25"
+    )
+  })
+  
   lapply(paste0(methods_inter_avail, "_step_title"), function(x){
     output[[x]] <- renderUI({
       ms <-  as.character(
@@ -3414,6 +3520,9 @@ server <- function(input, output, session) {
                            if (tolower(input$inter_tabset) == 
                                "growthcleanr-naive"){
                              input[["growthcleanr-naive_iter_step"]]
+                           } else if (tolower(input$inter_tabset) == 
+                                      "muthalagu") {
+                             input$muthalagu_bucket_step
                            } else {1})
     })
   })
@@ -3432,6 +3541,9 @@ server <- function(input, output, session) {
                            if (tolower(input$inter_tabset) == 
                                "growthcleanr-naive"){
                              input[["growthcleanr-naive_iter_step"]]
+                           } else if (tolower(input$inter_tabset) == 
+                                      "muthalagu") {
+                             input$muthalagu_bucket_step
                            } else {1},
                          legn = T)
     })
@@ -3450,11 +3562,15 @@ server <- function(input, output, session) {
                      methods_chosen = tolower(input$inter_tabset),
                      highlt = hover_id,
                      color_ans = input$inter_color_ans,
-                     iter_step = ifelse(
-                       tolower(input$inter_tabset) == "growthcleanr-naive",
-                       input[["growthcleanr-naive_iter_step"]],
-                       1
-                       ))
+                     iter_step = 
+                       if (tolower(input$inter_tabset) == 
+                           "growthcleanr-naive"){
+                         input[["growthcleanr-naive_iter_step"]]
+                       } else if (tolower(input$inter_tabset) == 
+                                  "muthalagu") {
+                         input$muthalagu_bucket_step
+                       } else {1}
+                     )
     },
     striped = TRUE,
     bordered = TRUE,
