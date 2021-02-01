@@ -303,30 +303,31 @@ muthalagu_clean_ht <- function(df, inter_vals = F){
               
               # nothing to compare to within 3 years: indeterminate
               if (length(avail_med) == 0){
-                return("Indeterminate")
+                ret_val <- "Indeterminate"
+                compare <- new_med <- NA
+              } else {
+                # assign nearest correct median
+                new_med <- avail_med[which.min(abs(avail_med - med_hts[x]))]
+                
+                # compare cleaned median to all valid recorded heights
+                compare <- abs(subj_df_age$measurement[-err_hts_idx]-new_med)
+                
+                # for end points, they have a wider range
+                ret_val <-
+                  if (x == 1 | x == length(med_hts)){
+                    if(any(compare > 6)){
+                      "Erroneous"
+                    } else {
+                      "Include"
+                    }
+                  } else {
+                    if(any(compare >= btwn_range_cutoff)){
+                      "Erroneous"
+                    } else {
+                      "Include"
+                    }
+                  }
               }
-              
-              # assign nearest correct median
-              new_med <- avail_med[which.min(abs(avail_med - med_hts[x]))]
-              
-              # compare cleaned median to all recorded heights
-              compare <- abs(subj_df_age$measurement[-x]-new_med)
-              
-              # for end points, they have a wider range
-              ret_val <-
-                if (x == 1 | x == length(med_hts)){
-                  if(any(compare > 6)){
-                    "Erroneous"
-                  } else {
-                    "Include"
-                  }
-                } else {
-                  if(any(compare >= btwn_range_cutoff)){
-                    "Erroneous"
-                  } else {
-                    "Include"
-                  }
-                }
               
               # if using intermediate values, we want to keep some
               if (inter_vals){
