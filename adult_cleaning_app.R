@@ -5,7 +5,7 @@
 # This implements a prototype application to explore adult EHR cleaning 
 # implementations.
 
-vers_adult_ehr <- "0.2.0"
+vers_adult_ehr <- "1.0.0"
 
 # load libraries, scripts, and data ----
 
@@ -18,6 +18,11 @@ library(viridisLite)
 library(ggplotify)
 library(reshape2)
 library(shinyBS)
+library(shinyWidgets)
+# to install:
+# install.packages(devtools)
+# devtools::install_github("zeehio/facetscales")
+library(facetscales)
 
 #https://stackoverflow.com/questions/3452086/getting-path-of-an-r-script/35842176#35842176
 # set working directory - only works in RStudio (with rstudioapi)
@@ -52,6 +57,17 @@ sourceDir("EHR_Cleaning_Implementations")
 
 # supporting data ----
 
+# capitalize first letter of words, from ?toupper, edited to handle vector
+simpleCap <- function(y) {
+  sapply(y, function(x){
+    s <- strsplit(x, " ")[[1]]
+    paste(toupper(substring(s, 1, 1)), substring(s, 2),
+          sep = "", collapse = " ")
+  }, USE.NAMES = F)
+}
+
+# regular methods
+
 methods_avail <- c("muthalagu", "cheng", "chan", "littman", "breland", "growthcleanr-naive")
 
 # types cleaned for each method
@@ -68,29 +84,129 @@ methods_func <- list(muthalagu_clean_ht,
                      growthcleanr_clean_both)
 names(methods_func) <- methods_avail
 
-# capitalize first letter of words, from ?toupper, edited to handle vector
-simpleCap <- function(y) {
-  sapply(y, function(x){
-    s <- strsplit(x, " ")[[1]]
-    paste(toupper(substring(s, 1, 1)), substring(s, 2),
-          sep = "", collapse = " ")
-  }, USE.NAMES = F)
-}
-
 # method colors
 m_colors <- viridisLite::viridis(length(methods_avail))
 names(m_colors) <- simpleCap(methods_avail)
 
-# supporting functions ----
+# intermediate methods
 
-# Function to extract legend
-# https://stackoverflow.com/questions/12041042/how-to-plot-just-the-legends-in-ggplot2
-g_legend <- function(a.gplot){ 
-  tmp <- ggplot_gtable(ggplot_build(a.gplot)) 
-  leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box") 
-  legend <- tmp$grobs[[leg]] 
-  legend
-} 
+methods_inter_avail <- c("muthalagu", "cheng", "chan", "littman", "breland", "growthcleanr-naive")
+
+# types cleaned for each method
+m_inter_types <- list(
+  "HEIGHTCM" = c("muthalagu", "cheng", "chan", "littman", "breland",
+                 "growthcleanr-naive"),
+  "WEIGHTKG" = c("muthalagu", "cheng", "chan", "littman", "breland",
+                 "growthcleanr-naive")
+)
+
+methods_inter_func <- list(muthalagu_clean_ht,
+                           cheng_clean_both,
+                           chan_clean_both,
+                           littman_clean_both,
+                           breland_clean_both,
+                           growthcleanr_clean_both)
+names(methods_inter_func) <- methods_inter_avail
+
+# list of steps for each method
+m_inter_steps <- list(
+  "muthalagu" = c("1h", "2ha", "2hb", "2hc"),
+  "cheng" = c("1h", "2h", "1w", "2w", "3"),
+  "chan" = c("1h", "2h", "1w", "2w", "3w"),
+  "littman" = c("1h", "1wa", "1wb", "1bmi", "2w", "2h", "3h"),
+  "breland" = c("Preprocessing", "1h", "1w", "2w"),
+  "growthcleanr-naive" = c("1h", "1w")
+)
+
+m_inter_steps_full_title <- list(
+  "muthalagu" = c(
+    "1h" = "1h: H BIV",
+    "2ha" = "2ha: H age range check",
+    "2hb" = "2hb: H median check",
+    "2hc"= "2hc: H erroneous and indeterminate median check"
+  ),
+  "cheng" = c(
+    "1h" = "1h: H BIV",
+    "2h" = "2h: H compare difference from average to SD",
+    "1w" = "1w: W BIV",
+    "2w" = "2w: W compare difference from average to range or SD",
+    "3" = "3: BMI BIV"
+  ),
+  "chan" = c(
+    "1h" = "1h: H BIV",
+    "2h" = "2h: H check SD away from mean",
+    "1w" = "1w: W BIV",
+    "2w" = "2w: W BMI BIV",
+    "3w" = "3w: W check SD away from mean"
+  ),
+  "littman" = c(
+    "1h" = "1h: H BIV", 
+    "1wa" = "1wa: W BIV cutoffs", 
+    "1wb" = "1wb: W BIV rate change", 
+    "1bmi" = "1bmi: BMI BIV", 
+    "2w" = "2w: W compare difference from average to SD", 
+    "2h" = "2h: H compare difference from average to SD", 
+    "3h" = "3h: H compare difference to SD, with most deviant height dropped"
+  ),
+  "breland" = c(
+    "Preprocessing" = "Preprocessing: Convert to U.S. measurements",
+    "1h" = "1h: H BIV",
+    "1w" = "1w: W BIV",
+    "2w" = "2w: W compare weight trajectory ratios"
+  ),
+  "growthcleanr-naive" = c(
+    "1h" = "1h: H calculate ewma",
+    "1w" = "1w: W calculate ewma"
+  )
+)
+
+m_inter_steps_full_subtitle <- list(
+  "muthalagu" = c(
+    "1h" = "1: Remove biologically implausible height records. Heights are biologically implausible if less than 100 cm or greater than 250 cm.",
+    "2ha" = "2a: If height range < 3.5 cm, all heights in that bucket are plausible.",
+    "2hb" = "2b: If the height range is > 3.5 cm, calculate median height at each age. Compare with prior and next median. If height at current age differs by > 3.5 cm compared to prior and next median, flag as potentially erroneous. If only two valid medians and differ by > 3.5 cm, flag both as indeterminate. First and last records by age in bucket are indeterminate.",
+    "2hc"= "2c: For erroneous and indeterminate medians, assign correct medians within 3 year period. Then compare all other recorded heights to the median at that age. If the recorded height for any age differs > 3.5 cm (for erroneous) or > 6 cm (for indeterminate) from cleaned median height for that age, the value is erroneous."
+  ),
+  "cheng" = c(
+    "1h" = "Remove biologically implausible height records. Heights are biologically implausible if less than 111.8 cm or greater than 228.6 cm.",
+    "2h" = "Exclude height if a) absolute difference between that height and average height > standard deviation (SD) AND b) SD > 2.5% of average height.",
+    "1w" = "Remove biologically implausible weight records. Weights are biologically implausible if less than 24.9 kg or greater than 453.6 kg.",
+    "2w" = "Weight was determined to be inaccurate if: a) the range was > 22.7 kg AND absolute difference between recorded weight and avg weight was > 70% of range OR b) SD was >20% of the average weight AND absolute difference between that weight and average weight > the SD.",
+    "3" = "Remove biologically implausible BMI records. If BMI for a given set of height/weights is < 12 or > 70, deem implausible."
+  ),
+  "chan" = c(
+    "1h" = "Remove biologically implausible height records. Heights are biologically implausible if less than 121.92 cm (48 in) or greater than 213 cm (84 in).",
+    "2h" = "Exclude heights that were greater than 3 standard deviations from the mean.",
+    "1w" = "Remove biologically implausible weight records. Weights are biologically implausible if less than 22.7 kg or greater than 340.2 kg.",
+    "2w" = "Calculate BMI based on average height for all weight records, then remove biologically implausible weights. BMIs are biologically implausible if less than 10 or greater than 100.",
+    "3w" = "Exclude weights that were greater than 3 standard deviations from the mean."
+  ),
+  "littman" = c(
+    "1h" = "Remove biologically implausible height records. Heights are biologically implausible if less than 49 in (124.46 cm) or greater than 94 in (238.76 cm).", 
+    "1wa" = "Remove biologically implausible weight records. Weights are biologically implausible if less than 75 lbs (34.0194 kg) or greater than 600 lbs (272.1552 kg).", 
+    "1wb" = "Remove biologically implausible weight records based on rate of weight change over time. Weights are biologically implausible if the weight change per week is greater than 2 lbs (0.907184 kg) and greater than 50 lbs (22.6796 kg) overall, OR the rate of weight change is greater than 100 lbs (45.3592 kg).", 
+    "1bmi" = "Remove biologically implausible BMI records. If BMI for a given set of height/weights is > 80, deem implausible.", 
+    "2w" = "Exclude any weight measurements where: 1) difference between mean weight and recorded weight was greater than the standard deviation (SD) AND 2) the SD was greater than 10% of the mean.", 
+    "2h" = "Exclude any height measurements where: 1) difference between mean height and recorded height was greater than SD AND 2) SD was greater than 2.5% of mean.", 
+    "3h" = "Run step 2h again, but with the most deviant height dropped to see if there are any more implausible values."
+  ),
+  "breland" = c(
+    "Preprocessing" = "Convert all heights to inches and weights to pounds. Round height to the nearest whole inch. Round weight to the nearest hundreth pound.",
+    "1h" = "Remove biologically implausible height records. Heights are biologically implausible if less than 48 in or greater than 84 in.",
+    "1w" = "Remove biologically implausible weight records. Weights are biologically implausible if less than 75 lbs or greater than 700 lbs.",
+    "2w" = "Compute ratios of weight trajectories (ratio 1: current record/prior record, ratio 2: current record/next record). Compute indicator variables based on the ratios:<br>
+        if ratio <= .67, indicator = -1<br>
+        if ratio <= 1.50, indicator = 1<br>
+        else, indicator = 0<br>
+    Set record to missing if both ratios are -1 OR both ratios are 1."
+  ),
+  "growthcleanr-naive" = c(
+    "1h" = "Exclude extreme errors by calculating the exponentially weighted moving average and removing by a specified cutoff (2 for all, 1.5 for before/after). If record(s) is/are found to be extreme, remove the most extreme one and recalculate. Repeat until this no more values are found to be extreme.",
+    "1w" = "Exclude extreme errors by calculating the exponentially weighted moving average and removing by a specified cutoff (2 for all, 1.5 for before/after). If record(s) is/are found to be extreme, remove the most extreme one and recalculate. Repeat until this no more values are found to be extreme."
+  )
+)
+
+# processing functions ----
 
 # function to tabulate results of a given height or weight
 tab_clean_res <- function(cleaned_df, type, methods_chosen = methods_avail){
@@ -115,27 +231,6 @@ tab_clean_res <- function(cleaned_df, type, methods_chosen = methods_avail){
   }
   
   return(t_tab)
-}
-
-# function to plot overall bar plot
-plot_bar <- function(t_tab, yval = "Implausible"){
-  if (nrow(t_tab) > 0){
-    t_tab$Method <- factor(t_tab$Method, levels = unique(t_tab$Method))
-    
-    ggplotly(
-      ggplot(t_tab, aes_string("Method", yval, fill = "Method"))+
-        geom_bar(stat = "identity")+
-        theme_bw()+
-        # scale_fill_discrete_qualitative(palette = "Dark 3")+
-        scale_fill_manual(values = m_colors)+
-        theme(legend.position = "none")+
-        scale_y_continuous(expand = expansion(mult = c(0,.05))) +
-        NULL,
-      tooltip = c("x","y")
-    ) %>% config(displayModeBar = F)
-  } else {
-    ggplotly(ggplot()+theme_bw()) %>% config(displayModeBar = F)
-  }
 }
 
 # function to calculate total possible answers
@@ -210,86 +305,6 @@ tab_answers <- function(cleaned_df, type,
   return(t_tab)
 }
 
-# function to plot check answers bar plot
-plot_answer_bar <- function(t_tab, yval = "Count", 
-                            group = F, ontop = F, legn = F){
-  if (nrow(t_tab) > 0){
-    t_tab$Method <- factor(t_tab$Method, levels = unique(t_tab$Method))
-    
-    fill_color <-
-      if (group){
-        c("Include" = "#b2abd2","Implausible" = "#fdb863")
-      } else {
-        m_colors
-      }
-    
-    p <- 
-      if (group){
-        ggplot(t_tab, aes_string("Method", yval, fill = "Answer", group = "Answer"))+
-          theme_bw()+
-          theme(legend.position = "bottom",
-                legend.direction = "horizontal",
-                text = element_text(size = 15))+
-          if (ontop){
-            geom_bar(stat = "identity")
-          } else {
-            geom_bar(stat = "identity", position = position_dodge(.9))
-          }
-      } else {
-        ggplot(t_tab, aes_string("Method", yval, fill = "Method"))+
-          theme_bw()+
-          geom_bar(stat = "identity")+
-          theme(legend.position = "none")
-      }
-    
-    p <- p +
-      scale_fill_manual(values = fill_color)+
-      scale_y_continuous(
-        expand = expansion(mult = c(0,.05))) +
-      ylab(paste(yval, " Correct"))+
-      NULL
-    
-    p <- p + 
-      if (!legn){
-        theme(legend.position = "none")
-      }
-    
-    p <- 
-      if (!legn | !group){
-        ggplotly(
-          p,
-          tooltip = c("x","y","fill")
-        ) %>% config(displayModeBar = F)
-      } else {
-        as.ggplot(g_legend(p))
-      }
-  } else {
-    p <- 
-      if (!legn){
-        ggplotly(ggplot()+theme_bw()) %>% config(displayModeBar = F)
-      } else {
-        ggplot()+theme_bw()
-      }
-  }
-  
-  return(p)
-}
-
-# function to generate the overall title for each shiny tab
-gen_title <- function(criteria, tab_titl){
-  return(
-    if (criteria){
-      HTML(paste0("<center><h3>",
-                  tab_titl, 
-                  " Results: Full Data</center></h3>"))
-    } else {
-      HTML(paste0("<center><h3>", 
-                  tab_titl, 
-                  " Results: Subset Data</center></h3>"))
-    }
-  )
-}
-
 # function to tabulate reasons for implausibility for a given height or weight
 tab_clean_reason <- function(cleaned_df, type, 
                              show_count = F, 
@@ -344,13 +359,16 @@ tab_clean_reason <- function(cleaned_df, type,
 
 # function to subset cleaned data based on subject and type
 sub_subj_type <- function(cleaned_df, type, subj,
-                          methods_chosen = methods_avail){
+                          methods_chosen = methods_avail,
+                          m_types = m_types){
   result_map <- c(
     "TRUE" = "Include",
     "FALSE" = "Implausible"
   )
   
-  m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
+  m_for_type <- unique(
+    unlist(m_types[type])[unlist(m_types[type]) %in% methods_chosen]
+  )
   
   if (length(m_for_type) == 0 | nrow(cleaned_df) == 0){
     return(data.frame())
@@ -358,14 +376,17 @@ sub_subj_type <- function(cleaned_df, type, subj,
   
   # subset the data to the things we care about
   clean_df <- cleaned_df[cleaned_df$subjid == subj & 
-                           cleaned_df$param == type,]
+                           cleaned_df$param %in% type,]
   # subset to only the methods included
   clean_df <- clean_df[
     ,
     (!grepl("_result", colnames(clean_df)) &
-       !grepl("_reason", colnames(clean_df))) |
+       !grepl("_reason", colnames(clean_df)) &
+       !grepl("_Step", colnames(clean_df))) |
       (colnames(clean_df) %in% paste0(m_for_type, "_reason") |
-         colnames(clean_df) %in% paste0(m_for_type, "_result"))
+         colnames(clean_df) %in% paste0(m_for_type, "_result") |
+         # when using _step, we only ever need the first one
+         grepl(paste0(m_for_type, "_Step")[1], colnames(clean_df)))
   ]
   
   # create counts for plotting
@@ -410,6 +431,450 @@ sub_subj_type <- function(cleaned_df, type, subj,
   return(clean_df)
 }
 
+# function to create the dataframe for the heatmap
+tab_heat_df <- function(cleaned_df, type,
+                        methods_chosen = methods_avail,
+                        sort_col = "none",
+                        sort_dec = F,
+                        hide_agree = F, 
+                        interactive = F,
+                        show_y_lab = F,
+                        show_answers = T,
+                        hl_incorr = T,
+                        reduce_lines = F,
+                        reduce_amount = nrow(cleaned_df),
+                        offset_amount = 0){
+  # if show answers is true and there are no answers, fix that
+  if (show_answers & !"answers" %in% colnames(cleaned_df)){
+    show_answers <- F
+  }
+  
+  number_map <- 
+    if (show_answers){
+      c(
+        "Incorrect: Include (False Negative)" = 0,
+        "Correct: Include (True Negative)" = 1,
+        "Incorrect: Implausible (False Positive)" = 2,
+        "Correct: Implausible (True Positive)" = 3
+      )
+    } else {
+      c(
+        "Include" = 0,
+        "Implausible" = 1
+      )
+    }
+  
+  # get the possible methods for this type
+  m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
+  
+  # subset the data to the things we care about
+  clean_df <- cleaned_df[cleaned_df$param == type,]
+  # subset to only the methods included
+  clean_df <- clean_df[
+    ,
+    (!grepl("_result", colnames(clean_df)) &
+       !grepl("_reason", colnames(clean_df))) |
+      (colnames(clean_df) %in% paste0(m_for_type, "_reason") |
+         colnames(clean_df) %in% paste0(m_for_type, "_result"))
+  ]
+  
+  if (nrow(clean_df) == 0 | reduce_amount <= 0){
+    return(data.frame())
+  }
+  
+  # only keep the results and necessary sorting
+  clean_df <- 
+    clean_df[,
+             !(grepl("_reason", colnames(clean_df)) | 
+                 grepl("param", colnames(clean_df)))
+    ]
+  
+  # if we're going to show answers, we want to change the names  
+  if (show_answers){
+    # get the results as compared to the answers
+    ans_res <- 
+      clean_df[, grepl("_result", colnames(clean_df))] == clean_df$answers
+    ans_incl <- clean_df$answers == "Include"
+    ans_impl <- clean_df$answers == "Implausible"
+    # add correct/incorrect + fp/tp/fn/tn
+    clean_df[, grepl("_result", colnames(clean_df))][ans_res] <- 
+      paste0(
+        "Correct: ", clean_df[, grepl("_result", colnames(clean_df))][ans_res]
+      )
+    clean_df[, grepl("_result", colnames(clean_df))][ans_res & ans_incl] <-
+      paste0(
+        clean_df[, grepl("_result", colnames(clean_df))][ans_res & ans_incl],
+        " (True Negative)"
+      )
+    clean_df[, grepl("_result", colnames(clean_df))][ans_res & ans_impl] <-
+      paste0(
+        clean_df[, grepl("_result", colnames(clean_df))][ans_res & ans_impl],
+        " (True Positive)"
+      )
+    
+    clean_df[, grepl("_result", colnames(clean_df))][!ans_res] <- 
+      paste0(
+        "Incorrect: ", clean_df[, grepl("_result", colnames(clean_df))][!ans_res]
+      )
+    clean_df[, grepl("_result", colnames(clean_df))][(!ans_res) & ans_impl] <-
+      paste0(
+        clean_df[, grepl("_result", colnames(clean_df))][(!ans_res) & ans_impl],
+        " (False Negative)"
+      )
+    clean_df[, grepl("_result", colnames(clean_df))][(!ans_res) & ans_incl] <-
+      paste0(
+        clean_df[, grepl("_result", colnames(clean_df))][(!ans_res) & ans_incl],
+        " (False Positive)"
+      )
+  }
+  
+  # if we choose to remove where they all agree, do so!
+  if (hide_agree){
+    # result columns
+    res_col <- grepl("_result", colnames(clean_df))
+    
+    if (!show_answers){
+      clean_df <- clean_df[rowSums(clean_df[, res_col] != "Include") > 0,]
+    } else {
+      clean_df <- 
+        clean_df[rowSums(
+          clean_df[, res_col] != "Correct: Include" & 
+            clean_df[, res_col] != "Correct: Implausible"
+        ) > 0,]
+    }
+  }
+  
+  # sort for visualizing
+  if (!"none" %in% sort_col){
+    sort_col <- sort_col[sort_col != "none"]
+    
+    clean_df <- 
+      clean_df[do.call('order', 
+                       c(clean_df[sort_col], list(decreasing = sort_dec))),]
+  }
+  
+  # create label column (combining all the non result columns)
+  clean_df$Label <- trimws(apply(
+    clean_df[, !grepl("_result", colnames(clean_df))],
+    1,
+    paste,
+    collapse = " / "
+  ))
+  lab <- paste(
+    colnames(clean_df[, !(grepl("_result", colnames(clean_df)) | 
+                            grepl("Label", colnames(clean_df)))]),
+    collapse = " / "
+  )
+  # remove the sort columns (keep subject and id)
+  clean_df <- clean_df[, (grepl("_result", colnames(clean_df)) | 
+                            grepl("Label", colnames(clean_df)) |
+                            grepl("subjid", colnames(clean_df)) |
+                            grepl("id", colnames(clean_df)))]
+  # add label name
+  clean_df$Label_Name <- lab
+  # rename result columns
+  colnames(clean_df)[grepl("_result", colnames(clean_df))] <-
+    simpleCap(
+      gsub("_result", "", 
+           colnames(clean_df)[grepl("_result", colnames(clean_df))])
+    )
+  
+  # reduce lines, if specified
+  if (reduce_lines){
+    if (reduce_amount > nrow(clean_df)){
+      reduce_amount <- nrow(clean_df)
+    }
+    if (offset_amount > nrow(clean_df)){
+      offset_amount <- nrow(clean_df) - 1
+      reduce_amount <- nrow(clean_df)
+    }
+    
+    clean_df <- clean_df[(offset_amount+1):(offset_amount+1 + reduce_amount), ]
+  }
+  
+  if (nrow(clean_df) > 0){
+    clean_m <- melt(clean_df, id.vars = c("Label", "subjid", "id", "Label_Name"), variable.name = "Method")
+    clean_m$Label <- factor(clean_m$Label, levels = unique(clean_m$Label))
+    
+    # convert the text to numbers
+    clean_m[, "value"] <- number_map[clean_m$value]
+  } else {
+    clean_m <- clean_df
+  }
+  
+  return(clean_m)
+}
+
+# function to build a table of intermediate values depending on a step and 
+# method chosen
+tab_inter_vals <- function(cleaned_df, subj, step,
+                           methods_chosen = methods_inter_avail[1],
+                           highlt = "none",
+                           iter_step = 1,
+                           color_ans = T){
+  # if color answers is true and there are no answers, fix that
+  if (nrow(cleaned_df) > 0 && 
+      color_ans && !"answers" %in% colnames(cleaned_df)){
+    color_ans <- F
+  }
+  
+  type_map <- c(
+    "HEIGHTCM" = "Height (cm)",
+    "WEIGHTKG" = "Weight (kg)"
+  )
+  
+  result_map <- c(
+    "TRUE" = "Implausible",
+    "FALSE" = "Include",
+    "Implausible" = "Implausible",
+    "Include" = "Include",
+    "Not Calculated" = "Not Calculated",
+    "Unknown" = "Unknown"
+  )
+  
+  # values we want to focus on in the table
+  step_focus <- 
+    if (grepl("h", step)){
+      "HEIGHTCM"
+    } else if (grepl("w", step)){
+      "WEIGHTKG"
+    } else {
+      c("HEIGHTCM", "WEIGHTKG")
+    }
+  
+  # subset the data to the subject, type, and methods we care about
+  clean_df <- sub_subj_type(cleaned_df, step_focus, subj, methods_chosen, 
+                            m_types = m_inter_types)
+  
+  if (nrow(clean_df) == 0){
+    return(data.frame())
+  }
+  
+  tab_out <- clean_df[,c("id", "param", "age_years", "measurement",
+                         if (color_ans) {"answers"} else {c()})]
+  tab_out <- cbind(
+    tab_out, 
+    if (step == "Before"){
+      rep("Include", nrow(tab_out))
+    } else if (step == "After"){
+      clean_df[, paste0(methods_chosen, "_result")]
+    } else {
+      if (!methods_chosen %in% c("growthcleanr-naive", "muthalagu")){
+        clean_df[,colnames(clean_df)[
+          grepl(paste0("_Step_", step), colnames(clean_df))]]
+      } else if (methods_chosen == "growthcleanr-naive") {
+        clean_df[,colnames(clean_df)[
+          grepl(paste0("_Step_", step, "_Iter_", iter_step), 
+                colnames(clean_df))]]
+      } else {
+        if (grepl("2", step)){ # we only need the bucket for step 2
+          clean_df[, colnames(clean_df)[
+            grepl(paste0("_Step_", step, "_Bucket_", iter_step),
+                  colnames(clean_df))]]
+        } else {
+          clean_df[, colnames(clean_df)[
+            grepl(paste0("_Step_", step),
+                  colnames(clean_df))]]
+        }
+      }
+    }
+  )
+  if (step == "Before" | step == "After"){
+    colnames(tab_out)[ncol(tab_out)] <- 
+      paste0(methods_chosen, "_Step_", step, "_Result")
+  }
+  # if it's muthalagu, we want to remove all the ages not in the bucket
+  if (methods_chosen == "muthalagu" & grepl("2", step)){
+    ages <- as.numeric(unlist(strsplit(iter_step, "-")))
+    age_low <- ages[1]
+    age_high <- ages[2]
+    
+    tab_out <- tab_out[tab_out$age_years >= age_low & 
+                         tab_out$age_years < age_high,]
+    
+    if (nrow(tab_out) == 0){
+      return(data.frame())
+    }
+    
+    # if the step is 2b+, we need to check if they're all NA (which means they
+    # weren't processed for that step)
+    if (step %in% c("2hb", "2hc")){
+      if (all(is.na(tab_out[, paste0(methods_chosen, "_Step_", step, 
+                                      "_Bucket_", iter_step, "_Result")]))){
+        tab_out[, paste0(methods_chosen, "_Step_", step, 
+                         "_Bucket_", iter_step, "_Result")] <- "Include"
+      }
+    }
+  }
+  # for muthalagu, we also want to remove all the weights
+  if (methods_chosen == "muthalagu"){
+    # filter out all the weights
+    tab_out <- tab_out[tab_out$param == "HEIGHTCM",]
+  }
+  
+  # if there are only NAs in a column, remove it 
+  # (this will happen in growthcleanr)
+  tab_out <- tab_out[, sapply(tab_out, function(x){ !all(is.na(x)) })]
+  
+  # prettify certain columns
+  tab_out[, grepl("_Result", colnames(tab_out))] <- 
+    as.data.frame(
+      lapply(tab_out[, grepl("_Result", colnames(tab_out)), drop = F],
+           function(x){result_map[as.character(x)]})
+    )
+  tab_out$param <- type_map[tab_out$param]
+  tab_out[,sapply(tab_out, class) == "numeric"] <- 
+    round(tab_out[,sapply(tab_out, class) == "numeric"], 3)
+  
+  # transpose for output
+  tab_out <- as.data.frame(t(tab_out))
+  # add a column for names
+  step_names <- gsub(
+    paste0(methods_chosen, " Step ", step, " "), 
+    "",
+    gsub("_", " ", rownames(tab_out)[-c(1:ifelse(color_ans, 5, 4))])
+  )
+  
+  tab_out <- cbind(
+    "names" = paste0(
+      "<strong><p align = 'right'>",
+      c("ID", "Parameter", "Age (years)", "Measurement", 
+        if (color_ans) {"Answers"} else {c()},
+        step_names),
+      "</strong></p>"
+    ),
+    tab_out
+  )
+  
+  # need to remove leading/trailing whitespace
+  tab_out <- as.data.frame(
+    apply(tab_out, 2, function(x){trimws(x, which = "both")})
+  )
+  
+  # highlight a specific column
+  if (highlt != "none" & highlt %in% clean_df$id){
+    highlt <- as.character(highlt)
+    tab_out[, tab_out["id",] == highlt] <- 
+      paste0("<strong>", tab_out[, tab_out["id",] == highlt], "</strong>")
+  }
+  
+  return(tab_out)
+}
+
+# plotting/output functions ----
+
+# Function to extract legend
+# https://stackoverflow.com/questions/12041042/how-to-plot-just-the-legends-in-ggplot2
+g_legend <- function(a.gplot){ 
+  tmp <- ggplot_gtable(ggplot_build(a.gplot)) 
+  leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box") 
+  legend <- tmp$grobs[[leg]] 
+  legend
+} 
+
+# function to plot overall bar plot
+plot_bar <- function(t_tab, yval = "Implausible"){
+  if (nrow(t_tab) > 0){
+    t_tab$Method <- factor(t_tab$Method, levels = unique(t_tab$Method))
+    
+    ggplotly(
+      ggplot(t_tab, aes_string("Method", yval, fill = "Method"))+
+        geom_bar(stat = "identity")+
+        theme_bw()+
+        # scale_fill_discrete_qualitative(palette = "Dark 3")+
+        scale_fill_manual(values = m_colors)+
+        theme(legend.position = "none")+
+        scale_y_continuous(expand = expansion(mult = c(0,.05))) +
+        NULL,
+      tooltip = c("x","y")
+    ) %>% config(displayModeBar = F)
+  } else {
+    ggplotly(ggplot()+theme_bw()) %>% config(displayModeBar = F)
+  }
+}
+
+
+# function to plot check answers bar plot
+plot_answer_bar <- function(t_tab, yval = "Count", 
+                            group = F, ontop = F, legn = F){
+  if (nrow(t_tab) > 0){
+    t_tab$Method <- factor(t_tab$Method, levels = unique(t_tab$Method))
+    
+    fill_color <-
+      if (group){
+        c("Include" = "#b2abd2","Implausible" = "#fdb863")
+      } else {
+        m_colors
+      }
+    
+    p <- 
+      if (group){
+        ggplot(t_tab, aes_string("Method", yval, fill = "Answer", group = "Answer"))+
+          theme_bw()+
+          if (ontop){
+            geom_bar(stat = "identity")
+          } else {
+            geom_bar(stat = "identity", position = position_dodge(.9))
+          }
+      } else {
+        ggplot(t_tab, aes_string("Method", yval, fill = "Method"))+
+          theme_bw()+
+          geom_bar(stat = "identity")+
+          theme(legend.position = "none")
+      }
+    
+    p <- p +
+      scale_fill_manual(values = fill_color)+
+      scale_y_continuous(
+        expand = expansion(mult = c(0,.05))) +
+      ylab(paste(yval, " Correct"))+
+      NULL
+    
+    p <- p + 
+      if (!legn){
+        theme(legend.position = "none")
+      } else {
+        theme(legend.position = "bottom",
+              legend.direction = "horizontal",
+              text = element_text(size = 15))
+      }
+    
+    p <- 
+      if (!legn | !group){
+        ggplotly(
+          p,
+          tooltip = c("x","y","fill")
+        ) %>% config(displayModeBar = F)
+      } else {
+        as.ggplot(g_legend(p))
+      }
+  } else {
+    p <- 
+      if (!legn){
+        ggplotly(ggplot()+theme_bw()) %>% config(displayModeBar = F)
+      } else {
+        ggplot()+theme_bw()
+      }
+  }
+  
+  return(p)
+}
+
+# function to generate the overall title for each shiny tab
+gen_title <- function(criteria, tab_titl){
+  return(
+    if (criteria){
+      HTML(paste0("<center><h3>",
+                  tab_titl, 
+                  " Results: Full Data</center></h3>"))
+    } else {
+      HTML(paste0("<center><h3>", 
+                  tab_titl, 
+                  " Results: Subset Data</center></h3>"))
+    }
+  )
+}
+
 # function to plot individual heights and weights
 plot_cleaned <- function(cleaned_df, type, subj, 
                          methods_chosen = methods_avail,
@@ -440,7 +905,8 @@ plot_cleaned <- function(cleaned_df, type, subj,
   
   # subset the data to the subject, type, and methods we care about
   # also create necessary counts for plotting and such
-  clean_df <- sub_subj_type(cleaned_df, type, subj, methods_chosen)
+  clean_df <- sub_subj_type(cleaned_df, type, subj, methods_chosen,
+                            m_types = m_types)
   
   # get the possible methods for this type
   m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
@@ -451,6 +917,12 @@ plot_cleaned <- function(cleaned_df, type, subj,
     } else {
       return(ggplotly(ggplot()+theme_bw()) %>% config(displayModeBar = F))
     }
+  }
+  
+  if (nrow(clean_df) == 1){
+    show_fit_line <- F
+    show_sd_shade <- F
+    calc_fit_w_impl <- F
   }
   
   bf_df <- data.frame(
@@ -465,37 +937,39 @@ plot_cleaned <- function(cleaned_df, type, subj,
     )
   )
   
-  # if user wants to show the line fit
-  # add best fit line (padded slightly for plotting prettiness)
-  bf_df$best_fit <- 
-    if (calc_fit_w_impl){
-      predict(lm(measurement ~ age_years, clean_df), bf_df)
-    } else {
-      predict(lm(measurement ~ age_years, clean_df, 
-                 subset = clean_df$all_result == "Include"), 
-              bf_df)
-    }
-  
-  st_dev <- 
-    if (calc_fit_w_impl){
-      sd(clean_df$measurement)
-    } else {
-      sd(clean_df$measurement[clean_df$all_result == "Include"])
-    }
-  
-  
-  if (show_fit_line){
-    bf_df$min_sd1 <- bf_df$best_fit-st_dev
-    bf_df$max_sd1 <- bf_df$best_fit+st_dev
-    bf_df$min_sd2 <- bf_df$best_fit-(2*st_dev)
-    bf_df$max_sd2 <- bf_df$best_fit+(2*st_dev)
-  } else {
-    bf_df$min_sd1 <- bf_df$measurement_orig-st_dev
-    bf_df$max_sd1 <- bf_df$measurement_orig+st_dev
-    bf_df$min_sd2 <- bf_df$measurement_orig-(2*st_dev)
-    bf_df$max_sd2 <- bf_df$measurement_orig+(2*st_dev)
+  if (nrow(clean_df) > 1){
+    # if user wants to show the line fit
+    # add best fit line (padded slightly for plotting prettiness)
+    bf_df$best_fit <- 
+      if (calc_fit_w_impl){
+        predict(lm(measurement ~ age_years, clean_df), bf_df)
+      } else {
+        predict(lm(measurement ~ age_years, clean_df, 
+                   subset = clean_df$all_result == "Include"), 
+                bf_df)
+      }
     
-    bf_df <- bf_df[complete.cases(bf_df),]
+    st_dev <- 
+      if (calc_fit_w_impl){
+        sd(clean_df$measurement)
+      } else {
+        sd(clean_df$measurement[clean_df$all_result == "Include"])
+      }
+    
+    
+    if (show_fit_line){
+      bf_df$min_sd1 <- bf_df$best_fit-st_dev
+      bf_df$max_sd1 <- bf_df$best_fit+st_dev
+      bf_df$min_sd2 <- bf_df$best_fit-(2*st_dev)
+      bf_df$max_sd2 <- bf_df$best_fit+(2*st_dev)
+    } else {
+      bf_df$min_sd1 <- bf_df$measurement_orig-st_dev
+      bf_df$max_sd1 <- bf_df$measurement_orig+st_dev
+      bf_df$min_sd2 <- bf_df$measurement_orig-(2*st_dev)
+      bf_df$max_sd2 <- bf_df$measurement_orig+(2*st_dev)
+      
+      bf_df <- bf_df[complete.cases(bf_df),]
+    }
   }
   
   # consider the y range to be, at a minimum, a certain amount around the mean
@@ -599,7 +1073,8 @@ gen_subj_text <- function(cleaned_df, type, subj,
                           methods_chosen = methods_avail,
                           single = F){
   # subset the data to the subject, type, and methods we care about
-  clean_df <- sub_subj_type(cleaned_df, type, subj, methods_chosen)
+  clean_df <- sub_subj_type(cleaned_df, type, subj, methods_chosen,
+                            m_types = m_types)
   
   if (nrow(clean_df) == 0){
     return(HTML(""))
@@ -719,7 +1194,7 @@ plot_methods_corr <- function(cleaned_df, type,
                         fill = Correlation,
                         label = Correlation))+
       geom_tile()+
-      geom_text()+
+      geom_text(size = 3)+
       scale_fill_gradient2(
         breaks = c(-1,0,1),
         limits = c(-1,1),
@@ -750,7 +1225,11 @@ plot_result_heat_map <- function(cleaned_df, type,
                                  interactive = F,
                                  show_y_lab = F,
                                  show_answers = T,
-                                 hl_incorr = T){
+                                 hl_incorr = T,
+                                 reduce_lines = F,
+                                 reduce_amount = nrow(cleaned_df),
+                                 offset_amount = 0,
+                                 legn = F){
   type_n <- c(
     "HEIGHTCM" = "Height",
     "WEIGHTKG" = "Weight"
@@ -761,22 +1240,39 @@ plot_result_heat_map <- function(cleaned_df, type,
     show_answers <- F
   }
   
+  number_map <- 
+    if (show_answers){
+      c(
+        "Incorrect: Include (False Negative)" = 0,
+        "Correct: Include (True Negative)" = 1,
+        "Incorrect: Implausible (False Positive)" = 2,
+        "Correct: Implausible (True Positive)" = 3
+      )
+    } else {
+      c(
+        "Include" = 0,
+        "Implausible" = 1
+      )
+    }
+  num_to_lab <- names(number_map)
+  names(num_to_lab) <- number_map
+  
   color_map <- 
     if (show_answers){
       # if we're highlighting incorrect answers, make those brighter
       if (hl_incorr){
         c(
-          "Include (Incorrect)" = "#5e3c99",
-          "Include (Correct)" = "#b2abd2",
-          "Implausible (Incorrect)" = "#e66101",
-          "Implausible (Correct)" = "#fdb863"
+          "Incorrect: Include (False Negative)" = "#5e3c99",
+          "Correct: Include (True Negative)" = "#b2abd2",
+          "Incorrect: Implausible (False Positive)" = "#e66101",
+          "Correct: Implausible (True Positive)" = "#fdb863"
         )
       } else {
         c(
-          "Include (Correct)" = "#5e3c99",
-          "Include (Incorrect)" = "#b2abd2",
-          "Implausible (Correct)" = "#e66101",
-          "Implausible (Incorrect)" = "#fdb863"
+          "Correct: Include (True Negative)" = "#5e3c99",
+          "Incorrect: Include (False Negative)" = "#b2abd2",
+          "Correct: Implausible (True Positive)" = "#e66101",
+          "Incorrect: Implausible (False Positive)" = "#fdb863"
         )
       }
     } else {
@@ -785,96 +1281,52 @@ plot_result_heat_map <- function(cleaned_df, type,
         "Implausible" = "#fdb863"
       )
     }
-  
-  # get the possible methods for this type
-  m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
-  
-  # subset the data to the things we care about
-  clean_df <- cleaned_df[cleaned_df$param == type,]
-  # subset to only the methods included
-  clean_df <- clean_df[
-    ,
-    (!grepl("_result", colnames(clean_df)) &
-       !grepl("_reason", colnames(clean_df))) |
-      (colnames(clean_df) %in% paste0(m_for_type, "_reason") |
-         colnames(clean_df) %in% paste0(m_for_type, "_result"))
-  ]
-  
-  if (nrow(clean_df) == 0){
-    return(ggplotly(ggplot()+theme_bw()))
+  if (!legn){
+    names(color_map) <- number_map[names(color_map)]
   }
   
-  # only keep the results and necessary sorting
-  clean_df <- 
-    clean_df[,
-             !(grepl("_reason", colnames(clean_df)) | 
-                 grepl("param", colnames(clean_df)))
-    ]
-
-  # if we're going to show answers, we want to change the names  
-  if (show_answers){
-    # get the results as compared to the answers
-    ans_res <- 
-      clean_df[, grepl("_result", colnames(clean_df))] == clean_df$answers
-    # add correct/incorrect
-    clean_df[, grepl("_result", colnames(clean_df))][ans_res] <- 
-      paste0(
-        clean_df[, grepl("_result", colnames(clean_df))][ans_res], " (Correct)"
-      )
-    clean_df[, grepl("_result", colnames(clean_df))][!ans_res] <- 
-      paste0(
-        clean_df[, grepl("_result", colnames(clean_df))][!ans_res], " (Incorrect)"
-      )
-  }
-  
-  # if we choose to remove where they all agree, do so!
-  if (hide_agree){
-    # result columns
-    res_col <- grepl("_result", colnames(clean_df))
-    
-    if (!show_answers){
-      clean_df <- clean_df[rowSums(clean_df[, res_col] != "Include") > 0,]
-    } else {
-      clean_df <- 
-        clean_df[rowSums(
-          clean_df[, res_col] != "Include (Correct)" & 
-            clean_df[, res_col] != "Implausible (Correct)"
-        ) > 0,]
-    }
-  }
-  
-  # sort for visualizing
-  if (!"none" %in% sort_col){
-    sort_col <- sort_col[sort_col != "none"]
-    
-    clean_df <- 
-      clean_df[do.call('order', 
-                       c(clean_df[sort_col], list(decreasing = sort_dec))),]
-  }
-  
-  # create label column (combining all the non result columns)
-  clean_df$Label <- trimws(apply(
-    clean_df[, !grepl("_result", colnames(clean_df))],
-    1,
-    paste,
-    collapse = " / "
-  ))
-  lab <- paste(
-    colnames(clean_df[, !(grepl("_result", colnames(clean_df)) | 
-                            grepl("Label", colnames(clean_df)))]),
-    collapse = " / "
-  )
-  # remove the sort columns
-  clean_df <- clean_df[, (grepl("_result", colnames(clean_df)) | 
-                            grepl("Label", colnames(clean_df)))]
-  # rename result columns
-  colnames(clean_df)[grepl("_result", colnames(clean_df))] <-
-    simpleCap(
-      gsub("_result", "", 
-           colnames(clean_df)[grepl("_result", colnames(clean_df))])
+  # we're going to make a fake dataset for legend purposes
+  if (legn){
+    df <- data.frame(
+      "fill" = names(color_map),
+      "y" = names(color_map),
+      "x" = rep("a", length(color_map))
     )
+    
+    p <- ggplot(df, 
+                aes(x, y, fill = fill))+
+      theme_bw()+
+      scale_x_discrete(expand = c(0,0))+
+      scale_y_discrete(expand = c(0,0))+
+      theme(axis.title.x = element_blank(),
+            axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+            legend.position = "top",
+            legend.direction = "horizontal",
+            legend.title = element_blank())+
+      scale_fill_discrete(type = color_map)+ 
+      geom_tile(color = "black") +
+      theme(legend.position = "bottom",
+            legend.direction = "horizontal",
+            text = element_text(size = 15))
+    
+    return(as.ggplot(g_legend(p)))
+  }
   
-  if (nrow(clean_df) == 0){
+  clean_m <- tab_heat_df(cleaned_df = cleaned_df, 
+                         type = type,
+                         methods_chosen = methods_chosen,
+                         sort_col = sort_col,
+                         sort_dec = sort_dec,
+                         hide_agree = hide_agree, 
+                         interactive = interactive,
+                         show_y_lab = show_y_lab,
+                         show_answers = show_answers,
+                         hl_incorr = hl_incorr,
+                         reduce_lines = reduce_lines,
+                         reduce_amount = reduce_amount,
+                         offset_amount = offset_amount)
+
+  if (nrow(clean_m) == 0){
     if (interactive){
       return(ggplotly(ggplot()+theme_bw()+ggtitle("No entries.")))
     } else {
@@ -882,13 +1334,23 @@ plot_result_heat_map <- function(cleaned_df, type,
     }
   }
   
-  clean_m <- melt(clean_df, id.vars = "Label", variable.name = "Method")
-  clean_m$Label <- factor(clean_m$Label, levels = unique(clean_m$Label))
+  # get the possible methods for this type
+  m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
   
   p <- ggplot(clean_m, 
-              aes(Method, Label, fill = value))+
+              aes(Method, Label, fill = value,
+                  text = paste0(
+                    "Method: ", Method,"\n",
+                    "Label: ", Label,"\n",
+                    "Result: ", num_to_lab[as.character(value)]
+                  )))+
     theme_bw()+
-    scale_fill_discrete(type = color_map)+
+    scale_fill_gradientn(
+      colors = color_map, 
+      breaks = as.numeric(names(color_map)),
+      limits = c(min(as.numeric(names(color_map))), 
+                 max(as.numeric(names(color_map))))
+    )+
     scale_x_discrete(expand = c(0,0))+
     scale_y_discrete(expand = c(0,0))+
     theme(axis.title.x = element_blank(),
@@ -896,7 +1358,8 @@ plot_result_heat_map <- function(cleaned_df, type,
           legend.position = "top",
           legend.direction = "horizontal",
           legend.title = element_blank())+
-    ylab(paste("Record:", lab))+
+    ylab(paste("Record:", unique(clean_m$Label_Name)))+
+    theme(legend.position = "none")+
     NULL
   
   if (!show_y_lab | length(unique(clean_m$Label)) > 100){
@@ -908,7 +1371,7 @@ plot_result_heat_map <- function(cleaned_df, type,
   # if there aren't a ton of entries, you can add grids
   if (length(unique(clean_m$Label))*length(m_for_type) < 250*6){
     p <- p + 
-      geom_tile(color = "black")
+      geom_tile(color = "white")
   } else {
     p <- p + 
       geom_tile()
@@ -921,19 +1384,28 @@ plot_result_heat_map <- function(cleaned_df, type,
         ggplot()+
           theme_bw()+
           ggtitle(
-            "Too many entries. Reduce the amount of subjects or remove interactivity in the sidebar."
+            "Too many entries. Reduce the amount of subjects by focusing\non a subset, reduce number of entries in sidebar, or remove\ninteractivity in the sidebar."
           )
-      )
+      ) %>%
+        layout(margin = list(t = 100)) %>% 
+        config(displayModeBar = F)
     } else {
       p <- suppressWarnings({
         ggplotly(
-          p
+          p,
+          source = paste0(
+            "all_indiv_heat",
+            ifelse(type == "HEIGHTCM", "_ht", "_wt")
+            ),
+          tooltip = c("text")
         ) %>%
           layout(
             legend = list(orientation = "h",   # show entries horizontally
                           xanchor = "center",  
                           x = 0.5,
                           y = 1.1)) %>% 
+          style(xgap = 1, ygap = 1) %>%
+          event_register("plotly_click") %>%
           config(displayModeBar = F)
       })
     }
@@ -944,6 +1416,385 @@ plot_result_heat_map <- function(cleaned_df, type,
   return(p)
 }
 
+# function to plot individual heights and weights for intermediate values at
+# a specific step for a specific method
+plot_inter_cleaned <- function(cleaned_df, subj, step,
+                               methods_chosen = methods_inter_avail[1],
+                               focus_ids = c(),
+                               color_ans = T,
+                               iter_step = 1,
+                               legn = F){
+  # if color answers is true and there are no answers, fix that
+  if (nrow(cleaned_df) > 0 && 
+      color_ans && !"answers" %in% colnames(cleaned_df)){
+    color_ans <- F
+  }
+  
+  # the minimum +/- value around the mean for the y axis to show
+  min_range_band <- c(
+    "HEIGHTCM" = 3.5,
+    "WEIGHTKG" = 5
+  )
+  
+  # maps for configuring ggplot
+  color_map <- 
+    if (color_ans){
+      # if we're highlighting incorrect answers, make those brighter
+      if (T){#(hl_incorr){ FIX LATER
+        c(
+          "Incorrect: Include (False Negative)" = "#5e3c99",
+          "Correct: Include (True Negative)" = "#b2abd2",
+          "Incorrect: Implausible (False Positive)" = "#e66101",
+          "Correct: Implausible (True Positive)" = "#fdb863",
+          "Not Calculated" = "#000000",
+          "Unknown" = "#000000"
+        )
+      } else {
+        c(
+          "Correct: Include (True Negative)" = "#5e3c99",
+          "Incorrect: Include (False Negative)" = "#b2abd2",
+          "Correct: Implausible (True Positive)" = "#e66101",
+          "Incorrect: Implausible (False Positive)" = "#fdb863",
+          "Not Calculated" = "#000000",
+          "Unknown" = "#000000"
+        )
+      }
+    } else {
+      c(
+        "Include" = "#000000",
+        "Not Calculated" = "#000000",
+        "Unknown" = "#000000",
+        "Implausible" = "#fdb863"
+      )
+    }
+  
+  shape_map <- c(
+    "Include" = 16,
+    "Not Calculated" = 16,
+    "Unknown" = 16,
+    "Implausible" = 17
+  )
+  
+  size_map <- c(
+    "Include" = 2,
+    "Not Calculated" = 2,
+    "Unknown" = 2,
+    "Implausible" = 3
+  )
+  
+  type_map <- c(
+    "HEIGHTCM" = "Height (cm)",
+    "WEIGHTKG" = "Weight (kg)"
+  )
+  
+  result_map <- c(
+    "TRUE" = "Implausible",
+    "FALSE" = "Include",
+    "Not Calculated" = "Not Calculated",
+    "Unknown" = "Unknown"
+  )
+  
+  opposite_focus_map <- c(
+    "Height (cm)" = "w",
+    "Weight (kg)" = "h"
+  )
+  
+  type <- c("HEIGHTCM", "WEIGHTKG")
+  step_focus <- type_map[
+    if (grepl("h", step)){
+      "HEIGHTCM"
+    } else if (grepl("w", step)){
+      "WEIGHTKG"
+    } else {
+      c("HEIGHTCM", "WEIGHTKG")
+    }
+  ]
+  
+  # subset the data to the subject, type, and methods we care about
+  # also create necessary counts for plotting and such
+  clean_df <- sub_subj_type(cleaned_df, type, subj, methods_chosen, 
+                            m_types = m_inter_types)
+  
+  # get the possible methods for this type
+  m_for_type <- unique(
+    unlist(m_types[type])[unlist(m_types[type]) %in% methods_chosen]
+  )
+  
+  if (nrow(clean_df) == 0){
+    if (legn){
+      return(ggplot()+theme_bw())
+    } else {
+      return(ggplotly(ggplot()+theme_bw()) %>% config(displayModeBar = F))
+    }
+  }
+  
+  bf_df <- data.frame(
+    "id" = clean_df$id,
+    "age_years" = clean_df$age_years,
+    "param" = type_map[clean_df$param],
+    "measurement" = clean_df$measurement,
+    "step_result" = 
+      if (step == "Before"){
+        rep("Include", nrow(clean_df))
+      } else if (step == "After"){
+        clean_df$all_result
+      } else {
+        if (!methods_chosen %in% c("growthcleanr-naive", "muthalagu")){
+          result_map[
+            as.character(
+              clean_df[, paste0(methods_chosen, "_Step_", step, "_Result")]
+            )
+          ]
+        } else if (methods_chosen == "growthcleanr-naive") {
+          result_map[
+            as.character(
+              clean_df[, paste0(methods_chosen, "_Step_", step, 
+                                "_Iter_", iter_step, "_Result")]
+            )
+          ]
+        } else {
+          if (grepl("2", step)){ # we only need the bucket for step 2
+            result_map[
+              as.character(
+                clean_df[, paste0(methods_chosen, "_Step_", step, 
+                                  "_Bucket_", iter_step, "_Result")]
+              )
+            ]
+          } else {
+            result_map[
+              as.character(
+                clean_df[, paste0(methods_chosen, "_Step_", step, "_Result")]
+              )
+            ]
+          }
+        }
+      }
+  )
+  add_title <- ""
+  # if it's muthalagu, we want to remove all the ages not in the bucket
+  if (methods_chosen == "muthalagu" & grepl("2", step)){
+    ages <- as.numeric(unlist(strsplit(iter_step, "-")))
+    age_low <- ages[1]
+    age_high <- ages[2]
+    
+    bf_df <- bf_df[bf_df$age_years >= age_low & bf_df$age_years < age_high,]
+    
+    if (nrow(bf_df) == 0){
+      if (legn){
+        return(ggplot()+theme_bw())
+      } else {
+        return(ggplotly(ggplot()+
+                          theme_bw()+
+                          ggtitle("No ages in selected bucket.")) %>% 
+                 config(displayModeBar = F))
+      }
+    }
+    
+    # if the step is 2b+, we need to check if they're all NA (which means they
+    # weren't processed for that step)
+    if (step %in% c("2hb", "2hc")){
+      if (all(is.na(bf_df$step_result))){
+        bf_df$step_result <- "Include"
+        add_title <- "All records included in step 2ha."
+      }
+    }
+  }
+  # for muthalagu, we also want to remove all the weights
+  # if (methods_chosen == "muthalagu"){
+  #   # filter out all the weights
+  #   bf_df <- bf_df[bf_df$param == "Height (cm)",]
+  # }
+  
+  
+  # if it's the end, we want to make all the implausible NA
+  if (step == "After"){
+    bf_df$step_result[bf_df$step_result == "Implausible"] <- NA
+  }
+  bf_df[is.na(bf_df$step_result) & bf_df$param %in% step_focus,
+        "step_result"] <- "Implausible"
+  # for the parameter not in focus, we want the last result
+  if (length(step_focus) == 1){
+    # get all the steps for the method
+    all_steps <- m_inter_steps[[methods_chosen]]
+    all_op_steps <- which(
+      grepl(opposite_focus_map[step_focus], 
+            all_steps[c(1:(which(all_steps == step))-1)]
+      )
+    )
+    last_op_step <- 
+      if (length(all_op_steps) == 0) {
+        "Before"
+      } else {
+        all_steps[all_op_steps[length(all_op_steps)]]
+      }
+    
+    # add the values for the last step
+    foc_log <- !bf_df$param %in% step_focus
+    
+    bf_df[foc_log, "step_result"] <- 
+      if (last_op_step == "Before"){
+        rep("Include", sum(foc_log))
+      } else if (last_op_step == "After"){
+        clean_df$all_result[!type_map[clean_df$param] %in% step_focus]
+      } else {
+        result_map[
+          as.character(
+            clean_df[!type_map[clean_df$param] %in% step_focus, 
+                     paste0(methods_chosen, "_Step_", last_op_step, "_Result")]
+          )
+        ]
+      }
+    
+    bf_df$step_result_orig[foc_log] <- bf_df$step_result[foc_log]
+    bf_df$step_result_orig[foc_log][
+      bf_df$step_result[foc_log] == "Implausible"] <- 
+      NA
+    bf_df[is.na(bf_df$step_result) & foc_log,
+          "step_result"] <- "Implausible"
+  }
+  
+  # for ease of coloring
+  bf_df$step_result_color <- bf_df$step_result
+  # if we're going to show answers, we want to change the names  
+  if (color_ans){
+    # get the results as compared to the answers
+    ans_res <- bf_df$step_result_color == 
+      clean_df$answers[clean_df$id %in% bf_df$id]
+    # do not get the not calculated
+    ans_nnc <- !bf_df$step_result_color %in% c("Not Calculated", "Unknown")
+    ans_incl <- clean_df$answers[clean_df$id %in% bf_df$id] == "Include"
+    ans_impl <- clean_df$answers[clean_df$id %in% bf_df$id] == "Implausible"
+    # add correct/incorrect + fp/tp/fn/tn
+    bf_df$step_result_color[ans_res & ans_nnc] <- 
+      paste0(
+        "Correct: ", bf_df$step_result_color[ans_res & ans_nnc]
+      )
+    bf_df$step_result_color[ans_res & ans_nnc & ans_incl] <-
+      paste0(
+        bf_df$step_result_color[ans_res & ans_nnc & ans_incl],
+        " (True Negative)"
+      )
+    bf_df$step_result_color[ans_res & ans_nnc & ans_impl] <-
+      paste0(
+        bf_df$step_result_color[ans_res & ans_nnc & ans_impl],
+        " (True Positive)"
+      )
+    
+    bf_df$step_result_color[!ans_res & ans_nnc] <- 
+      paste0(
+        "Incorrect: ", bf_df$step_result_color[!ans_res & ans_nnc]
+      )
+    bf_df$step_result_color[(!ans_res) & ans_nnc & ans_impl] <-
+      paste0(
+        bf_df$step_result_color[(!ans_res) & ans_nnc & ans_impl],
+        " (False Negative)"
+      )
+    bf_df$step_result_color[(!ans_res) & ans_nnc & ans_incl] <-
+      paste0(
+        bf_df$step_result_color[(!ans_res) & ans_nnc & ans_incl],
+        " (False Positive)"
+      )
+  }
+  
+  # consider the y range to be, at a minimum, a certain amount around the mean
+  scales_y <- list()
+  for (t in type){
+    foc_log <- bf_df$param == type_map[t]
+    if (sum(foc_log) > 0){
+      min_rg <- min(bf_df$measurement[foc_log], na.rm = T)
+      max_rg <- max(bf_df$measurement[foc_log], na.rm = T)
+      yaxis_lim <- 
+        if (diff(c(min_rg, max_rg)) < (min_range_band[t]*2)){
+          c(
+            mean(c(min_rg, max_rg))-min_range_band[t],
+            mean(c(min_rg, max_rg))+min_range_band[t]
+          )
+        } else {
+          c(
+            min_rg-(.01*diff(c(min_rg,max_rg))), 
+            max_rg+(.01*diff(c(min_rg,max_rg)))
+          )
+        }
+      
+      scales_y[[type_map[t]]] <- scale_y_continuous(limits = yaxis_lim)
+    }
+  }
+  
+  p <- suppressWarnings(
+    ggplot(bf_df, aes(customdata = id))+
+      geom_line(
+        data = bf_df[bf_df$step_result %in% 
+                       c("Include", "Not Calculated", "Unknown"),], 
+        aes(age_years, measurement), color = "grey")+
+      geom_point(
+        aes(
+          age_years, measurement,
+          color = step_result_color, shape = step_result,
+          size = step_result,
+          text = paste0(
+            "ID: ", id,"\n",
+            "Step ", step, 
+            if (methods_chosen == "growthcleanr-naive"){ 
+              paste0(" Iter ", iter_step) } else {""},
+            " Result: ", step_result,"\n",
+            if(color_ans){paste0("Answer: ", step_result_color)} else {""}
+          )
+        )
+      )+
+      theme_bw()+
+      scale_color_manual("Result Color", values = color_map, breaks = names(color_map))+
+      scale_shape_manual("Result Shape", values = shape_map, breaks = names(shape_map))+
+      scale_size_manual("Result Shape", values = size_map, breaks = names(shape_map))+
+      theme(plot.title = element_text(hjust = .5))+
+      xlab("Age (Years)")+
+      ylab("Measurement")+
+      facet_grid_sc(rows = vars(param), scales = list(y = scales_y))+
+      if (methods_chosen == "muthalagu"){
+        ggtitle(add_title)
+      }
+  )
+  
+  # # keep if necessary
+  # if (length(unique(bf_df$param)) > 1){
+  #   p <- p +
+  #     facet_grid_sc(rows = vars(param), scales = list(y = scales_y))
+  # } else {
+  #   p <- p +
+  #     ylim(yaxis_lim)+
+  #     ylab(unique(bf_df$param))
+  # }
+  
+  if (sum(bf_df$id %in% focus_ids) > 0){
+    p <- p +
+      geom_point(
+        data = bf_df[bf_df$id %in% focus_ids,],
+        aes(
+          age_years, measurement,
+          color = step_result_color
+        ), 
+        fill = NA, shape = 21, size = 6
+      )
+  }
+  
+  if (legn){
+    p <- p +
+      theme(legend.position = "bottom",
+            legend.direction = "horizontal",
+            text = element_text(size = 15))
+    
+    return(as.ggplot(g_legend(p)))
+  } else {
+    p <- p +
+      theme(legend.position = "none")
+    
+    return(
+      ggplotly(p, tooltip = c("text"), source = "inter_plot") %>%
+        config(displayModeBar = F) %>%
+        event_register("plotly_hover")
+    )
+  }
+}
+
 # UI ----
 
 # TODO: LOOK INTO MODULES
@@ -952,7 +1803,7 @@ ui <- navbarPage(
   # UI: compute and compare results ----
   "Adult EHR Data Cleaning",
   tabPanel(
-    "Compare",
+    "Compare Results",
     sidebarLayout(
       # UI: sidebar options ----
       sidebarPanel(
@@ -963,9 +1814,14 @@ ui <- navbarPage(
           open = "Start: Run Data/Upload Results",
           bsCollapsePanel(
             "Start: Run Data/Upload Results",
-            HTML("<b>Upload adult EHR data or results and click the corresponding button below to get started!</b> If no data is input, default synthetic data/results will be used. More information on data format can be found in the \"About\" tab.<p>"),
+            HTML("<b>Upload adult EHR data or results and click the corresponding button below to get started!</b> If no data is input, default synthetic data/results will be used. More information on data format can be found in the \"About\" tab. Note that this will update data in \"Examine Methods\" tab.<p>"),
             fileInput("dat_file", "Upload Data/Results CSV",
                       accept = c(".csv", ".CSV")),
+            checkboxInput(
+              "run_ex", 
+              HTML("<b>Run example data?</b>"),
+              value = F
+            ),
             div(style="display:inline-block",
                 actionButton("run_data", "Run data!"),
                 actionButton("upload_res", "Upload Results"),
@@ -1043,7 +1899,7 @@ ui <- navbarPage(
             "Options: All Individuals Heat Map",
             checkboxInput(
               "heat_side_by_side", 
-              HTML("<b>Display both height and weight heat maps side by side?</b>"),
+              HTML("<b>Display both height and weight heat maps side by side?</b> Legends may be cut off if checked."),
               value = T
             ),
             selectInput(
@@ -1065,12 +1921,35 @@ ui <- navbarPage(
               selected = "none",
               multiple = T
             ),
+            div(
+              style="display: inline-block;",
+              checkboxInput(
+                "heat_reduce_lines", 
+                HTML("<b>Show first X entries?</b>"),
+                value = F
+              )
+            ),
+            div(style="display: inline-block; width: 70px;",
+                numericInput(
+                  "heat_reduce_amount", 
+                  "X:", 
+                  value = 10, 
+                  step = 5,
+                  min = 0)
+            ),
+            div(style="display: inline-block; width: 70px;",
+                numericInput(
+                  "heat_offset_amount", 
+                  "Offset?:", 
+                  value = 0, 
+                  step = 10,
+                  min = 0)
+            ),
             checkboxInput(
               "heat_show_answers", 
               HTML("<b>Show answers, if available?</b>"),
               value = T
             ),
-            
             checkboxInput(
               "heat_hl_incorr", 
               HTML("<b>If showing answers, highlight incorrect answers?</b> If selected, incorrect answers will appear darker than correct answers. Otherwise, correct answers will be highlighted."),
@@ -1202,6 +2081,11 @@ ui <- navbarPage(
             fluidRow(
               width = 12,
               uiOutput("all_indiv_title"),
+              HTML("<p align = 'right'>Note: Clicking on a tile will add that subject/measurement to the focus list in both \"Compare Results\" and \"Examine Methods\".</p>"),
+            ),
+            fluidRow(
+              width = 12,
+              plotOutput("all_indiv_legn", height = "30px"),
             ),
             conditionalPanel(
               "input.heat_side_by_side == true",
@@ -1283,7 +2167,83 @@ ui <- navbarPage(
       )
     )
   ),
-  
+  # UI: intermediate values ----
+  tabPanel(
+    "Examine Methods",
+    sidebarLayout(
+      # UI: intermediate sidebar options ----
+      sidebarPanel(
+        width = 3,
+        HTML("<b>Upload adult EHR data or results and click the corresponding button below to understand intermediate values!</b> If no data is input, default synthetic data/results will be used. More information on data format can be found in the \"About\" tab. Note that this will update data in \"Compare Results\" tab.<p>"),
+        fileInput("dat_inter_file", "Upload Data/Results CSV",
+                  accept = c(".csv", ".CSV")),
+        checkboxInput(
+          "run_inter_ex", 
+          HTML("<b>Run example data?</b>"),
+          value = F
+        ),
+        div(style="display:inline-block",
+            actionButton("run_inter_data", "Run data!"),
+            actionButton("upload_inter_res", "Upload Results"),
+            downloadButton("download_inter_results", label = "Download Results")
+        ),
+        hr(),
+        textAreaInput("subj_inter_focus", 
+                      "Enter subjects/record IDs to focus on (line separated,  with / between subject and record ID):",
+                      width = "100%",
+                      height = "100px"),
+        div(style="display:inline-block",
+            actionButton("update_inter_subj", "Update Focus"),
+            actionButton("reset_inter_subj", "Reset"),
+            downloadButton("download_inter_focus", label = "Download Focus")
+        ),
+        p(),
+        uiOutput("indiv_inter_choose"),
+        checkboxInput(
+          "inter_color_ans",
+          HTML("<b>Show answers (if available)?</b>"),
+          value = T
+        )
+      ),
+      # UI: intermediate value visualizations ----
+      mainPanel(
+        width = 9,
+        do.call(
+          tabsetPanel,
+          c(
+            id = "inter_tabset",
+            lapply(methods_inter_avail, function(m_name){
+              tabPanel(
+                simpleCap(m_name),
+                br(),
+                HTML("<center>"),
+                sliderTextInput(
+                  paste0(m_name, "_method_step"),
+                  "Choose Step:",
+                  choices = c(
+                    "Before",
+                    m_inter_steps[[m_name]],
+                    "After"
+                  ),
+                  selected = "Before"
+                ),
+                uiOutput(paste0(m_name, "_iter_step_ui")),
+                uiOutput(paste0(m_name, "_bucket_step_ui")),
+                HTML("</center>"),
+                uiOutput(paste0(m_name, "_step_title")),
+                uiOutput(paste0(m_name, "_step_subtitle")),
+                plotlyOutput(paste0(m_name, "_inter_plot")),
+                plotOutput(paste0(m_name, "_inter_plot_legn"), height = 50),
+                div(style = 'overflow-x: scroll', 
+                    tableOutput(paste0(m_name, '_inter_table'))
+                )
+              )
+            })
+          )
+        )
+      )
+    )
+  ),
   # UI: documentation ----
   
   tabPanel(
@@ -1311,7 +2271,7 @@ ui <- navbarPage(
                 "<li><b>subjid:</b> subject ID</li>",
                 "<li><b>param:</b> parameter for each measurement. must be either HEIGHTCM (height in centimeters) or WEIGHTKG (weight in kilograms)</li>",
                 "<li><b>measurement:</b> measurement of height or weight, corresponding to the parameter</li>",
-                "<li><b>age_years:</b> age in years</li>",
+                "<li><b>age_years:</b> age in years (ages < 18 will be filtered out) (can also be <b>agedays</b>, as in the original growthcleanr format, and will be automatically converted to years)</li>",
                 "<li><b>sex:</b> 0 (male) or 1 (female)</li>",
                 "<li><b>answers:</b> (<u>not required</u>) an answer column, indicating whether the value should be Include or Implausible</li>",
                 "</ul><p>",
@@ -1554,49 +2514,119 @@ server <- function(input, output, session) {
     "sub" = data.frame()
   )
   
+  cleaned_inter_df <- reactiveValues(
+    "full" = data.frame(),
+    "sub" = data.frame()
+  )
+  
   methods_chosen <- reactiveValues(
     "m" = methods_avail
   )
   
   subj_focus <- reactiveValues(
-    "subj" = c()
+    "subj" = c(),
+    "subj_inter" = c()
   )
+  
+  # save run button clicks
+  run_clicks <- reactiveValues(
+    "reg" = 0,
+    "inter" = 0
+  )
+  # create a listener for multiple buttons
+  run_listener <- reactive({
+    if (any(list(input$run_data, input$run_inter_data) > 0)){
+      return(list(input$run_data, input$run_inter_data))
+    } else {
+      return()
+    }
+  })
   
   # observe button/click inputs ----
   
-  observeEvent(input$run_data, {
+  observeEvent(run_listener(), {
     withProgress(message = "Cleaning data!", value = 0, {
-      tot_increments <- 1+1+length(methods_avail)
+      # check which button got pressed; if it's not the regular, it's the 
+      # intermediate values
+      inter <- !(input$run_data[1] > run_clicks$reg)
+      
+      # update the saved values
+      run_clicks$reg <- input$run_data[1]
+      run_clicks$inter <- input$run_inter_data[1]
+      
+      # which methods are we running? -- we're running all of them
+      # idea -> run all so that both datasets are available
+      # m_run <- if(inter){methods_inter_avail} else {methods_avail}
+      m_run <- methods_avail
+      
+      tot_increments <- 1+1+length(m_run)
       
       incProgress(1/tot_increments, 
                   message = "Uploading data!",
                   detail = Sys.time())
       
       df <-
-        if (is.null(input$dat_file)){
-          # use example data
-          dat
+        if (inter){
+          if (is.null(input$dat_inter_file) | input$run_inter_ex){
+            # use example data
+            dat
+          } else {
+            read.csv(input$dat_inter_file$datapath)
+          }
         } else {
-          read.csv(input$dat_file$datapath)
+          if (is.null(input$dat_file) | input$run_ex){
+            # use example data
+            dat
+          } else {
+            read.csv(input$dat_file$datapath)
+          }
         }
+      
+      # check that age_years is not "ageyears"
+      if ("ageyears" %in% colnames(df)){
+        colnames(df)[colnames(df) == "ageyears"] <- "age_years"
+      }
+      # check that df has age_years or age days, preferring age_years
+      if ("agedays" %in% colnames(df) & !"age_years" %in% colnames(df)){
+        df$age_years <- df$agedays /365.25
+      }
+      # fix id if not unique or if it doesn't exist
+      if (is.null(df$id) || length(unique(df$id)) != nrow(df)){
+        df$id <- 1:nrow(df)
+      }
+      # filter out data less than 18
+      df <- df[df$age_years >= 18, ]
       
       # run each method and save the results
       c_df <- df
-      for (m in methods_avail){
+      for (m in m_run){
         incProgress(1/tot_increments,
                     message = paste("Running", simpleCap(m)),
                     detail = Sys.time())
         
         # clean data
-        clean_df <- methods_func[[m]](df)
+        # m_func <- if (inter){methods_inter_func} else {methods_func}
+        m_func <- methods_func
+        clean_df <- 
+          m_func[[m]](
+            df, inter_vals = T
+          )
         
         # add the results to the overall dataframe
         c_df[,paste0(m, "_result")] <- clean_df$result
         c_df[,paste0(m, "_reason")] <- clean_df$reason
+        
+        if (m %in% methods_inter_avail){
+          # if adding intermediate values, we add those at the end
+          inter_cols <- colnames(clean_df)[grepl("Step_", colnames(clean_df))]
+          c_df[,paste0(m, "_", inter_cols)] <- clean_df[, inter_cols]
+        }
       }
       
       # initialize subset (cleaned_df holds all subjects)
-      cleaned_df$full <- cleaned_df$sub <- c_df
+      cleaned_inter_df$full <- cleaned_inter_df$sub <- c_df
+      cleaned_df$full <- cleaned_df$sub <- 
+        c_df[, !grepl("Step_", colnames(c_df))]
       
       # now let the tabs update
       all_collapse_names <- c(
@@ -1648,10 +2678,16 @@ server <- function(input, output, session) {
   # download data results
   output$download_results <- downloadHandler(
     filename = function() {
-      if (is.null(input$dat_file)){
+      if ((is.null(input$dat_file) & is.null(input$dat_inter_file)) |
+          input$run_inter_ex){
         "Adult_EHR_Cleaning_Results_data_example.csv"
       } else {
-        paste0("Adult_EHR_Cleaning_Results_", input$dat_file$name)
+        fn <- ifelse(is.null(input$dat_file), 
+                     input$dat_inter_file$name,
+                     input$dat_file$name
+        )
+        
+        paste0("Adult_EHR_Cleaning_Results_", fn)
       }
     },
     content = function(file) {
@@ -1659,11 +2695,42 @@ server <- function(input, output, session) {
     }
   )
   
+  # download intermediate data results
+  output$download_inter_results <- downloadHandler(
+    filename = function() {
+      if ((is.null(input$dat_file) & is.null(input$dat_inter_file)) |
+          input$run_inter_ex){
+        "Adult_EHR_Cleaning_Results_w_Intermediate_Values_data_example.csv"
+      } else {
+        fn <- ifelse(is.null(input$dat_file), 
+                     input$dat_inter_file$name,
+                     input$dat_file$name
+        )
+        paste0("Adult_EHR_Cleaning_Results_w_Intermediate_Values_", fn)
+      }
+    },
+    content = function(file) {
+      write.csv(cleaned_inter_df$full, file, row.names = FALSE, na = "")
+    }
+  )
+  
   # update output to only focus on specified subjects
   observeEvent(input$update_subj, {
-    subj <- strsplit(input$subj_focus, "\n")[[1]]
+    subj <- subj_focus$subj <- strsplit(input$subj_focus, "\n")[[1]]
     cleaned_df$sub <-
       cleaned_df$full[as.character(cleaned_df$full$subj) %in% subj,]
+  })
+  
+  # update output to only focus on specified individual subjects
+  observeEvent(input$update_inter_subj, {
+    subj_ids <- subj_focus$subj_inter <- 
+      strsplit(input$subj_inter_focus, "\n")[[1]]
+    # get the the subjects - ids will be be baked
+    subjids <- sapply(strsplit(subj_ids, "/"), `[[`, 1)
+    
+    cleaned_inter_df$sub <-
+      cleaned_inter_df$full[
+        as.character(cleaned_inter_df$full$subj) %in% subjids,]
   })
   
   # reset output to include all subjects
@@ -1676,13 +2743,164 @@ server <- function(input, output, session) {
                         value = "")
   })
   
+  # reset output to include all subjects for examining subjects
+  observeEvent(input$reset_inter_subj, {
+    cleaned_inter_df$sub <- cleaned_inter_df$full
+    subj_focus$subj_inter <- c()
+    
+    updateTextAreaInput(session,
+                        "subj_inter_focus",
+                        value = "")
+  })
+  
+  # click on the height heat map to add subjects and ids to focus
+  observeEvent(event_data("plotly_click", source = "all_indiv_heat_ht"), {
+      d <- event_data("plotly_click", source = "all_indiv_heat_ht")
+      if(!is.null(d)){
+        dx <- d$x
+        dy <- d$y
+        
+        # get the heatmap df
+        clean_m <- tab_heat_df(cleaned_df$sub, 
+                               "HEIGHTCM",
+                               methods_chosen = methods_chosen$m,
+                               sort_col = input$heat_sort_col,
+                               hide_agree = input$heat_hide_agree,
+                               sort_dec = input$heat_sort_dec,
+                               interactive = F,
+                               show_y_lab = input$heat_show_y_lab,
+                               show_answers = input$heat_show_answers,
+                               hl_incorr = input$heat_hl_incorr,
+                               reduce_lines = input$heat_reduce_lines,
+                               reduce_amount = input$heat_reduce_amount,
+                               offset_amount = input$heat_offset_amount)
+        # get the info we need
+        m <- unique(clean_m$Method)[dx]
+        subjid <- clean_m$subjid[dy]
+        id <- clean_m$id[dy]
+        
+        # for the regular tab
+        # add ones that were already there (added through other means)
+        sub_add <- strsplit(input$subj_focus, "\n")[[1]]
+        if (length(sub_add) > 0){
+          subj_focus$subj <- sub_add
+        } else {
+          subj_focus$subj <- c()
+        }
+        
+        # now, automatically add the subject to the focus on list
+        subj_focus$subj[length(subj_focus$subj)+1] <- subjid
+        subj_focus$subj <- unique(subj_focus$subj)
+        
+        updateTextAreaInput(session,
+                            "subj_focus",
+                            value = paste(subj_focus$subj, collapse = "\n"))
+        
+        # add to the individual subject text area
+        
+        # add ones that were already there (added through other means)
+        sub_add <- strsplit(input$subj_inter_focus, "\n")[[1]]
+        if (length(sub_add) > 0){
+          subj_focus$subj_inter <- sub_add
+        } else {
+          subj_focus$subj_inter <- c()
+        }
+        
+        # now, automatically add the subject to the focus on list
+        subj_focus$subj_inter[length(subj_focus$subj_inter)+1] <- 
+          paste0(subjid, "/", id)
+        subj_focus$subj_inter <- unique(subj_focus$subj_inter)
+        
+        updateTextAreaInput(
+          session,
+          "subj_inter_focus",
+          value = paste(subj_focus$subj_inter, collapse = "\n")
+        )
+      }
+  })
+  
+  # click on the weight heat map to add subjects and ids to focus
+  observeEvent(event_data("plotly_click", source = "all_indiv_heat_wt"), {
+    d <- event_data("plotly_click", source = "all_indiv_heat_wt")
+    if(!is.null(d)){
+      dx <- d$x
+      dy <- d$y
+      
+      # get the heatmap df
+      clean_m <- tab_heat_df(cleaned_df$sub, 
+                             "WEIGHTKG",
+                             methods_chosen = methods_chosen$m,
+                             sort_col = input$heat_sort_col,
+                             hide_agree = input$heat_hide_agree,
+                             sort_dec = input$heat_sort_dec,
+                             interactive = F,
+                             show_y_lab = input$heat_show_y_lab,
+                             show_answers = input$heat_show_answers,
+                             hl_incorr = input$heat_hl_incorr,
+                             reduce_lines = input$heat_reduce_lines,
+                             reduce_amount = input$heat_reduce_amount,
+                             offset_amount = input$heat_offset_amount)
+      
+      # get the info we need
+      m <- unique(clean_m$Method)[dx]
+      subjid <- clean_m$subjid[dy]
+      id <- clean_m$id[dy]
+      
+      # replace ones that were already there (added through other means)
+      sub_add <- strsplit(input$subj_focus, "\n")[[1]]
+      if (length(sub_add) > 0){
+        subj_focus$subj <- sub_add
+      } else {
+        subj_focus$subj <- c()
+      }
+      
+      # now, automatically add the subject to the focus on list
+      subj_focus$subj[length(subj_focus$subj)+1] <- subjid
+      subj_focus$subj <- unique(subj_focus$subj)
+      
+      updateTextAreaInput(session,
+                          "subj_focus",
+                          value = paste(subj_focus$subj, collapse = "\n"))
+      
+      # add to the individual subject text area
+      
+      # add ones that were already there (added through other means)
+      sub_add <- strsplit(input$subj_inter_focus, "\n")[[1]]
+      if (length(sub_add) > 0){
+        subj_focus$subj_inter <- sub_add
+      } else {
+        subj_focus$subj_inter <- c()
+      }
+      
+      # now, automatically add the subject to the focus on list
+      subj_focus$subj_inter[length(subj_focus$subj_inter)+1] <- 
+        paste0(subjid, "/", id)
+      subj_focus$subj_inter <- unique(subj_focus$subj_inter)
+      
+      updateTextAreaInput(
+        session,
+        "subj_inter_focus",
+        value = paste(subj_focus$subj_inter, collapse = "\n")
+      )
+    }
+  })
+  
   # update output to only focus on specified methods
   observeEvent(input$update_methods, {
     methods_chosen$m <- input$togg_methods
   })
   
   observeEvent(input$add_subj_focus, {
+    # add ones that were already there (added through other means)
+    sub_add <- strsplit(input$subj_focus, "\n")[[1]]
+    if (length(sub_add) > 0){
+      subj_focus$subj <- sub_add
+    } else {
+      subj_focus$subj <- c()
+    }
+    
     subj_focus$subj[length(subj_focus$subj)+1] <- input$subj
+    subj_focus$subj <- unique(subj_focus$subj)
     
     updateTextAreaInput(session,
                         "subj_focus",
@@ -1691,14 +2909,38 @@ server <- function(input, output, session) {
   
   output$download_focus <- downloadHandler(
     filename = function() {
-      if (is.null(input$dat_file)){
+      if ((is.null(input$dat_file) & is.null(input$dat_inter_file)) |
+          input$run_ex){
         "Adult_EHR_Cleaning_Subject_Focus_List_Example_Data.csv"
       } else {
-        paste0("Adult_EHR_Cleaning_Subject_Focus_List_", input$dat_file$name)
+        fn <- ifelse(is.null(input$dat_file), 
+                     input$dat_inter_file$name,
+                     input$dat_file$name
+                     )
+        paste0("Adult_EHR_Cleaning_Subject_Focus_List_", fn)
       }
     },
     content = function(file) {
       write.csv(data.frame("Focus.Subjects" = subj_focus$subj),
+                file, row.names = FALSE, na = "")
+    }
+  )
+  
+  output$download_inter_focus <- downloadHandler(
+    filename = function() {
+      if ((is.null(input$dat_file) & is.null(input$dat_inter_file)) |
+          input$run_inter_ex){
+        "Adult_EHR_Cleaning_Subject_ID_Focus_List_Example_Data.csv"
+      } else {
+        fn <- ifelse(is.null(input$dat_file), 
+                     input$dat_inter_file$name,
+                     input$dat_file$name
+        )
+        paste0("Adult_EHR_Cleaning_Subject_ID_Focus_List_", fn)
+      }
+    },
+    content = function(file) {
+      write.csv(data.frame("Focus.Subjects.IDs" = subj_focus$subj_inter),
                 file, row.names = FALSE, na = "")
     }
   )
@@ -1927,6 +3169,23 @@ server <- function(input, output, session) {
                 "</center></h3>"))
   })
   
+  output$all_indiv_legn <- renderPlot({
+    plot_result_heat_map(cleaned_df$sub, 
+                         "HEIGHTCM",
+                         methods_chosen = methods_chosen$m,
+                         sort_col = input$heat_sort_col,
+                         hide_agree = input$heat_hide_agree,
+                         sort_dec = input$heat_sort_dec,
+                         interactive = F,
+                         show_y_lab = input$heat_show_y_lab,
+                         show_answers = input$heat_show_answers,
+                         hl_incorr = input$heat_hl_incorr,
+                         reduce_lines = input$heat_reduce_lines,
+                         reduce_amount = input$heat_reduce_amount,
+                         offset_amount = input$heat_offset_amount,
+                         legn = T)
+  })
+  
   # render plotly version -- will only render if UI is allocated
   output$ht_heat_all_plotly <- renderPlotly({
     plot_result_heat_map(cleaned_df$sub, 
@@ -1938,7 +3197,10 @@ server <- function(input, output, session) {
                          interactive = T,
                          show_y_lab = input$heat_show_y_lab,
                          show_answers = input$heat_show_answers,
-                         hl_incorr = input$heat_hl_incorr)
+                         hl_incorr = input$heat_hl_incorr,
+                         reduce_lines = input$heat_reduce_lines,
+                         reduce_amount = input$heat_reduce_amount,
+                         offset_amount = input$heat_offset_amount)
   })
   
   # render ggplot version -- will only render if UI is allocated
@@ -1952,7 +3214,10 @@ server <- function(input, output, session) {
                          interactive = F,
                          show_y_lab = input$heat_show_y_lab,
                          show_answers = input$heat_show_answers,
-                         hl_incorr = input$heat_hl_incorr)
+                         hl_incorr = input$heat_hl_incorr,
+                         reduce_lines = input$heat_reduce_lines,
+                         reduce_amount = input$heat_reduce_amount,
+                         offset_amount = input$heat_offset_amount)
   })
   
   # render plotly version -- will only render if UI is allocated
@@ -1966,7 +3231,10 @@ server <- function(input, output, session) {
                          interactive = T,
                          show_y_lab = input$heat_show_y_lab,
                          show_answers = input$heat_show_answers,
-                         hl_incorr = input$heat_hl_incorr)
+                         hl_incorr = input$heat_hl_incorr,
+                         reduce_lines = input$heat_reduce_lines,
+                         reduce_amount = input$heat_reduce_amount,
+                         offset_amount = input$heat_offset_amount)
   })
   
   # render ggplot version -- will only render if UI is allocated
@@ -1980,7 +3248,10 @@ server <- function(input, output, session) {
                          interactive = F,
                          show_y_lab = input$heat_show_y_lab,
                          show_answers = input$heat_show_answers,
-                         hl_incorr = input$heat_hl_incorr)
+                         hl_incorr = input$heat_hl_incorr,
+                         reduce_lines = input$heat_reduce_lines,
+                         reduce_amount = input$heat_reduce_amount,
+                         offset_amount = input$heat_offset_amount)
   })
   
   # render plotly version -- will only render if UI is allocated
@@ -1994,7 +3265,10 @@ server <- function(input, output, session) {
                          interactive = T,
                          show_y_lab = input$heat_show_y_lab,
                          show_answers = input$heat_show_answers,
-                         hl_incorr = input$heat_hl_incorr)
+                         hl_incorr = input$heat_hl_incorr,
+                         reduce_lines = input$heat_reduce_lines,
+                         reduce_amount = input$heat_reduce_amount,
+                         offset_amount = input$heat_offset_amount)
   })
   
   # render ggplot version -- will only render if UI is allocated
@@ -2008,7 +3282,10 @@ server <- function(input, output, session) {
                          interactive = F,
                          show_y_lab = input$heat_show_y_lab,
                          show_answers = input$heat_show_answers,
-                         hl_incorr = input$heat_hl_incorr)
+                         hl_incorr = input$heat_hl_incorr,
+                         reduce_lines = input$heat_reduce_lines,
+                         reduce_amount = input$heat_reduce_amount,
+                         offset_amount = input$heat_offset_amount)
   })
   
   # plot check answers ----
@@ -2084,6 +3361,223 @@ server <- function(input, output, session) {
   options = list(scrollX = TRUE,
                  pageLength = 10)
   )
+  
+  # output for 'examine methods' (intermediate steps) tab ----
+  
+  output$indiv_inter_choose <- renderUI({
+    selectInput(
+      "inter_subj",
+      label = HTML("<p style = 'font-weight: normal'><b>Which subject's intermediate steps would you like to examine?</b> Search for subjects by pressing backspace and typing. Focus IDs, if added to focus list and updated, will be circled points in plot.</p>"),
+      choices = 
+        if (nrow(cleaned_inter_df$sub) == 0){
+          c()
+        } else {
+          unique(cleaned_inter_df$sub$subjid)
+        }
+    )
+  })
+  
+  # we're only going to render the iteration steps for growthcleanr naive
+  output[["growthcleanr-naive_iter_step_ui"]] <- renderUI({
+    sliderInput(
+      "growthcleanr-naive_iter_step",
+      "Choose Iteration:",
+      min = 1,
+      max = 1,
+      value = 1
+    )
+  })
+  
+  # update the iteration count
+  observeEvent(input[["growthcleanr-naive_method_step"]], {
+    if (input[["growthcleanr-naive_method_step"]] %in% c("Before", "After")){
+      updateSliderInput(
+        session,
+        "growthcleanr-naive_iter_step",
+        "Choose Iteration:",
+        min = 1,
+        max = 1,
+        value = 1
+      )
+    } else {
+      # get the maximum iterations
+      step <- as.character(input[["growthcleanr-naive_method_step"]])
+      # values we want to focus on in the table
+      step_focus <- 
+        if (grepl("h", step)){
+          "HEIGHTCM"
+        } else if (grepl("w", step)){
+          "WEIGHTKG"
+        } else {
+          c("HEIGHTCM", "WEIGHTKG")
+        }
+      
+      # subset the data to the subject, type, and methods we care about
+      clean_df <- sub_subj_type(cleaned_inter_df$sub,  
+                                step_focus, input$inter_subj,
+                                "growthcleanr-naive", 
+                                m_types = m_inter_types)
+      tab_out <- clean_df[,colnames(clean_df)[
+        grepl("_Iter_", colnames(clean_df))]]
+      # remove all NA columns
+      tab_out <- tab_out[, sapply(tab_out, function(x){ !all(is.na(x)) })]
+      # get all possible iterations
+      iters <- as.numeric(substring(
+        gsub(paste0("growthcleanr-naive_Step_", step,"_Iter_"), 
+             "", colnames(tab_out)), 
+        1, 1))
+      
+      updateSliderInput(
+        session,
+        "growthcleanr-naive_iter_step",
+        "Choose Iteration:",
+        min = 1,
+        max = max(iters),
+        step = 1,
+        value = 1
+      )
+    }
+  })
+  
+  # we're only going to render the bucket steps for muthalgu
+  output[["muthalagu_bucket_step_ui"]] <- renderUI({
+    sliderTextInput(
+      "muthalagu_bucket_step",
+      "Choose Age Bucket:",
+      choices = c("18-25", "25-50", "50-Inf"),
+      selected = "18-25"
+    )
+  })
+  
+  lapply(paste0(methods_inter_avail, "_step_title"), function(x){
+    output[[x]] <- renderUI({
+      ms <-  as.character(
+        input[[paste0(tolower(input$inter_tabset),"_method_step")]]
+      )
+      
+      HTML(paste0(
+        "<h3><center>",
+        if (ms == "Before"){
+          "Before Method"
+        } else if (ms == "After"){
+          "After Method"
+        } else {
+          paste(
+            "Step", 
+            m_inter_steps_full_title[[tolower(input$inter_tabset)]][ms]
+          )
+        },
+        "</h3></center>"
+      ))
+    })
+  })
+  
+  lapply(paste0(methods_inter_avail, "_step_subtitle"), function(x){
+    output[[x]] <- renderUI({
+      if (!input[[paste0(tolower(input$inter_tabset), "_method_step")]] %in%
+          c("Before", "After")){
+        ms <- as.character(input[[paste0(tolower(input$inter_tabset),
+                                           "_method_step")]])
+        
+        HTML(paste0(
+          "<h4><center>",
+          m_inter_steps_full_subtitle[[tolower(input$inter_tabset)]][ms],
+          "</h4></center>"
+          
+        ))
+      }
+    })
+  })
+  
+  lapply(paste0(methods_inter_avail, "_inter_plot"), function(x){
+    output[[x]] <- renderPlotly({
+      # get possible ids to focus on
+      subj_ids <- subj_focus$subj_inter
+      if (length(subj_ids) > 0){
+        subjids <- sapply(strsplit(subj_ids, "/"), `[[`, 1)
+        # take caution if only a subject is entered
+        ids <- sapply(strsplit(subj_ids, "/"), function(x){
+          if (length(x) < 2){ "" } else { x[[2]] }
+        })
+        # get ids to focus on
+        focus_ids <- ids[subjids == input$inter_subj]
+        if (all(focus_ids == "")){
+          focus_ids <- c()
+        }
+      } else {
+        focus_ids <- c()
+      }
+      
+      plot_inter_cleaned(cleaned_inter_df$sub, input$inter_subj, 
+                         step = as.character(
+                           input[[paste0(tolower(input$inter_tabset), 
+                                              "_method_step")]]
+                           ),
+                         methods_chosen = tolower(input$inter_tabset),
+                         focus_ids = focus_ids,
+                         color_ans = input$inter_color_ans,
+                         iter_step = 
+                           if (tolower(input$inter_tabset) == 
+                               "growthcleanr-naive"){
+                             input[["growthcleanr-naive_iter_step"]]
+                           } else if (tolower(input$inter_tabset) == 
+                                      "muthalagu") {
+                             input$muthalagu_bucket_step
+                           } else {1})
+    })
+  })
+  
+  lapply(paste0(methods_inter_avail, "_inter_plot_legn"), function(x){
+    output[[x]] <- renderPlot({
+      plot_inter_cleaned(cleaned_inter_df$sub, input$inter_subj, 
+                         step = as.character(
+                           input[[paste0(tolower(input$inter_tabset), 
+                                         "_method_step")]]
+                         ),
+                         methods_chosen = tolower(input$inter_tabset),
+                         focus_ids = c(),
+                         color_ans = input$inter_color_ans,
+                         iter_step = 
+                           if (tolower(input$inter_tabset) == 
+                               "growthcleanr-naive"){
+                             input[["growthcleanr-naive_iter_step"]]
+                           } else if (tolower(input$inter_tabset) == 
+                                      "muthalagu") {
+                             input$muthalagu_bucket_step
+                           } else {1},
+                         legn = T)
+    })
+  })
+  
+  lapply(paste0(methods_inter_avail, "_inter_table"), function(x){
+    output[[x]] <- renderTable({
+      d <- suppressWarnings(event_data("plotly_hover", source = "inter_plot"))
+      hover_id <- if (!is.null(d)){ d$customdata } else { "none" }
+      
+      tab_inter_vals(cleaned_inter_df$sub, input$inter_subj,
+                     step = as.character(
+                       input[[paste0(tolower(input$inter_tabset), 
+                                     "_method_step")]]
+                     ),
+                     methods_chosen = tolower(input$inter_tabset),
+                     highlt = hover_id,
+                     color_ans = input$inter_color_ans,
+                     iter_step = 
+                       if (tolower(input$inter_tabset) == 
+                           "growthcleanr-naive"){
+                         input[["growthcleanr-naive_iter_step"]]
+                       } else if (tolower(input$inter_tabset) == 
+                                  "muthalagu") {
+                         input$muthalagu_bucket_step
+                       } else {1}
+                     )
+    },
+    striped = TRUE,
+    bordered = TRUE,
+    sanitize.text.function = function(x){x},
+    width = '100%',
+    colnames = FALSE)
+  })
   
   # output for 'about' tab ----
   

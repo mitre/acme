@@ -8,7 +8,9 @@
 
 # function to calculate the criteria to remove measurement based on difference
 # of record from mean compared to SD, provided that the SD is large enough
-remove_diff_from_sd <- function(subj_df, max_sd_of_mean){
+remove_diff_from_sd <- function(subj_df, max_sd_of_mean, 
+                                inter_vals = F, inter_df = data.frame(),
+                                step = "2", type = "h"){
   avg <- mean(subj_df$measurement)
   st_dev <- sd(subj_df$measurement)
   
@@ -22,7 +24,23 @@ remove_diff_from_sd <- function(subj_df, max_sd_of_mean){
     criteria <- rep(F, nrow(subj_df))
   }
   
-  return(criteria)
+  
+  # if using intermediate values, we want to keep some
+  if(inter_vals){
+    inter_df[as.character(subj_df$id), 
+             paste0("Step_", step, type, "_Difference_from_Mean")] <- 
+      abs(subj_df$measurement - avg)
+    inter_df[as.character(subj_df$id), 
+             paste0("Step_", step, type, "_SD")] <- 
+      st_dev
+    inter_df[as.character(subj_df$id), 
+             paste0("Step_", step, type, "_", max_sd_of_mean,"_of_Mean")] <- 
+      avg*max_sd_of_mean
+    inter_df[as.character(subj_df$id), 
+             paste0("Step_", step, type, "_Result")] <- criteria
+  }
+  
+  return(list("criteria" = criteria, "inter_df" = inter_df))
 }
 
 # implement littman, et al. ----
@@ -42,7 +60,7 @@ remove_diff_from_sd <- function(subj_df, max_sd_of_mean){
 #       or is implausible.
 #     reason, which specifies, for implausible values, the reason for exclusion,
 #       and the step at which exclusion occurred.
-littman_clean_both <- function(df){
+littman_clean_both <- function(df, inter_vals = F){
   # method specific constants ----
   # this includes specified cutoffs, etc.
   
@@ -53,15 +71,55 @@ littman_clean_both <- function(df){
   )
   rownames(biv_df) <- c("height", "weight", "bmi")
   
+  # intermediate value columns
+  inter_cols <- c(
+    "Step_1h_H_BIV_Low_Compare",
+    "Step_1h_H_BIV_High_Compare",
+    "Step_1h_Result",
+    "Step_1wa_W_BIV_Low_Compare",
+    "Step_1wa_W_BIV_High_Compare",
+    "Step_1wa_Result",
+    "Step_1wb_Rate_Change",
+    "Step_1wb_Change_More_Than_2lbs",
+    "Step_1wb_Change_More_Than_50lbs_Overall",
+    "Step_1wb_Change_More_Than_100lbs",
+    "Step_1wb_Result",
+    "Step_1bmi_BMI",
+    "Step_1bmi_BMI_BIV_Low_Compare",
+    "Step_1bmi_BMI_BIV_High_Compare",
+    "Step_1bmi_Result",
+    "Step_2w_Difference_from_Mean",
+    "Step_2w_SD",
+    "Step_2w_.1_of_Mean",
+    "Step_2w_Result",
+    "Step_2h_Difference_from_Mean",
+    "Step_2h_SD",
+    "Step_2h_.025_of_Mean",
+    "Step_2h_Result",
+    "Step_3h_Difference_from_Mean",
+    "Step_3h_SD",
+    "Step_3h_.025_of_Mean",
+    "Step_3h_Result"
+  )
+  
   # begin implementation ----
   
   # preallocate final designation
   df$result <- "Include"
   df$reason <- ""
   rownames(df) <- df$id
+  # if using intermediate values, preallocate values
+  if (inter_vals){
+    df[, inter_cols] <- NA
+  }
   # go through each subject
   for (i in unique(df$subjid)){
     slog <- df$subjid == i
+    
+    # if using intermediate values, we want to start storing them
+    # keep the ID to collate with the final dataframe
+    inter_df <- df[slog, "id", drop = F]
+    rownames(inter_df) <- inter_df$id
     
     # start by removing BIVs ----
     
@@ -91,6 +149,15 @@ littman_clean_both <- function(df){
     h_subj_keep[criteria] <- "Implausible"
     h_subj_reason[criteria] <- paste0("Erroneous, Step ",step)
     
+    # if using intermediate values, we want to keep some
+    if(inter_vals){
+      inter_df[as.character(h_subj_df$id), "Step_1h_H_BIV_Low_Compare"] <- 
+        remove_biv_low(h_subj_df, "height", biv_df)
+      inter_df[as.character(h_subj_df$id), "Step_1h_H_BIV_High_Compare"] <- 
+        remove_biv_high(h_subj_df, "height", biv_df)
+      inter_df[as.character(h_subj_df$id), "Step_1h_Result"] <- criteria
+    }
+    
     h_subj_df <- h_subj_df[!criteria,]
     
     # 1w, W BIV ----
@@ -103,9 +170,23 @@ littman_clean_both <- function(df){
     # criteria a) traditional weight biv removal
     criteria_a <- remove_biv(w_subj_df, "weight", biv_df)
     
+    # if using intermediate values, we want to keep some
+    if(inter_vals){
+      inter_df[as.character(w_subj_df$id), "Step_1wa_W_BIV_Low_Compare"] <- 
+        remove_biv_low(w_subj_df, "weight", biv_df)
+      inter_df[as.character(w_subj_df$id), "Step_1wa_W_BIV_High_Compare"] <- 
+        remove_biv_high(w_subj_df, "weight", biv_df)
+      inter_df[as.character(w_subj_df$id), "Step_1wa_Result"] <- criteria_a
+    }
+    
     # criteria b) rate change biv removal
     # preallocate
     criteria_b <- rep(F, nrow(w_subj_df))
+    
+    # if using intermediate values, we want to keep some
+    if(inter_vals){
+      inter_df[as.character(w_subj_df$id), "Step_1wb_Result"] <- criteria_b
+    }
     
     # need at least 2 values to compute rate change
     if (nrow(w_subj_df) >= 2){
@@ -144,6 +225,28 @@ littman_clean_both <- function(df){
       if (length(invalid_2) > 0){
         criteria_b[c(invalid_2, invalid_2+1)] <- T
       }
+      
+      # if using intermediate values, we want to keep some
+      if(inter_vals){
+        # the weight change is represented for the first and second values in
+        # the weight change
+        w_ch_inter <- paste0(c("", round(w_ch_per_week, 4)), 
+                             ", ",
+                             c(round(w_ch_per_week, 4)))
+        w_ch_inter[1] <- round(w_ch_per_week, 4)[1]
+        w_ch_inter[length(w_ch_inter)] <- 
+          round(w_ch_per_week, 4)[length(w_ch_per_week)]
+        inter_df[as.character(w_subj_df$id), "Step_1wb_Rate_Change"] <-
+          w_ch_inter
+        inter_df[as.character(w_subj_df$id), "Step_1wb_Change_More_Than_2lbs"] <-
+          c(w_ch_per_week > 2*.453592, F) | c(F, w_ch_per_week > 2*.453592)
+        inter_df[as.character(w_subj_df$id),
+                 "Step_1wb_Change_More_Than_50lbs_Overall"] <-
+          w_ch_overall > 50*.453592
+        inter_df[as.character(w_subj_df$id), "Step_1wb_Change_More_Than_100lbs"] <-
+          c(w_ch_per_week > 100*.453592, F) | c(F, w_ch_per_week > 100*.453592)
+        inter_df[as.character(w_subj_df$id), "Step_1wb_Result"] <- criteria_b
+      }
     }
     
     w_subj_keep[criteria_a | criteria_b] <- "Implausible"
@@ -159,9 +262,16 @@ littman_clean_both <- function(df){
     # /weights
     step <- "1bmi, BMI BIV"
     
+    # if intermediate values, remove the appended columns
+    if (inter_vals){
+      h_subj_df <- h_subj_df[, !colnames(h_df) %in% inter_cols]
+      w_subj_df <- w_subj_df[, !colnames(w_df) %in% inter_cols]
+    }
+    
     # possible removal of height/weights by bmi
     # x = height, y = weight
-    comb_df <- merge(h_subj_df, w_subj_df, by = "age_years", all = T)
+    comb_df <- comb_df_orig <- 
+      merge(h_subj_df, w_subj_df, by = "age_years", all = T)
     # remove ones that don't match
     comb_df <- comb_df[complete.cases(comb_df),]
     # also remove ones that are not plausible
@@ -185,6 +295,21 @@ littman_clean_both <- function(df){
       w_subj_reason[as.character(comb_df$id.y)] <- 
         h_subj_reason[as.character(comb_df$id.x)] <- comb_df$tot_reason
       
+      if(inter_vals){
+        inter_df[as.character(comb_df$id.y), "Step_1bmi_BMI"] <- 
+          inter_df[as.character(comb_df$id.x), "Step_1bmi_BMI"] <- 
+          comb_df$measurement
+        inter_df[as.character(comb_df$id.y), "Step_1bmi_BMI_BIV_Low_Compare"] <- 
+          inter_df[as.character(comb_df$id.x), "Step_1bmi_BMI_BIV_Low_Compare"] <- 
+          remove_biv_low(comb_df, "bmi", biv_df)
+        inter_df[as.character(comb_df$id.y), "Step_1bmi_BMI_BIV_High_Compare"] <- 
+          inter_df[as.character(comb_df$id.x), "Step_1bmi_BMI_BIV_High_Compare"] <- 
+          remove_biv_high(comb_df, "bmi", biv_df)
+        inter_df[as.character(comb_df$id.y), "Step_1bmi_Result"] <- 
+          inter_df[as.character(comb_df$id.x), "Step_1bmi_Result"] <- 
+          bmi_biv
+      }
+      
       # subset height and weight data
       w_subj_df[unique(as.character(comb_df$id.y)),] <- 
         w_subj_df[unique(as.character(comb_df$id.y)),][
@@ -192,6 +317,25 @@ littman_clean_both <- function(df){
       h_subj_df[unique(as.character(comb_df$id.x)),] <- 
         h_subj_df[unique(as.character(comb_df$id.x)),][
           comb_df$tot_res[!duplicated(comb_df$id.x)] == "Include",]
+    }
+    
+    if (inter_vals){
+      # we also want to add a "not calculated" for ones that didn't have a 
+      # corresponding height/weight
+      comb_df_orig <- comb_df_orig[
+        !(comb_df_orig$result.x == "Include" & comb_df_orig$result.y == "Include") |
+          !complete.cases(comb_df_orig),]
+      # remove any that were both already implausible
+      comb_df_orig <- comb_df_orig[
+        (comb_df_orig$result.x != "Implausible" | 
+           comb_df_orig$result.y != "Implausible") %in% T,
+      ]
+      ind <- as.character(c(
+        comb_df_orig$id.y[comb_df_orig$result.y == "Include"], 
+        comb_df_orig$id.x[comb_df_orig$result.x == "Include"]
+      ))
+      ind <- ind[!is.na(ind)]
+      inter_df[ind, "Step_1bmi_Result"] <- "Not Calculated"
     }
     
     # 2, remove erroneous values based on SD ----
@@ -205,7 +349,10 @@ littman_clean_both <- function(df){
     
     # to compute standard deviation, you need at least 2 plausible values
     if (nrow(w_subj_df) > 1){
-      criteria <- remove_diff_from_sd(w_subj_df, .1)
+      criteria_list <- remove_diff_from_sd(
+        w_subj_df, .1, inter_vals, inter_df, step = "2", type = "w")
+      criteria <- criteria_list$criteria
+      inter_df <- criteria_list$inter_df
       
       w_subj_keep[as.character(w_subj_df$id[criteria])] <- "Implausible"
       w_subj_reason[as.character(w_subj_df$id[criteria])] <- paste0("Erroneous, Step ", step)
@@ -223,7 +370,10 @@ littman_clean_both <- function(df){
     
     # to compute standard deviation, you need at least 2 plausible values
     if (nrow(h_subj_df) > 1){
-      criteria <- remove_diff_from_sd(h_subj_df, .025)
+      criteria_list <- remove_diff_from_sd(
+        h_subj_df, .025, inter_vals, inter_df, step = "2", type = "h")
+      criteria <- criteria_list$criteria
+      inter_df <- criteria_list$inter_df
       
       h_subj_keep[as.character(h_subj_df$id[criteria])] <- "Implausible"
       h_subj_reason[as.character(h_subj_df$id[criteria])] <- paste0("Erroneous, Step ", step)
@@ -244,8 +394,17 @@ littman_clean_both <- function(df){
         sapply(orig_h_subj_df$measurement, function(x){abs(x-avg_h)})
       )
       # remove most deviant height and rerun the algorithm
+      if (inter_vals){
+        inter_df[as.character(orig_h_subj_df$id[most_dev]), "Step_3h_Result"] <- 
+          "Not Calculated"
+      }
       orig_h_subj_df <- orig_h_subj_df[-most_dev,]
+      
       criteria <- remove_diff_from_sd(orig_h_subj_df, .025)
+      criteria_list <- remove_diff_from_sd(
+        orig_h_subj_df, .025, inter_vals, inter_df, step = "3", type = "h")
+      criteria <- criteria_list$criteria
+      inter_df <- criteria_list$inter_df
       
       h_subj_keep[as.character(orig_h_subj_df$id[criteria])] <- "Implausible"
       h_subj_reason[as.character(orig_h_subj_df$id[criteria])] <- 
@@ -259,6 +418,11 @@ littman_clean_both <- function(df){
     df[as.character(names(w_subj_reason)), "reason"] <- w_subj_reason
     df[as.character(names(h_subj_keep)), "result"] <- h_subj_keep
     df[as.character(names(h_subj_reason)), "reason"] <- h_subj_reason
+    
+    # if we're using intermediate values, we want to save them
+    if (inter_vals){
+      df[as.character(inter_df$id), colnames(inter_df)[-1]] <- inter_df[,-1]
+    }
   }
   
   return(df)
