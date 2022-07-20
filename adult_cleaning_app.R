@@ -30,9 +30,9 @@ setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 # load default data - fake 
 # dat <- read.csv(file.path("Data", "adult_synthetic_data_seed_8.csv"))
-dat <- read.csv(file.path("Data", "synthea-adults-sub-100subj.csv"))
+dat <- read.csv(file.path("Data", "adult", "synthea-adults-sub-100subj.csv"))
 dat_res <- read.csv(
-  file.path("Data", "Adult_EHR_Cleaning_Results_data_example.csv")
+  file.path("Data", "adult", "Adult_EHR_Cleaning_Results_data_example.csv")
 )
 
 # add "answers" (completely made up), as an example
@@ -53,7 +53,7 @@ sourceDir <- function(path, trace = TRUE, ...) {
   }
 }
 
-sourceDir("EHR_Cleaning_Implementations")
+sourceDir(file.path("EHR_Cleaning_Implementations", "adult"))
 
 # supporting data ----
 
