@@ -1,20 +1,19 @@
 ################################################################################
-# yang_hutcheon_2015.R: Implementation of paper to compare data cleaning 
+# yang_hutcheon_2015.R: Implementation of paper to compare data cleaning
 # algorithms for infant data. Original paper is by Seungmi Yang and Jennifer
-# Hutcheon and uses conditional growth percentiles "to systematically identify 
-# implausible measurements in growth trajectory data". The conditional growth 
+# Hutcheon and uses conditional growth percentiles "to systematically identify
+# implausible measurements in growth trajectory data". The conditional growth
 # percentiles are computed using a random effects model. The algorithm in the
 # original paper is used to clean data for children from birth to 6.5 years old.
-# The code below is an R implementation of the author's original Stata code 
+# The code below is an R implementation of the author's original Stata code
 # (contained in Appendix A) of the paper. The original paper is available at:
 # https://www.sciencedirect.com/science/article/pii/S1047279715004184?viewFullText=true
-# 
+#
 # @author = Max Olivier
 ################################################################################
 
 # Import necessary libraries
 library(dplyr)
-library(dbplyr) 
 library(ggplot2)
 library(hrbrthemes)
 library(miceadds)
@@ -24,7 +23,7 @@ library(data.table)
 
 ################################################################################
 # Import and clean data----
-# At end data should be in three colummns: ID for 
+# At end data should be in three colummns: ID for
 ################################################################################
 
 # Import synthetic data set for testing.
@@ -35,9 +34,6 @@ dat <- fread("C:/Users/molivier/Documents/Projects/CDC_CODI/Data_sets/gc-observa
 # algorithm uses weight data) and drop all the columns
 df <- dat[param=="WEIGHTKG", c("subjid", "measurement", "sex",  "age_days")]
 
-
-
-
 ################################################################################
 # Drop missing observations and sort data.----
 ################################################################################
@@ -45,136 +41,70 @@ df <- dat[param=="WEIGHTKG", c("subjid", "measurement", "sex",  "age_days")]
 df <- df[!(is.na(df$measurement) | is.na(df$age_days)),]
 df <- df[order(df$subjid, df$age_days),]
 
-# Doesn't work
-df$visit <- data.table::rowid(df$dubjid)
-
-# Works
+# Generate a variable that indexes the visits for each subject.
 df[, visit := seq_len(.N), by=subjid]
 df[, visit := rowid(subjid)]
 
-# Other alternatives to generate the visit variable.
-# df$num <- ave(df$val, df$cat, FUN = seq_along)
-# df %>% group_by(cat) %>% mutate(id = row_number())
-# df$num <- sequence(rle(df$cat)$lengths) with as.character() around cat if it is a factor var
-# df %>% arrange(cat, val) %>% group_by(cat) %>% mutate(id = row_number())
-# df %>% group_by(cat) %>% mutate(num = 1:n())
-# df$num <- data.table::rowid(df$cat)
-# For entire data frame: iris %>% mutate(row_num = seq_along(Sepal.Length))
-# For groups: iris %>% group_by(Species) %>% mutate(num_in_group=seq_along(Species)) %>% as.data.frame
-
-
 # Include cubic spline, though not sure what this is for
 
-# Random effects model for unconditional mean weight by age (equation 1 from 
+# Random effects model for unconditional mean weight by age (equation 1 from
 # Appendix A)
 model = lmer(measurement ~ (1 + age_days | subjid) + age_days, data=df, REML = FALSE)
 
-
-# Get predicited value
+# Get predicited value of weight for each subject at each time.
 df$uncond_mean <- predict(model)
 
-summary(model)
+# Level 1 residual variance
+resid_var <- summary(model)$sigma^2
 
-str(model)
+# Pull out the variance/covariance matrix and the variances for the individual
+# random effects.
+vcov_mat <- VarCorr(model)$subjid
+cons_var <- vcov_mat[2,2]
+slope_var <- vcov_mat[1,1]
+cons_slope_cov <- vcov_mat[1,2]
 
-summary(model12)
+# Get the unconditional variance for each observation.
+df$uncond_var <- cons_var + slope_var*df$age_days^2 +
+  2*df$age_days*cons_slope_cov + resid_var
 
-X <- VarCorr(model)
+# Get conditional centiles.
 
+# Store a value for "last minus 1", the second to last index in the data frame
+# since it will be used a lot.
+#Lm1 <- nrow(df)-1
 
-str(summary(model)$varcor)
+# Covariance between successive observations. First get vector of lagged ages
+# since it will be used a lot.
+lag_age <- c(NA, df$age_days[1:nrow(df)-1])
+df$cov12 = cons_var + lag_age*cons_slope_cov + lag_age*df$age_days*slope_var
 
+# All the cases where visit is 1 are not valid, so make those NA.
+df$cov12[df$visit==1] <- NA
 
+# Get conditional mean (equation 3 from paper).
+df$cond_mean <- df$uncond_mean +
+              c(NA, (df$measurement-df$uncond_mean)[1:nrow(df)-1])*
+              df$cov12/c(NA, df$uncond_var[1:nrow(df)-1])
 
+# And conditional variance (equation 4 from paper).
+df$cond_var <- df$uncond_var-(df$cov12^2/c(NA, df$uncond_var[1:nrow(df)-1]))
 
+# Identifying outliers.
+outliers <- (df$measurement > df$cond_mean+4*sqrt(df$cond_var)) |
+  (df$measurement < df$cond_mean-4*sqrt(df$cond_var))
+df$outlier <- "not outlier"
+df$outlier[outliers] <- "outlier"
+#df$outlier[df$visit==1] <- NA
 
-# Run Hierarchical Linear Models ----
+# Remove second outlier if you have two outliers in succession. DO WE WANT THIS?
+second_outlier <- df$outlier == "outlier" & c(NA, df$outlier[1:nrow(df)-1])=="outlier"
 
-library(lme4)
-library(lmerTest)
+df$outlier[second_outlier] <- "not outlier"
 
-pl_local <- as.data.frame(personlevel)
-pl_local$eri <- factor(pl_local$eri,
-                       levels=c("White", "AAPI", "Black", "Hispanic", "Native",
-                                "Other"))
-pl_local$year <- factor(pl_local$year)
+# Quick check for number of second outliers. This is not part of algorithm.
+sum(second_outlier, na.rm = TRUE)
 
-pl_local %>% select(year) %>% group_by(year) %>% count()
+table(second_outlier)
 
-head(pl_local)
-
-## Dependent variable: PERFORMANCE ----
-
-model1=lmer(score ~ (1 | year), data=pl_local, REML = FALSE)
-summary(model1)
-
-model2=lmer(score ~ (1 + unionize | year) + pay_plan_desc + sex_cd + age 
-            + years_federal + promotion + rec_work_pos + sat_job_pos + sat_pay_pos + sat_tel_pos 
-            + sat_wl_pos + eri + veteran_status + supervisor_status + unionize,
-            data=pl_local,
-            REML = TRUE)
-summary(model2)
-
-
-model2 <- lm(score ~ year, data=pl_local)
-summary(model2)
-
-
-
-
-model2 <- lm(score ~ year+pay_plan_desc + sex_cd + age 
-             + years_federal + promotion + rec_work_pos + sat_job_pos + sat_pay_pos + sat_tel_pos 
-             + sat_wl_pos + eri + veteran_status + supervisor_status + unionize, data=pl_local)
-summary(model2)
-
-
-
-### Random intercept only model 
-model11=lmer(score ~ (1 | center) + pay_plan_desc + sex_cd + age 
-             + years_federal + promotion + rec_work_pos + sat_job_pos + sat_pay_pos + sat_tel_pos 
-             + sat_wl_pos + eri + veteran_status + supervisor_status + unionize,
-             data=pl_local,
-             REML = FALSE)
-
-summary(model11)
-
-### Mixed effects model
-model12=lmer(score ~ (1 + sex_cd + unionize | center) + pay_plan_desc + sex_cd + age 
-             + years_federal + promotion + rec_work_pos + sat_job_pos + sat_pay_pos + sat_tel_pos 
-             + sat_wl_pos + eri + veteran_status + supervisor_status + unionize,
-             data=pl_local,
-             REML = TRUE)
-
-summary(model12)
-
-
-## Dependent variable: RETIREMENT ----
-
-# personlevel_retire <- pl_local[pl_local['retirement_elig'] == 1, ]
-# 
-# model2 <- glmer(formula = retirement ~ (1 | center) + pay_plan_desc + sex_cd + age + job_fam
-#                 + years_federal + promotion + rec_work_pos + sat_job_pos + sat_pay_pos + sat_tel_pos 
-#                 + sat_wl_pos + eri + veteran_status + supervisor_status + unionize,
-#                 family = binomial(link="logit"),
-#                 data = personlevel_retire,
-#                 control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun=2e5)))
-# 
-# summary(model2)
-
-
-## Dependent variable: RESIGNATION ----
-
-# personlevel_resign <- pl_local[pl_local['retirement_elig'] == 0, ]
-# 
-# model3 <- glmer(formula = resignation ~ (1 | center) + pay_plan_desc + sex_cd + age + job_fam
-#                 + years_federal + retirement_elig + promotion + rec_work_pos + sat_job_pos + sat_pay_pos + sat_tel_pos
-#                 + sat_wl_pos + eri + veteran_status + supervisor_status + unionize,
-#                 family = binomial(link="logit"),
-#                 data = pl_local,
-#                 control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun=2e5)))
-# 
-# summary(model3)
-
-
-# Disconnect from database ----
-dbDisconnect(con)
+table(df$outlier)
