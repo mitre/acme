@@ -13,98 +13,166 @@
 ################################################################################
 
 # Import necessary libraries
-library(dplyr)
-library(ggplot2)
-library(hrbrthemes)
-library(miceadds)
-library(broom)
 library(lme4)
-library(data.table)
 
-################################################################################
-# Import and clean data----
-# At end data should be in three colummns: ID for
-################################################################################
+# function to clean weight data by yang, et al.
+# inputs:
+# df: data frame with 7 columns:
+#   id: row id, must be unique
+#   subjid: subject id
+#   sex: sex of subject
+#   age_days: age, in days
+#   param: HEIGHTCM or WEIGHTKG
+#   measurement: height or weight measurement
+# inter_vals: boolean, return intermediate values
+# outputs:
+#   df, with additional columns:
+#     result, which specifies whether the height measurement should be included,
+#       or is implausible.
+#     reason, which specifies, for implausible values, the reason for exclusion,
+#       and the step at which exclusion occurred.
+#     intermediate value columns, if specified
+yang_clean_wt <- function(df, inter_vals = F){
+  
+  # method specific constants ----
+  
+  inter_cols <- c(
+    "Step_1w_W_Unconditional_Mean",
+    "Step_1w_W_Unconditional_Variance", 
+    "Step_1w_W_Covariance", 
+    "Step_1w_W_Conditional_Mean", 
+    "Step_1w_W_Conditional_Variance", 
+    "Step_1w_W_4_SD", 
+    "Step_1w_W_Mean_plus_4_SD", 
+    "Step_1w_W_Mean_minus_4_SD",
+    "Step_1w_Result"
+  )
+  
+  # begin implementation ----
+  
+  # preallocate final designation
+  df$result <- "Unknown" # preallocating for heights -- not used
+  df$reason <- ""
+  rownames(df) <- df$id
+  # if using intermediate values, preallocate values
+  if (inter_vals){
+    df[, inter_cols] <- NA
+  }
+  
+  # if using intermediate values, we want to start storing them
+  # keep the ID to collate with the final dataframe
+  inter_df <- df[, "id", drop = F]
+  rownames(inter_df) <- inter_df$id
+  
+  # in order not to add additional columns to output (unless called for),
+  # we create a dataframe to use for computation
+  subj_df <- df
+  
+  # 1w, W conditional growth percentiles ----
+  # 1w: calculate conditional growth percentiles using a random effects model,
+  # using conditional mean weights and 4 SD range for an individual's weight. if
+  # weight measurement is >+/- 4SD, classify as outlier.
+  step <- "1w, W conditional growth percentiles"
+  
+  # filter down to weights only
+  subj_df <- subj_df[subj_df$param == "WEIGHTKG",]
+  subj_df$result <- "Include"
+  
+  # Drop missing observations and sort data
+  subj_df <- subj_df[!(is.na(subj_df$measurement) | is.na(subj_df$age_days)),]
+  subj_df <- subj_df[order(subj_df$subjid, subj_df$age_days),]
+  
+  # Generate a variable that indexes the visits for each subject.
+  subj_df$visit <- ave(1:nrow(subj_df), subj_df$subjid, FUN = seq_along)
+  
+  # Random effects model for unconditional mean weight by age (equation 1 from
+  # Appendix A)
+  model <- suppressWarnings(
+    lmer(measurement ~ (1 + age_days | subjid) + age_days, 
+         data = subj_df, 
+         REML = FALSE)
+  )
+  
+  # Get predicited value of weight for each subject at each time.
+  subj_df$uncond_mean <- predict(model)
+  
+  # Level 1 residual variance
+  resid_var <- summary(model)$sigma^2
+  
+  # Pull out the variance/covariance matrix and the variances for the individual
+  # random effects.
+  vcov_mat <- VarCorr(model)$subjid
+  cons_var <- vcov_mat[2,2]
+  slope_var <- vcov_mat[1,1]
+  cons_slope_cov <- vcov_mat[1,2]
+  
+  # Get the unconditional variance for each observation.
+  subj_df$uncond_var <- cons_var + slope_var*subj_df$age_days^2 +
+    2*subj_df$age_days*cons_slope_cov + resid_var
+  
+  # Get conditional centiles
+  
+  # Covariance between successive observations. First get vector of lagged ages
+  # since it will be used a lot.
+  lag_age <- c(NA, subj_df$age_days[1:nrow(subj_df)-1])
+  subj_df$cov12 <- cons_var + lag_age*cons_slope_cov + lag_age*subj_df$age_days*slope_var
+  
+  # All the cases where visit is 1 are not valid, so make those NA.
+  subj_df$cov12[subj_df$visit==1] <- NA
+  
+  # Get conditional mean (equation 3 from paper).
+  subj_df$cond_mean <- subj_df$uncond_mean +
+    c(NA, (subj_df$measurement-subj_df$uncond_mean)[1:nrow(subj_df)-1])*
+    subj_df$cov12/c(NA, subj_df$uncond_var[1:nrow(subj_df)-1])
+  
+  # And conditional variance (equation 4 from paper).
+  subj_df$cond_var <- subj_df$uncond_var-(subj_df$cov12^2/c(NA, subj_df$uncond_var[1:nrow(subj_df)-1]))
+  
+  # Identifying outliers.
+  outliers <- (subj_df$measurement > subj_df$cond_mean+4*sqrt(subj_df$cond_var)) |
+    (subj_df$measurement < subj_df$cond_mean-4*sqrt(subj_df$cond_var))
+  subj_df$result[outliers] <- "Implausible"
+  subj_df$reason[outliers] <- paste0("Outlier, Step ", step)
+  
+  # Remove second outlier if you have two outliers in succession.
+  second_outlier <- subj_df$outlier == "Implausible" & 
+    c(NA, subj_df$result[1:nrow(subj_df)-1])=="Implausible"
+  
+  subj_df$result[second_outlier] <- "Include"
+  subj_df$reason[second_outlier] <- ""
+  
+  # add intermediate values
+  if (inter_vals){
+    inter_df[as.character(subj_df$id), "Step_1w_W_Unconditional_Mean"] <-
+      subj_df$uncond_mean
+    inter_df[as.character(subj_df$id), "Step_1w_W_Unconditional_Variance"] <-
+      subj_df$uncond_var
+    inter_df[as.character(subj_df$id), "Step_1w_W_Covariance"] <-
+      subj_df$cov12
+    inter_df[as.character(subj_df$id), "Step_1w_W_Conditional_Mean"] <-
+      subj_df$cond_mean
+    inter_df[as.character(subj_df$id), "Step_1w_W_Conditional_Variance"] <-
+      subj_df$cond_var
+    inter_df[as.character(subj_df$id), "Step_1w_W_4_SD"] <-
+      4*sqrt(subj_df$cond_var)
+    inter_df[as.character(subj_df$id), "Step_1w_W_Mean_plus_4_SD"] <-
+      subj_df$cond_mean+4*sqrt(subj_df$cond_var)
+    inter_df[as.character(subj_df$id), "Step_1w_W_Mean_minus_4_SD"] <-
+      subj_df$cond_mean-4*sqrt(subj_df$cond_var)
+    inter_df[as.character(subj_df$id), "Step_1w_Result"] <- F
+    inter_df[as.character(subj_df$id)[subj_df$result == "Implausible"], 
+             "Step_1w_Result"] <- T
+  }
+  
+  # add results to full dataframe
+  df[rownames(subj_df), c("result", "reason")] <- subj_df[, c("result", "reason")]
+  
+  # if we're using intermediate values, we want to save them
+  if (inter_vals){
+    df[as.character(inter_df$id), colnames(inter_df)[-1]] <- inter_df[,-1]
+  }
+  
+  return(df)
+}
 
-# Import synthetic data set for testing.
 
-dat <- fread("C:/Users/molivier/Documents/Projects/CDC_CODI/Data_sets/gc-observations.csv")
-
-# Filter out the data in several ways. Just keep weight data (since original
-# algorithm uses weight data) and drop all the columns
-df <- dat[param=="WEIGHTKG", c("subjid", "measurement", "sex",  "age_days")]
-
-################################################################################
-# Drop missing observations and sort data.----
-################################################################################
-
-df <- df[!(is.na(df$measurement) | is.na(df$age_days)),]
-df <- df[order(df$subjid, df$age_days),]
-
-# Generate a variable that indexes the visits for each subject.
-df[, visit := seq_len(.N), by=subjid]
-df[, visit := rowid(subjid)]
-
-# Include cubic spline, though not sure what this is for
-
-# Random effects model for unconditional mean weight by age (equation 1 from
-# Appendix A)
-model = lmer(measurement ~ (1 + age_days | subjid) + age_days, data=df, REML = FALSE)
-
-# Get predicited value of weight for each subject at each time.
-df$uncond_mean <- predict(model)
-
-# Level 1 residual variance
-resid_var <- summary(model)$sigma^2
-
-# Pull out the variance/covariance matrix and the variances for the individual
-# random effects.
-vcov_mat <- VarCorr(model)$subjid
-cons_var <- vcov_mat[2,2]
-slope_var <- vcov_mat[1,1]
-cons_slope_cov <- vcov_mat[1,2]
-
-# Get the unconditional variance for each observation.
-df$uncond_var <- cons_var + slope_var*df$age_days^2 +
-  2*df$age_days*cons_slope_cov + resid_var
-
-# Get conditional centiles.
-
-# Store a value for "last minus 1", the second to last index in the data frame
-# since it will be used a lot.
-#Lm1 <- nrow(df)-1
-
-# Covariance between successive observations. First get vector of lagged ages
-# since it will be used a lot.
-lag_age <- c(NA, df$age_days[1:nrow(df)-1])
-df$cov12 = cons_var + lag_age*cons_slope_cov + lag_age*df$age_days*slope_var
-
-# All the cases where visit is 1 are not valid, so make those NA.
-df$cov12[df$visit==1] <- NA
-
-# Get conditional mean (equation 3 from paper).
-df$cond_mean <- df$uncond_mean +
-              c(NA, (df$measurement-df$uncond_mean)[1:nrow(df)-1])*
-              df$cov12/c(NA, df$uncond_var[1:nrow(df)-1])
-
-# And conditional variance (equation 4 from paper).
-df$cond_var <- df$uncond_var-(df$cov12^2/c(NA, df$uncond_var[1:nrow(df)-1]))
-
-# Identifying outliers.
-outliers <- (df$measurement > df$cond_mean+4*sqrt(df$cond_var)) |
-  (df$measurement < df$cond_mean-4*sqrt(df$cond_var))
-df$outlier <- "not outlier"
-df$outlier[outliers] <- "outlier"
-#df$outlier[df$visit==1] <- NA
-
-# Remove second outlier if you have two outliers in succession. DO WE WANT THIS?
-second_outlier <- df$outlier == "outlier" & c(NA, df$outlier[1:nrow(df)-1])=="outlier"
-
-df$outlier[second_outlier] <- "not outlier"
-
-# Quick check for number of second outliers. This is not part of algorithm.
-sum(second_outlier, na.rm = TRUE)
-
-table(second_outlier)
-
-table(df$outlier)
