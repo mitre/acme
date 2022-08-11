@@ -7,6 +7,8 @@
 
 vers_infants_ehr <- "0.0.1"
 
+options(shiny.maxRequestSize=50*1024^2)
+
 # load libraries, scripts, and data ----
 
 library(shiny)
