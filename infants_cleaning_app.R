@@ -89,7 +89,7 @@ methods_inter_avail <- c("yang")
 
 # types cleaned for each method
 m_inter_types <- list(
-  "HEIGHTCM" = c("yang"),
+  "HEIGHTCM" = c(),
   "WEIGHTKG" = c("yang")
 )
 
@@ -1075,12 +1075,13 @@ plot_methods_corr <- function(cleaned_df, type,
          colnames(clean_df) %in% paste0(m_for_type, "_result"))
   ]
   
-  if (nrow(clean_df) == 0){
+  # if there's no data or there's no methods
+  if (nrow(clean_df) == 0 | all(!grepl("_result", colnames(clean_df)))){
     return(ggplotly(ggplot()+theme_bw()))
   }
   
   # get columns for correlation
-  corr_df <- clean_df[, grepl("_result", colnames(clean_df))]
+  corr_df <- clean_df[, grepl("_result", colnames(clean_df)), drop = F]
   colnames(corr_df) <- simpleCap(gsub("_result","",colnames(corr_df)))
   corr_df[corr_df == "Include"] <- 0
   corr_df[corr_df == "Implausible"] <- 1
@@ -2342,8 +2343,8 @@ server <- function(input, output, session) {
       if (is.null(df$id) || length(unique(df$id)) != nrow(df)){
         df$id <- 1:nrow(df)
       }
-      # filter out data less than 18
-      df <- df[df$age_years >= 18, ]
+      # filter out data greater than 18
+      df <- df[df$age_years <= 18, ]
       
       # run each method and save the results
       c_df <- df
