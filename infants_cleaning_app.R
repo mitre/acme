@@ -74,11 +74,11 @@ methods_avail <- c("yang")
 
 # types cleaned for each method
 m_types <- list(
-  "HEIGHTCM" = methods_avail[-1],
+  "HEIGHTCM" = methods_avail,
   "WEIGHTKG" = methods_avail
 )
 
-methods_func <- list(yang_clean_wt)
+methods_func <- list(yang_clean_both)
 names(methods_func) <- methods_avail
 
 # method colors
@@ -91,27 +91,29 @@ methods_inter_avail <- c("yang")
 
 # types cleaned for each method
 m_inter_types <- list(
-  "HEIGHTCM" = c(),
+  "HEIGHTCM" = c("yang"),
   "WEIGHTKG" = c("yang")
 )
 
-methods_inter_func <- list(yang_clean_wt)
+methods_inter_func <- list(yang_clean_both)
 names(methods_inter_func) <- methods_inter_avail
 
 # list of steps for each method
 m_inter_steps <- list(
-  "yang" = c("1w")
+  "yang" = c("1w", "1h")
 )
 
 m_inter_steps_full_title <- list(
   "yang" = c(
-    "1w" = "1w: W conditional growth percentiles"
+    "1w" = "1w: W conditional growth percentiles",
+    "1h" = "1h: H conditional growth percentiles"
   )
 )
 
 m_inter_steps_full_subtitle <- list(
   "yang" = c(
-    "1w" = "1w: Calculate conditional growth percentiles using a random effects model, using conditional mean weights and 4 SD range for an individual's weight. If weight measurement is outside mean +/- 4SD, classify as outlier."
+    "1w" = "1w: Calculate conditional growth percentiles using a random effects model, using conditional mean weights and 4 SD range for an individual's weight. If weight measurement is outside mean +/- 4SD, classify as outlier.",
+    "1h" = "1h: Calculate conditional growth percentiles using a random effects model, using conditional mean heights and 4 SD range for an individual's height. If height measurement is outside mean +/- 4SD, classify as outlier."
   )
 )
 
@@ -2207,8 +2209,10 @@ ui <- navbarPage(
               hr(),
               HTML(
                 "<h4>Steps:</h4>",
-                "<b>Step 1, W conditional growth percentiles</b><br>",
-                "<ul><li>Calculate conditional growth percentiles using a random effects model, using conditional mean weights and 4 SD range for an individual's weight. If weight measurement is greater than 4 SD above mean or less than 4 SD below mean, classify as outlier.</li></ul>"
+                "<b>Step 1w, W conditional growth percentiles</b><br>",
+                "<ul><li>Calculate conditional growth percentiles using a random effects model, using conditional mean weights and 4 SD range for an individual's weight. If weight measurement is greater than 4 SD above mean or less than 4 SD below mean, classify as outlier.</li></ul>",
+                "<b>Step 1h, H conditional growth percentiles</b><br>",
+                "<ul><li>Calculate conditional growth percentiles using a random effects model, using conditional mean heights and 4 SD range for an individual's height. If height measurement is greater than 4 SD above mean or less than 4 SD below mean, classify as outlier.</li></ul>"
               )
             ),
             column(width = 3)
