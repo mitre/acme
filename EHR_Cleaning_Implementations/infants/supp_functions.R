@@ -2,6 +2,10 @@
 # By Hannah De los Santos, Max Olivier
 # Originated on: 8/23/2022
 
+# required libraries ----
+
+library(data.table)
+
 # functions for all ----
 
 # based on read_anthro (growthcleanr): function to calculate z-scores and 
@@ -13,7 +17,7 @@
 #   sex: sex of subject
 #   measurement: height or weight measurement
 #   csd: include csd value
-# outputs: returns data table with standardized infant scores
+# outputs: returns vector of standardized infant scores
 get_standardized_infant_scores <- function(param, agedays, sex, measurement,
                                            csd = F) {
   # Pull in the needed files for the data.

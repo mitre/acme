@@ -16,126 +16,196 @@
 # @author = Max Olivier
 ################################################################################
 
-# Import library used (though it isn't required, could do without data.table).
-library(data.table)
+# function to clean height and weight data by carsley, et al.
+# inputs:
+# df: data frame with 7 columns:
+#   id: row id, must be unique
+#   subjid: subject id
+#   sex: sex of subject
+#   age_days: age, in days
+#   param: HEIGHTCM or WEIGHTKG
+#   measurement: height or weight measurement
+# inter_vals: boolean, return intermediate values
+# outputs:
+#   df, with additional columns:
+#     result, which specifies whether the height measurement should be included,
+#       or is implausible.
+#     reason, which specifies, for implausible values, the reason for exclusion,
+#       and the step at which exclusion occurred.
+#     intermediate value columns, if specified
 
-################################################################################
-# Import and clean data for testing----
-# Algorithm needs subject ID, age in days, measurement type (param) and z-scores
-# to identify outliers, but since we start with raw data, also need sex so that
-# we can get z-scpores. For-age-z-scores of measurement are created from WHO
-# values (reference 20 in paper). Data should be in long format.
-################################################################################
+carsley_clean_both <- function(df, inter_vals = F){
+  
+  # method specific constants ----
+  
+  # same step for both height and weight (originally in weight)
+  
+  inter_cols <- c(
+    "Step_1w_W_Unconditional_Mean",
+    "Step_1w_W_Unconditional_Variance", 
+    "Step_1w_W_Covariance", 
+    "Step_1w_W_Conditional_Mean", 
+    "Step_1w_W_Conditional_Variance", 
+    "Step_1w_W_4_SD", 
+    "Step_1w_W_Mean_plus_4_SD", 
+    "Step_1w_W_Mean_minus_4_SD",
+    "Step_1w_Result",
+    "Step_1h_H_Unconditional_Mean",
+    "Step_1h_H_Unconditional_Variance", 
+    "Step_1h_H_Covariance", 
+    "Step_1h_H_Conditional_Mean", 
+    "Step_1h_H_Conditional_Variance", 
+    "Step_1h_H_4_SD", 
+    "Step_1h_H_Mean_plus_4_SD", 
+    "Step_1h_H_Mean_minus_4_SD",
+    "Step_1h_Result"
+  )
+  
+  # begin implementation ----
+  
+  # preallocate final designation
+  df$result <- "Include" 
+  df$reason <- ""
+  rownames(df) <- df$id
+  # if using intermediate values, preallocate values
+  if (inter_vals){
+    df[, inter_cols] <- NA
+  }
+  
+  # if using intermediate values, we want to start storing them
+  # keep the ID to collate with the final dataframe
+  inter_df <- df[, "id", drop = F]
+  rownames(inter_df) <- inter_df$id
+  
+  # in order not to add additional columns to output (unless called for),
+  # we create a dataframe to use for computation
+  all_df <- df
+  
+  # preprocessing ----
+  
+  # Create standardized measurement. Assumes function is already loaded.
+  all_df$stdz_meas <- get_standardized_infant_scores(
+    all_df$param, all_df$age_days, all_df$sex, all_df$measurement
+  )
+  
+  # Sort data by subject, param, and age.
+  all_df <- all_df[order(all_df$subjid, all_df$param, all_df$age_days),]
+  
+  # Generate variables label outliers and "invalid inliers".
+  all_df$outlier <- all_df$invalid_inlier <- NA
+  
+  # 1h, H BIV ----
+  # 1h: Outliers are taken to be values where the z-score is outside of the 
+  # interval [-6, 6] for height.
+  step <- "1h, H BIV"
+  
+  ht_subset <- all_df$param=="HEIGHTCM" & !is.na(all_df$stdz_meas)
+  all_df$outlier[ht_subset] <- abs(all_df$stdz_meas[ht_subset]) > 6
+  
+  all_df[ht_subset & all_df$outlier, "result"] <- "Implausible"
+  all_df[ht_subset & all_df$outlier, "reason"] <- 
+    paste0("Implausible, Step ", step)
+  
+  # 1w, W BIV ----
+  # 1w: Outliers are taken to be values where the z-score is outside of the 
+  # interval [-6, 5] for weight.
+  step <- "1w, W BIV"
+  
+  wt_subset <- all_df$param=="WEIGHTKG" & !is.na(all_df$stdz_meas)
+  all_df$outlier[wt_subset] <- all_df$stdz_meas[wt_subset] < -6 |
+    all_df$stdz_meas[wt_subset] > 5
+  
+  all_df[wt_subset & all_df$outlier, "result"] <- "Implausible"
+  all_df[wt_subset & all_df$outlier, "reason"] <- 
+    paste0("Implausible, Step ", step)
+  
+  # 2h/w, H/W invalid inliers ----
+  # 2h/w: Invalid inliers" are observations that are not outliers, but have 
+  # a certain SD score away from another observation within
+  # a smaller time window. The value of the SD score and the time window depends
+  # upon the current age. Note that for the most part this relationship is
+  # symmetric, so these "invalid inliers" should come in pairs. It is not clear if
+  # that is what the algorithm intended.
+  step_base <- "invalid inliers" # 2h/w added in for loop
+  
+  # Generate a column to store standardized measurements.
+  all_df$sd_val <- all_df$invalid_inlier <- NA
+  
+  # Go through all the ID's looking for invalid inliers.
+  # only required for subjects with at least 3 values -- NOTE: table counts in
+  # the same order as unique()
+  for (i in unique(all_df$subjid)[table(all_df$subjid) > 3]){
+    # Do this for both height and weight. Since the code is identical for both
+    # except the parameter we filter on, just put it in a loop.
+    for (type in c("HEIGHTCM", "WEIGHTKG")) {
+      step <- paste0("2", tolower(substr(val, 1, 1)), ", ", 
+                     toupper(substr(val, 1, 1)), " ", step_base) 
+      
+      # Pick out a subset of the data that identifies this subject along with
+      # non-null and non-outlier values of the specific measurement. Identify them
+      # as the index values since we need to loop through the individual rows
+      # later.
+      id_locs <- all_df$subjid==i & all_df$param==type &
+        !is.na(all_df$stdz_meas) & !all_df$outlier
+      
+      # Pick out just the data for the rows in question since the age and SD
+      # values are needed.
+      subj_df <- all_df[id_locs,]
+      
+      # Make, a standardized version of the z-scores, but excluding the outlier
+      # values. Note it was not clear in the paper that the outlier values should
+      # be excluded when computing the standardized measurements, but it seems to
+      # make sense to do so.
+      subj_df$sd_val <- (subj_df$stdz_meas-mean(subj_df$stdz_meas))/
+        sd(subj_df$stdz_meas)
+      
+      # For each of the values in the subset index,
+      # No issue with an NA value for the outlier location since the sd_val is only valiud if the stdz value is, and if the stdz value is, we can determine if it is an outlier or not
+      
+      # calculate "differences" matrix for age days and sd vals
+      age_diff <- abs(outer(subj_df$age_days, subj_df$age_days, "-"))
+      sd_diff <- abs(outer(subj_df$sd_val, subj_df$sd_val, "-"))
+      
+      # This is where each value is checked to see if it is an "invalid inlier".
+      subj_df$invalid_inlier <- sapply(1:nrow(subj_df), function(x){
+        res <-
+          if (subj_df$age_days[x] <= 365.25){
+            # There are separate criteria for those under 1 yr. and those over. For
+            # those under, the value is an "invalid inlier" if it is more than 2.5
+            # SD's aways from another value and those values are less than 3 months
+            # apart. So, compare the current SD score to each other SD score on
+            # that criteria. The resulting vector is
 
-# Import synthetic data set for testing.
-dat <- fread("C:/Users/molivier/Documents/Projects/CDC_CODI/Data_sets/gc-observations.csv")
+            any(age_diff[x,] < 90 & sd_diff[x,] > 2.5)
+          } else {
+            # Same check, but for the case of those over 1 yr. In this case, a
+            # number is an "invalid inliers" if it is more than 3 SD's away from
+            # another observation that is less than 6 months away.
 
-# Filter out the data in several ways. Just keep weight data (since original
-# algorithm uses weight data) and drop all the columns
-df <- dat[, c("subjid", "param", "measurement", "sex", "age_days")]
-
-################################################################################
-# Setting up variables.----
-################################################################################
-
-# Create standardized measurement. Assumes function is already loaded.
-df[, stdz_meas := get_standardized_infant_scores(param, age_days, sex, measurement)]
-
-# Sort data by subject, param, and age.
-df <- df[order(df$subjid, df$param, df$age_days),]
-
-# Generate variables label outliers and "invalid inliers".
-df[,outlier := as.numeric(NA)]
-df[,invalid_inlier := as.numeric(NA)]
-
-################################################################################
-# Identify outliers----
-# Per the "Accuracy" section on pages 20 and 21 of the paper, outliers are taken
-# to be values where the z-score is outside of the interval [-6, 6] for height
-# and outside the interval [-6, 5] for weight.
-################################################################################
-
-ht_subset <- df$param=="HEIGHTCM" & !is.na(df$stdz_meas)
-df$outlier[ht_subset] <- abs(df$stdz_meas[ht_subset]) > 6
-
-wt_subset <- df$param=="WEIGHTKG" & !is.na(df$stdz_meas)
-df$outlier[wt_subset] <- df$stdz_meas[wt_subset] < -6 |
-                          df$stdz_meas[wt_subset] > 5
-
-
-################################################################################
-# Identify invalid inliers----
-# "Invalid inliers" are observations that are not outliers, but have a z-score
-# of more than 3 and are a certain SD score away from another observation within
-# a smaller time window. The value of the SD score and the time window depends
-# upon the current age. Note that for the most part this relationship is
-# symmetric, so these "invalid inliers" should come in pairs. It is not clear if
-# that is what the algorithm intended.
-################################################################################
-
-# Generate a column to store standardized measurements.
-df[,sd_val := as.numeric(NA)]
-
-# Could potentially try to speed things up by only looking at ID's where there
-# is a z-score greater than 3 in absolute value. Since, currently, this is slow.
-
-# Go through all the ID's looking for invalid inliers.
-for(id in unique(df$subjid)) {
-  # Do this for both height and weight. Since the code is identical for both
-  # except the parameter we filter on, just put it in a loop.
-  for(type in c("HEIGHTCM", "WEIGHTKG")) {
-    # Pick out a subset of the data that identifies this subject along with
-    # non-null and non-outlier values of the specific measurement. Identify them
-    # as the index values since we need to loop through the individual rows
-    # later.
-    id_locs <- which(df$subjid==id & df$param==type & !is.na(df$stdz_meas)
-                    & df$outlier != 1)
-
-    # Make, a standardized version of the z-scores, but excluding the outlier
-    # values. Note it was not clear in the paper that the outlier values should
-    # be excluded when computing the standardized measurements, but it seems to
-    # make sense to do so.
-    df$sd_val[id_locs] <- (df$stdz_meas[id_locs]-mean(df$stdz_meas[id_locs]))/
-                                sd(df$stdz_meas[id_locs])
-
-    # For each of the values in the subset index,
-    # No issue with an NA value for the outlier location since the sd_val is only valiud if the stdz value is, and if the stdz value is, we can determine if it is an outlier or not
-
-    # Pick out just the data for the rows in question since the age and SD
-    # values are needed.
-    Z <- df[id_locs]
-
-    # This is where each value is checked to see if it is an "invalid inlier".
-    for(val in id_locs) {
-      # Can only be an "invalid inlier" if the original z-score was greater than
-      # 3 in absolute value and not an outlier. SInce outliers were already
-      # filtered out, only need to check the first criteria here.
-      if(abs(df$stdz_meas[val]) > 3) {
-        # There are separate criteria for those under 1 yr. and those over. For
-        # those under, the value is an "invalid inlier" if it is more than 2.5
-        # SD's aways from another value and those values are less than 3 months
-        # apart. So, compare the current SD score to each other SD score on
-        # that criteria. The resulting vector is
-        if(df$age_days[val] < 365) {
-          meets_criteria <- abs(df$age_days[val] - Z$age_days) < 90 &
-            abs(df$sd_val[val] - Z$sd_val) > 2.5
-        }
-        # Same check, but for the case of those over 1 yr. In this case, a
-        # number is an "invalid inliers" if it is more than 3 SD's away from
-        # another observation that is less than 6 months away.
-        else {
-          meets_criteria <- abs(df$age_days[val] - Z$age_days) < 180 &
-            abs(df$sd_val[val] - Z$sd_val) > 3
-        }
-        # If any of the values in "meets_criteria" are 1, then the current
-        # observation should be labeled as an outlier.
-        df$invalid_inlier[val] <- sum(meets_criteria) > 0
-      }
+            any(age_diff[x,] < 180 & sd_diff[x,] > 3)
+          }
+        
+        return(res)
+      })
+      
+      all_df$invalid_inlier[id_locs] <- subj_df$invalid_inlier
+      
+      # update result and reason
+      all_df$result[id_locs][subj_df$invalid_inlier] <- "Implausible"
+      all_df$result[id_locs][subj_df$invalid_inlier] <- 
+        paste0("Implausible, Step ", step)
     }
   }
+  
+  # Fill in the rest of the null values in the "invalid inlier" column as not
+  # invalid inliers as long as there is a z-score (otherwise it couldn't have even
+  # been under consideration as one).
+  all_df$invalid_inlier[!is.na(all_df$stdz_meas) & 
+                          is.na(all_df$invalid_inlier)] <- FALSE
+  
+  # add results to full dataframe
+  df[all_df$id, "result"] <- all_df$result
+  df[all_df$id, "reason"] <- all_df$reason
+  
+  return(df)
 }
-
-# Fill in the rest of the null values in the "invalid inlier" column as not
-# invalid inliers as long as there is a z-score (otherwise it couldn't have even
-# been under consideration as one).
-df$invalid_inlier[!is.na(df$stdz_meas) & is.na(df$invalid_inlier)] <- 0
