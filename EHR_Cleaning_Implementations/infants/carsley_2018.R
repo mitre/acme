@@ -64,6 +64,8 @@ carsley_clean_both <- function(df, inter_vals = F){
   # preallocate final designation
   df$result <- "Include" 
   df$reason <- ""
+  df$id <- as.character(df$id)
+  rownames(df) <- df$id
   
   # if using intermediate values, we want to start storing them
   # keep the ID to collate with the final dataframe
@@ -161,8 +163,8 @@ carsley_clean_both <- function(df, inter_vals = F){
     # Do this for both height and weight. Since the code is identical for both
     # except the parameter we filter on, just put it in a loop.
     for (type in c("HEIGHTCM", "WEIGHTKG")) {
-      step <- paste0("2", tolower(substr(val, 1, 1)), ", ", 
-                     toupper(substr(val, 1, 1)), " ", step_base) 
+      step <- paste0("2", tolower(substr(type, 1, 1)), ", ", 
+                     toupper(substr(type, 1, 1)), " ", step_base) 
       
       # Pick out a subset of the data that identifies this subject along with
       # non-null and non-outlier values of the specific measurement. Identify them
