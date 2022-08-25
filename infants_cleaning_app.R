@@ -70,7 +70,7 @@ simpleCap <- function(y) {
 
 # regular methods
 
-methods_avail <- c("yang")
+methods_avail <- c("yang", "carsley")
 
 # types cleaned for each method
 m_types <- list(
@@ -78,7 +78,8 @@ m_types <- list(
   "WEIGHTKG" = methods_avail
 )
 
-methods_func <- list(yang_clean_both)
+methods_func <- list(yang_clean_both,
+                     carsley_clean_both)
 names(methods_func) <- methods_avail
 
 # method colors
@@ -87,26 +88,35 @@ names(m_colors) <- simpleCap(methods_avail)
 
 # intermediate methods
 
-methods_inter_avail <- c("yang")
+methods_inter_avail <- c("yang", "carsley")
 
 # types cleaned for each method
 m_inter_types <- list(
-  "HEIGHTCM" = c("yang"),
-  "WEIGHTKG" = c("yang")
+  "HEIGHTCM" = c("yang", "carsley"),
+  "WEIGHTKG" = c("yang", "carsley")
 )
 
-methods_inter_func <- list(yang_clean_both)
+methods_inter_func <- list(yang_clean_both,
+                           # NOTE: CARSLEY HAVING PROBLEMS ATM
+                           carsley_clean_both)
 names(methods_inter_func) <- methods_inter_avail
 
 # list of steps for each method
 m_inter_steps <- list(
-  "yang" = c("1w", "1h")
+  "yang" = c("1w", "1h"),
+  "carsley" = c("1h", "1w", "2h", "2w")
 )
 
 m_inter_steps_full_title <- list(
   "yang" = c(
     "1w" = "1w: W conditional growth percentiles",
     "1h" = "1h: H conditional growth percentiles"
+  ),
+  "carsley" = c(
+    "1h" = "1h: H BIV",
+    "1w" = "1w: W BIV",
+    "2h" = "1h: H invalid inliers",
+    "2w" = "1w: W invalid inliers"
   )
 )
 
@@ -114,6 +124,11 @@ m_inter_steps_full_subtitle <- list(
   "yang" = c(
     "1w" = "1w: Calculate conditional growth percentiles using a random effects model, using conditional mean weights and 4 SD range for an individual's weight. If weight measurement is outside mean +/- 4SD, classify as outlier.",
     "1h" = "1h: Calculate conditional growth percentiles using a random effects model, using conditional mean heights and 4 SD range for an individual's height. If height measurement is outside mean +/- 4SD, classify as outlier."
+  ),
+  "carsley" = c(
+    "1h" = "1h: If the z-score is outside of the interval [-6, 6] for height, classify as implausible.",
+    "1w" = "1w: If the z-score is outside of the interval [-6, 5] for weight, classify as implausible.",
+    "2h" = "2h: For measurements with ages < 1 year, if there is an SD score > 2.5 SD away within 90 days, classify as implausible. For measurements with ages > 1 year, if there is an SD score > 3 SD away within 180 days, classify as implausible."
   )
 )
 
@@ -2376,6 +2391,7 @@ server <- function(input, output, session) {
           inter_cols <- colnames(clean_df)[grepl("Step_", colnames(clean_df))]
           c_df[,paste0(m, "_", inter_cols)] <- clean_df[, inter_cols]
         }
+        
       }
       
       # initialize subset (cleaned_df holds all subjects)
