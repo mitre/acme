@@ -38,27 +38,25 @@ carsley_clean_both <- function(df, inter_vals = F){
   
   # method specific constants ----
   
-  # same step for both height and weight (originally in weight)
-  
   inter_cols <- c(
-    "Step_1w_W_Unconditional_Mean",
-    "Step_1w_W_Unconditional_Variance", 
-    "Step_1w_W_Covariance", 
-    "Step_1w_W_Conditional_Mean", 
-    "Step_1w_W_Conditional_Variance", 
-    "Step_1w_W_4_SD", 
-    "Step_1w_W_Mean_plus_4_SD", 
-    "Step_1w_W_Mean_minus_4_SD",
-    "Step_1w_Result",
-    "Step_1h_H_Unconditional_Mean",
-    "Step_1h_H_Unconditional_Variance", 
-    "Step_1h_H_Covariance", 
-    "Step_1h_H_Conditional_Mean", 
-    "Step_1h_H_Conditional_Variance", 
-    "Step_1h_H_4_SD", 
-    "Step_1h_H_Mean_plus_4_SD", 
-    "Step_1h_H_Mean_minus_4_SD",
-    "Step_1h_Result"
+    "Step_1h_WHO_Z_for_Age",
+    "Step_1h_H_BIV_Low_Compare", 
+    "Step_1h_H_BIV_Low_Compare", 
+    "Step_1h_Result", 
+    "Step_1w_WHO_Z_for_Age",
+    "Step_1w_W_BIV_Low_Compare", 
+    "Step_1w_W_BIV_Low_Compare", 
+    "Step_1w_Result", 
+    "Step_2h_First_Age_Diff_and_Criteria",
+    "Step_2h_First_SD_Diff_and_Criteria",
+    "Step_2h_WHO_Z_for_Age",
+    "Step_2h_Subject_SD",
+    "Step_2h_Result",
+    "Step_2w_First_Age_Diff_and_Criteria",
+    "Step_2w_First_SD_Diff_and_Criteria",
+    "Step_2w_WHO_Z_for_Age",
+    "Step_2w_Subject_SD",
+    "Step_2w_Result"
   )
   
   # begin implementation ----
@@ -106,6 +104,18 @@ carsley_clean_both <- function(df, inter_vals = F){
   all_df[ht_subset & all_df$outlier, "reason"] <- 
     paste0("Implausible, Step ", step)
   
+  # if using intermediate values, we want to keep some
+  if(inter_vals){
+    inter_df[as.character(all_df$id[ht_subset]), "Step_1h_WHO_Z_for_Age"] <- 
+      all_df$stdz_meas[ht_subset]
+    inter_df[as.character(all_df$id[ht_subset]), "Step_1h_H_BIV_Low_Compare"] <- 
+      all_df$stdz_meas[ht_subset] > -6
+    inter_df[as.character(all_df$id[ht_subset]), "Step_1h_H_BIV_Low_Compare"] <- 
+      all_df$stdz_meas[ht_subset] < 6
+    inter_df[as.character(all_df$id[ht_subset]), "Step_1h_Result"] <- 
+      all_df$outlier[ht_subset]
+  }
+  
   # 1w, W BIV ----
   # 1w: Outliers are taken to be values where the z-score is outside of the 
   # interval [-6, 5] for weight.
@@ -118,6 +128,18 @@ carsley_clean_both <- function(df, inter_vals = F){
   all_df[wt_subset & all_df$outlier, "result"] <- "Implausible"
   all_df[wt_subset & all_df$outlier, "reason"] <- 
     paste0("Implausible, Step ", step)
+  
+  # if using intermediate values, we want to keep some
+  if(inter_vals){
+    inter_df[as.character(all_df$id[wt_subset]), "Step_1w_WHO_Z_for_Age"] <- 
+      all_df$stdz_meas[wt_subset]
+    inter_df[as.character(all_df$id[wt_subset]), "Step_1w_W_BIV_Low_Compare"] <- 
+      all_df$stdz_meas[wt_subset] > -6
+    inter_df[as.character(all_df$id[wt_subset]), "Step_1w_W_BIV_High_Compare"] <- 
+      all_df$stdz_meas[wt_subset] < 5
+    inter_df[as.character(all_df$id[wt_subset]), "Step_1w_Result"] <- 
+      all_df$outlier[wt_subset]
+  }
   
   # 2h/w, H/W invalid inliers ----
   # 2h/w: Invalid inliers" are observations that are not outliers, but have 
@@ -168,32 +190,62 @@ carsley_clean_both <- function(df, inter_vals = F){
       
       # This is where each value is checked to see if it is an "invalid inlier".
       subj_df$invalid_inlier <- sapply(1:nrow(subj_df), function(x){
-        res <-
+        idx <-
           if (subj_df$age_days[x] <= 365.25){
             # There are separate criteria for those under 1 yr. and those over. For
             # those under, the value is an "invalid inlier" if it is more than 2.5
             # SD's aways from another value and those values are less than 3 months
             # apart. So, compare the current SD score to each other SD score on
             # that criteria. The resulting vector is
-
-            any(age_diff[x,] < 90 & sd_diff[x,] > 2.5)
+            
+            which(age_diff[x,] < 90 & sd_diff[x,] > 2.5)
           } else {
             # Same check, but for the case of those over 1 yr. In this case, a
             # number is an "invalid inliers" if it is more than 3 SD's away from
             # another observation that is less than 6 months away.
 
-            any(age_diff[x,] < 180 & sd_diff[x,] > 3)
+            which(age_diff[x,] < 180 & sd_diff[x,] > 3)
           }
         
-        return(res)
+        # needs to be done within the loop 
+        if (inter_vals & length(idx)> 0){
+          step_beg <- paste0("Step_2", tolower(substr(type,1,1)), "_")
+          
+          # for the intermediate value, we're going to show the first age
+          # difference and max sd diff combo
+          inter_df[as.character(subj_df$id[x]), 
+                   paste0(step_beg, "First_Age_Diff_and_Criteria")] <-
+            age_diff[x, idx[1]]
+          inter_df[as.character(subj_df$id[x]), 
+                   paste0(step_beg, "First_SD_Diff_and_Criteria")] <-
+            sd_diff[x, idx[1]]
+        }
+        
+        return(length(idx) > 0)
       })
       
       all_df$invalid_inlier[id_locs] <- subj_df$invalid_inlier
       
       # update result and reason
       all_df$result[id_locs][subj_df$invalid_inlier] <- "Implausible"
-      all_df$result[id_locs][subj_df$invalid_inlier] <- 
+      all_df$reason[id_locs][subj_df$invalid_inlier] <- 
         paste0("Implausible, Step ", step)
+      
+      
+      # if using intermediate values, we want to keep some
+      if(inter_vals){
+        step_beg <- paste0("Step_2", tolower(substr(type,1,1)), "_")
+        
+        inter_df[as.character(all_df$id[id_locs]), 
+                 paste0(step_beg, "WHO_Z_for_Age")] <- 
+          all_df$stdz_meas[id_locs]
+        inter_df[as.character(all_df$id[id_locs]), 
+                 paste0(step_beg, "Subject_SD")] <- 
+          subj_df$sd_val
+        inter_df[as.character(all_df$id[id_locs]), 
+                 paste0(step_beg, "Result")] <- 
+          all_df$invalid_inlier[id_locs]
+      }
     }
   }
   
@@ -206,6 +258,11 @@ carsley_clean_both <- function(df, inter_vals = F){
   # add results to full dataframe
   df[all_df$id, "result"] <- all_df$result
   df[all_df$id, "reason"] <- all_df$reason
+  
+  # if we're using intermediate values, we want to save them
+  if (inter_vals){
+    df[as.character(inter_df$id), colnames(inter_df)[-1]] <- inter_df[,-1]
+  }
   
   return(df)
 }
