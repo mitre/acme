@@ -34,23 +34,27 @@ shi_clean_both <- function(df, inter_vals = F){
   # method specific constants ----
 
   inter_cols <- c(
-    "Step_1h_WHO_Z_for_Age",
-    "Step_1h_H_BIV_Low_Compare",
-    "Step_1h_H_BIV_High_Compare",
+    "Step_1h_Standardized_Values",
+    "Step_1h_Standardized_Residuals",
+    "Step_1h_Raw_Residuals",
     "Step_1h_Result",
-    "Step_1w_WHO_Z_for_Age",
-    "Step_1w_W_BIV_Low_Compare",
-    "Step_1w_W_BIV_High_Compare",
+    "Step_1w_Standardized_Values",
+    "Step_1w_Standardized_Residuals",
+    "Step_1w_Raw_Residuals",
     "Step_1w_Result",
-    "Step_2h_First_Age_Diff_and_Criteria",
-    "Step_2h_First_SD_Diff_and_Criteria",
-    "Step_2h_WHO_Z_for_Age",
-    "Step_2h_Subject_SD",
+    "Step_2h_Next_Measurement",
+    "Step_2h_Raw_Residuals",
+    "Step_2h_Next_Raw_Residuals",
+    "Step_2h_Standardized_Residuals",
+    "Step_2h_Next_Standardized_Residuals",
+    "Step_2h_0.85_of_Measurement",
     "Step_2h_Result",
-    "Step_2w_First_Age_Diff_and_Criteria",
-    "Step_2w_First_SD_Diff_and_Criteria",
-    "Step_2w_WHO_Z_for_Age",
-    "Step_2w_Subject_SD",
+    "Step_2w_Next_Measurement",
+    "Step_2w_Raw_Residuals",
+    "Step_2w_Next_Raw_Residuals",
+    "Step_2w_Standardized_Residuals",
+    "Step_2w_Next_Standardized_Residuals",
+    "Step_2w_0.85_of_Measurement",
     "Step_2w_Result"
   )
 
@@ -88,7 +92,7 @@ shi_clean_both <- function(df, inter_vals = F){
   all_df <- all_df[order(all_df$subjid, all_df$param, all_df$age_days),]
 
   # Generate variables label outliers and "invalid inliers".
-  all_df$raw_resid <- all_df$stdz_resid <- F
+  all_df$raw_resid <- all_df$stdz_resid <- NA
 
   # Create a columns that will indicate if values are biologically implausible.
   all_df$biv <- F
@@ -178,15 +182,18 @@ shi_clean_both <- function(df, inter_vals = F){
 
     # if using intermediate values, we want to keep some
     if (inter_vals){
-      step_beg <- paste0("Step_1", step_beg, "_")
+      step_beg <- paste0("Step_1", step_base, "_")
       val_subset <- all_df$param == type
-
+      
       inter_df[as.character(all_df$id[val_subset]),
-               paste0(step_beg, "Standardized_Residuals")] <-
+               paste0(step_beg, "Standardized_Values")] <-
         all_df$stdz_meas[val_subset]
       inter_df[as.character(all_df$id[val_subset]),
+               paste0(step_beg, "Standardized_Residuals")] <-
+        all_df$stdz_resid[val_subset]
+      inter_df[as.character(all_df$id[val_subset]),
                paste0(step_beg, "Raw_Residuals")] <-
-        all_df$raw_meas[val_subset]
+        all_df$raw_resid[val_subset]
       inter_df[as.character(all_df$id[val_subset]), 
                paste0(step_beg, "Result")] <-
         all_df$stdz_outlier[val_subset] | all_df$raw_outlier[val_subset]
@@ -259,22 +266,22 @@ shi_clean_both <- function(df, inter_vals = F){
         
         # if using intermediate values, we want to keep some
         if (inter_vals){
-          step_beg <- paste0("Step_2", step_beg, "_")
+          step_beg <- paste0("Step_2", step_base, "_")
           
           inter_df[as.character(subj_df$id),
                    paste0(step_beg, "Next_Measurement")] <-
             subj_df$measurement_next
           inter_df[as.character(subj_df$id),
-                   paste0(step_beg, "Raw_Residual")] <-
+                   paste0(step_beg, "Raw_Residuals")] <-
             subj_df$raw_resid
           inter_df[as.character(subj_df$id),
-                   paste0(step_beg, "Next_Raw_Residual")] <-
+                   paste0(step_beg, "Next_Raw_Residuals")] <-
             subj_df$raw_resid_next
           inter_df[as.character(subj_df$id),
-                   paste0(step_beg, "Standardized_Residual")] <-
+                   paste0(step_beg, "Standardized_Residuals")] <-
             subj_df$stdz_resid
           inter_df[as.character(subj_df$id),
-                   paste0(step_beg, "Next_Standardized_Residual")] <-
+                   paste0(step_beg, "Next_Standardized_Residuals")] <-
             subj_df$stdz_resid_next
           if (type == "WEIGHTKG"){
             inter_df[as.character(subj_df$id),
