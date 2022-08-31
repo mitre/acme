@@ -70,7 +70,7 @@ simpleCap <- function(y) {
 
 # regular methods
 
-methods_avail <- c("yang", "carsley")
+methods_avail <- c("yang", "shi", "carsley")
 
 # types cleaned for each method
 m_types <- list(
@@ -79,6 +79,7 @@ m_types <- list(
 )
 
 methods_func <- list(yang_clean_both,
+                     shi_clean_both,
                      carsley_clean_both)
 names(methods_func) <- methods_avail
 
@@ -88,15 +89,16 @@ names(m_colors) <- simpleCap(methods_avail)
 
 # intermediate methods
 
-methods_inter_avail <- c("yang", "carsley")
+methods_inter_avail <- c("yang", "shi", "carsley")
 
 # types cleaned for each method
 m_inter_types <- list(
-  "HEIGHTCM" = c("yang", "carsley"),
-  "WEIGHTKG" = c("yang", "carsley")
+  "HEIGHTCM" = c("yang", "shi", "carsley"),
+  "WEIGHTKG" = c("yang", "shi", "carsley")
 )
 
 methods_inter_func <- list(yang_clean_both,
+                           shi_clean_both,
                            # NOTE: CARSLEY HAVING PROBLEMS ATM
                            carsley_clean_both)
 names(methods_inter_func) <- methods_inter_avail
@@ -104,6 +106,7 @@ names(methods_inter_func) <- methods_inter_avail
 # list of steps for each method
 m_inter_steps <- list(
   "yang" = c("1w", "1h"),
+  "shi" = c("1h", "1w", "2h", "2w"),
   "carsley" = c("1h", "1w", "2h", "2w")
 )
 
@@ -112,11 +115,17 @@ m_inter_steps_full_title <- list(
     "1w" = "1w: W conditional growth percentiles",
     "1h" = "1h: H conditional growth percentiles"
   ),
+  "shi" = c(
+    "1h" = "1h: H jackknife comparison",
+    "1w" = "1w: W jackknife comparison",
+    "2h" = "2h: H BIV",
+    "2w" = "2w: W BIV"
+  ),
   "carsley" = c(
     "1h" = "1h: H BIV",
     "1w" = "1w: W BIV",
-    "2h" = "1h: H invalid inliers",
-    "2w" = "1w: W invalid inliers"
+    "2h" = "2h: H invalid inliers",
+    "2w" = "2w: W invalid inliers"
   )
 )
 
@@ -125,10 +134,17 @@ m_inter_steps_full_subtitle <- list(
     "1w" = "1w: Calculate conditional growth percentiles using a random effects model, using conditional mean weights and 4 SD range for an individual's weight. If weight measurement is outside mean +/- 4SD, classify as outlier.",
     "1h" = "1h: Calculate conditional growth percentiles using a random effects model, using conditional mean heights and 4 SD range for an individual's height. If height measurement is outside mean +/- 4SD, classify as outlier."
   ),
+  "shi" = c(
+    "1h" = "1h: Calculate jackknife residuals for both standardized and raw measurements. If the residual > 4, mark as outlier. If it doesn't exist, mark as \"should be further investigated.\"",
+    "1w" = "1w: Calculate jackknife residuals for both standardized and raw measurements. If the residual > 4, mark as outlier. If it doesn't exist, mark as \"should be further investigated.\"",
+    "2h" = "2h: Identify biologically implausible values in sequential pairs. If measurement of earlier time point is > next time point, identify larger absolute residual as BIV, for both standardized and raw residuals.",
+    "2w" = "2w: Identify biologically implausible values in sequential pairs. If 0.85* measurement of earlier time point > next time point, identify larger absolute residual as BIV, for both standardized and raw residuals."
+  ),
   "carsley" = c(
     "1h" = "1h: If the z-score is outside of the interval [-6, 6] for height, classify as implausible.",
     "1w" = "1w: If the z-score is outside of the interval [-6, 5] for weight, classify as implausible.",
-    "2h" = "2h: For measurements with ages < 1 year, if there is an SD score > 2.5 SD away within 90 days, classify as implausible. For measurements with ages > 1 year, if there is an SD score > 3 SD away within 180 days, classify as implausible."
+    "2h" = "2h: For measurements with ages < 1 year, if there is a SD score > 2.5 SD away within 90 days, classify as implausible. For measurements with ages > 1 year, if there is an SD score > 3 SD away within 180 days, classify as implausible.",
+    "2w" = "2w: For measurements with ages < 1 year, if there is a SD score > 2.5 SD away within 90 days, classify as implausible. For measurements with ages > 1 year, if there is an SD score > 3 SD away within 180 days, classify as implausible."
   )
 )
 
@@ -2218,8 +2234,8 @@ ui <- navbarPage(
               width = 6,
               HTML(
                 "<h3>Yang, et al. (2016)</h3>",
-                "<h4>Cleans: Weight Records</h4><p>",
-                "Yang, et al. seeks \"to systematically identify implausible measurements in growth trajectory [EHR] data\", deciding implausible values based on conditional growth percentiles. More information on this method can be found <a href='https://www.sciencedirect.com/science/article/pii/S1047279715004184' target = 'blank'>here</a>. Steps for this method, along with their titles (used in output) and descriptions, are below.<p>"
+                "<h4>Cleans: Weight and Height Records</h4><p>",
+                "Shi, et al. seeks identify implausible values and outliers in longitudinal childhood anthropometric data, deciding outliers based on jackknife residuals and biologically implausible values. More information on this method can be found <a href='https://www.sciencedirect.com/science/article/pii/S1047279717306129' target = 'blank'>here</a>. Steps for this method, along with their titles (used in output) and descriptions, are below.<p>"
               ),
               hr(),
               HTML(
@@ -2233,6 +2249,66 @@ ui <- navbarPage(
             column(width = 3)
           )
         ),
+        
+        # UI: shi ----
+        tabPanel(
+          "Shi, et al. (2018)",
+          fluidRow(
+            column(width = 3),
+            column(
+              width = 6,
+              HTML(
+                "<h3>Shi, et al. (2018)</h3>",
+                "<h4>Cleans: Height and Weight Records</h4><p>",
+                "Yang, et al. seeks \"to systematically identify implausible measurements in growth trajectory [EHR] data\", deciding implausible values based on conditional growth percentiles. More information on this method can be found <a href='https://www.sciencedirect.com/science/article/pii/S1047279715004184' target = 'blank'>here</a>. Steps for this method, along with their titles (used in output) and descriptions, are below.<p>"
+              ),
+              hr(),
+              HTML(
+                "<h4>Steps:</h4>",
+                "<b>Step 1h, H jackknife comparison</b><br>",
+                "<ul><li>Calculate jackknife residuals for both WHO standardized and raw measurements. If the residual > 4, mark as outlier. If the standardized or raw measurement doesn't exist, mark as \"should be further investigated.\"</li></ul>",
+                "<b>Step 1w, W jackknife comparison</b><br>",
+                "<ul><li>Calculate jackknife residuals for both WHO standardized and raw measurements. If the residual > 4, mark as outlier. If the standardized or raw measurement doesn't exist, mark as \"should be further investigated.\"</li></ul>",
+                "<b>Step 2h, H BIV</b><br>",
+                "<ul><li>Identify biologically implausible values in sequential pairs. If measurement of earlier time point is greater than the next time point, identify larger absolute residual as BIV, for both standardized and raw residuals.</li></ul>",
+                "<b>Step 2w, W BIV</b><br>",
+                "<ul><li>Identify biologically implausible values in sequential pairs. If 0.85*measurement of earlier time point is greater than next time point, identify larger absolute residual as BIV, for both standardized and raw residuals.</li></ul>"
+              )
+            ),
+            column(width = 3)
+          )
+        ),
+        
+        
+        # UI: carsley ----
+        tabPanel(
+          "Carsley, et al. (2018)",
+          fluidRow(
+            column(width = 3),
+            column(
+              width = 6,
+              HTML(
+                "<h3>Carsley, et al. (2018)</h3>",
+                "<h4>Cleans: Height and Weight Records</h4><p>",
+                "Carsley, et al. aims to determine the data completeness and accuracy of child EMR data, deciding implausible values based on z-scores and subject inliers. More information on this method can be found <a href='https://informatics.bmj.com/content/25/1/19.long' target = 'blank'>here</a>. Steps for this method, along with their titles (used in output) and descriptions, are below.<p>"
+              ),
+              hr(),
+              HTML(
+                "<h4>Steps:</h4>",
+                "<b>Step 1h, H BIV</b><br>",
+                "<ul><li>If the WHO z-score is outside of the interval [-6, 6] for height, classify as implausible.</li></ul>",
+                "<b>Step 1w, W BIV</b><br>",
+                "<ul><li>If the WHO z-score is outside of the interval [-6, 5] for weight, classify as implausible.</li></ul>",
+                "<b>Step 2h, H invalid inliers</b><br>",
+                "<ul><li>Calculate standard deviations (SD) for each subject. For measurements with ages less than 1 year, if there is a SD score more than 2.5 SD away within 90 days, classify as implausible. For measurements with ages > 1 year, if there is an SD score more than 3 SD away within 180 days, classify as implausible.</li></ul>",
+                "<b>Step 2w, W invalid inliers</b><br>",
+                "<ul><li>Calculate standard deviations (SD) for each subject. For measurements with ages less than 1 year, if there is a SD score more than 2.5 SD away within 90 days, classify as implausible. For measurements with ages > 1 year, if there is an SD score more than 3 SD away within 180 days, classify as implausible.</li></ul>"
+              )
+            ),
+            column(width = 3)
+          )
+        ),
+        
         # UI: about synthetic data ----
         tabPanel(
           "About Synthetic Data",
