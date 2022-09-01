@@ -147,10 +147,6 @@ massara_clean_both <- function(df, inter_vals=FALSE) {
             # there is no standardized difference within two years, return NA.
             inter_df[subj_df$id[x], paste0(step_beg, "MaxSD_Diff_Under2Yrs")] <-
               ifelse(obs_within2y, max(sd_diff[x,][age_diff[x,] < 730.5]), NA)
-
-            # Change the result for this observation at this step.
-            # inter_df[subj_df$id[x], paste0(step_beg, "Result")] <-
-            #   !obs_within2y | sd_g2_within2y
           }
         }
 
