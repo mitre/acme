@@ -12,6 +12,23 @@
 # @author = Max Olivier
 ################################################################################
 
+# function to clean height and weight data by Massara, et al.
+# inputs:
+# df: data frame with 7 columns:
+#   id: row id, must be unique
+#   subjid: subject id
+#   sex: sex of subject
+#   age_days: age, in days
+#   param: HEIGHTCM or WEIGHTKG
+#   measurement: height or weight measurement
+# inter_vals: boolean, return intermediate values
+# outputs:
+#   df, with additional columns:
+#     result, which specifies whether the height measurement should be included,
+#       or is implausible.
+#     reason, which specifies, for implausible values, the reason for exclusion,
+#       and the step at which exclusion occurred.
+#     intermediate value columns, if specified
 massara_clean_both <- function(df, inter_vals=FALSE) {
 
   # method specific constants ----
@@ -26,7 +43,6 @@ massara_clean_both <- function(df, inter_vals=FALSE) {
     "Step_1w_Result",
     "Step_1w_Standardized_Values"
   )
-
 
   # Begin implementation ----
 
@@ -133,8 +149,8 @@ massara_clean_both <- function(df, inter_vals=FALSE) {
               ifelse(obs_within2y, max(sd_diff[x,][age_diff[x,] < 730.5]), NA)
 
             # Change the result for this observation at this step.
-            inter_df[subj_df$id[x], paste0(step_beg, "Result")] <-
-              !obs_within2y | sd_g2_within2y
+            # inter_df[subj_df$id[x], paste0(step_beg, "Result")] <-
+            #   !obs_within2y | sd_g2_within2y
           }
         }
 
@@ -145,12 +161,18 @@ massara_clean_both <- function(df, inter_vals=FALSE) {
 
           inter_df[subj_df$id, paste0(step_beg, "Standardized_Values")] <-
             subj_df$stdz_meas
+
+          # Change the result for this observation at this step.
+          inter_df[subj_df$id, paste0(step_beg, "Result")] <- subj_df$outlier
+
         }
       }
     }
     # Check for is.na(df$outlier) here instead?
-    all_df[!is.na(all_df$outlier) & all_df$outlier & all_df$param==type, "result"] <- "Implausible"
-    all_df[!is.na(all_df$outlier) & all_df$outlier & all_df$param==type, "reason"] <- paste0("Implausible, Step ", step)
+    all_df[!is.na(all_df$outlier) & all_df$outlier &
+             all_df$param==type, "result"] <- "Implausible"
+    all_df[!is.na(all_df$outlier) & all_df$outlier &
+             all_df$param==type, "reason"] <- paste0("Implausible, Step ", step)
   }
 
   # add results to full dataframe
