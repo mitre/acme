@@ -100,7 +100,6 @@ massara_clean_both <- function(df, inter_vals=FALSE) {
       # column,
       id_locs <- all_df$subjid==uid & all_df$param==type & !is.na(all_df$stdz_meas)
       subj_df <- all_df[id_locs,]
-      rownames(subj_df) <- 1:nrow(subj_df)
 
       # Proceed only if there are values for this parameter for this subject.
       if(nrow(subj_df) > 0) {
@@ -109,10 +108,9 @@ massara_clean_both <- function(df, inter_vals=FALSE) {
         # them with the difference matrices. There are different criteria for
         # height and weight.
         if(type=="HEIGHTCM") {
-          pot_outlier <- as.integer(rownames(subj_df)[abs(subj_df$stdz_meas) > 6])
+          pot_outlier <- which(abs(subj_df$stdz_meas) > 6)
         } else {
-          pot_outlier <- as.integer(rownames(subj_df)[subj_df$stdz_meas < -6 |
-                                                        subj_df$stdz_meas > 5])
+          pot_outlier <- which(subj_df$stdz_meas < -6 | subj_df$stdz_meas > 5)
         }
 
         # Calculate difference matrices
