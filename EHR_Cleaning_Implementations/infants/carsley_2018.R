@@ -212,19 +212,19 @@ carsley_clean_both <- function(df, inter_vals = F){
               which(age_diff[x,] < 180 & sd_diff[x,] > 3)
             }
           
-          # # needs to be done within the loop
-          # if (inter_vals & length(idx) > 0){
-          #   step_beg <- paste0("Step_2", tolower(substr(type,1,1)), "_")
-          # 
-          #   # for the intermediate value, we're going to show the first age
-          #   # difference and max sd diff combo
-          #   inter_df[as.character(subj_df$id[x]),
-          #            paste0(step_beg, "First_Age_Diff_and_Criteria")] <-
-          #     age_diff[x, idx[1]]
-          #   inter_df[as.character(subj_df$id[x]),
-          #            paste0(step_beg, "First_SD_Diff_and_Criteria")] <-
-          #     sd_diff[x, idx[1]]
-          # }
+          # needs to be done within the loop
+          if (inter_vals & length(idx) > 0){
+            step_beg <- paste0("Step_2", tolower(substr(type,1,1)), "_")
+
+            # for the intermediate value, we're going to show the first age
+            # difference and max sd diff combo
+            inter_df[as.character(subj_df$id[x]),
+                     paste0(step_beg, "First_Age_Diff_and_Criteria")] <-
+              age_diff[x, idx[1]]
+            inter_df[as.character(subj_df$id[x]),
+                     paste0(step_beg, "First_SD_Diff_and_Criteria")] <-
+              sd_diff[x, idx[1]]
+          }
           
           return(length(idx) > 0)
         })
@@ -239,17 +239,17 @@ carsley_clean_both <- function(df, inter_vals = F){
         
         # if using intermediate values, we want to keep some
         if (inter_vals){
-          # step_beg <- paste0("Step_2", tolower(substr(type,1,1)), "_")
-          # 
-          # inter_df[as.character(all_df$id[id_locs]), 
-          #          paste0(step_beg, "WHO_Z_for_Age")] <- 
-          #   all_df$stdz_meas[id_locs]
-          # inter_df[as.character(all_df$id[id_locs]), 
-          #          paste0(step_beg, "Subject_SD")] <- 
-          #   subj_df$sd_val
-          # inter_df[as.character(all_df$id[id_locs]), 
-          #          paste0(step_beg, "Result")] <- 
-          #   all_df$invalid_inlier[id_locs]
+          step_beg <- paste0("Step_2", tolower(substr(type,1,1)), "_")
+
+          inter_df[as.character(all_df$id[id_locs]),
+                   paste0(step_beg, "WHO_Z_for_Age")] <-
+            all_df$stdz_meas[id_locs]
+          inter_df[as.character(all_df$id[id_locs]),
+                   paste0(step_beg, "Subject_SD")] <-
+            subj_df$sd_val
+          inter_df[as.character(all_df$id[id_locs]),
+                   paste0(step_beg, "Result")] <-
+            all_df$invalid_inlier[id_locs]
         }
       }
     }
