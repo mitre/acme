@@ -143,8 +143,8 @@ m_inter_steps_full_subtitle <- list(
     "1h" = "1h: Calculate conditional growth percentiles using a random effects model, using conditional mean heights and 4 SD range for an individual's height. If height measurement is outside mean +/- 4SD, classify as outlier."
   ),
   "shi" = c(
-    "1h" = "1h: Calculate jackknife residuals for both standardized and raw measurements. If the residual > 4, mark as outlier. If it doesn't exist, mark as \"should be further investigated.\"",
-    "1w" = "1w: Calculate jackknife residuals for both standardized and raw measurements. If the residual > 4, mark as outlier. If it doesn't exist, mark as \"should be further investigated.\"",
+    "1h" = "1h: Calculate jackknife residuals for both standardized and raw measurements. If the residual > 4, mark as outlier. If it doesn't exist, mark as \"should be further investigated.\" Does not disqualify for consideration in next step.",
+    "1w" = "1w: Calculate jackknife residuals for both standardized and raw measurements. If the residual > 4, mark as outlier. If it doesn't exist, mark as \"should be further investigated.\" Does not disqualify for consideration in next step.",
     "2h" = "2h: Identify biologically implausible values in sequential pairs. If measurement of earlier time point is > next time point, identify larger absolute residual as BIV, for both standardized and raw residuals.",
     "2w" = "2w: Identify biologically implausible values in sequential pairs. If 0.85* measurement of earlier time point > next time point, identify larger absolute residual as BIV, for both standardized and raw residuals."
   ),
@@ -2278,9 +2278,9 @@ ui <- navbarPage(
               HTML(
                 "<h4>Steps:</h4>",
                 "<b>Step 1h, H jackknife comparison</b><br>",
-                "<ul><li>Calculate jackknife residuals for both WHO standardized and raw measurements. If the residual > 4, mark as outlier. If the standardized or raw measurement doesn't exist, mark as \"should be further investigated.\"</li></ul>",
+                "<ul><li>Calculate jackknife residuals for both WHO standardized and raw measurements. If the residual > 4, mark as outlier. If the standardized or raw measurement doesn't exist, mark as \"should be further investigated.\" Does not disqualify for consideration in next step.</li></ul>",
                 "<b>Step 1w, W jackknife comparison</b><br>",
-                "<ul><li>Calculate jackknife residuals for both WHO standardized and raw measurements. If the residual > 4, mark as outlier. If the standardized or raw measurement doesn't exist, mark as \"should be further investigated.\"</li></ul>",
+                "<ul><li>Calculate jackknife residuals for both WHO standardized and raw measurements. If the residual > 4, mark as outlier. If the standardized or raw measurement doesn't exist, mark as \"should be further investigated.\" Does not disqualify for consideration in next step.</li></ul>",
                 "<b>Step 2h, H BIV</b><br>",
                 "<ul><li>Identify biologically implausible values in sequential pairs. If measurement of earlier time point is greater than the next time point, identify larger absolute residual as BIV, for both standardized and raw residuals.</li></ul>",
                 "<b>Step 2w, W BIV</b><br>",
