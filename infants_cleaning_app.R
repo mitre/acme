@@ -70,7 +70,7 @@ simpleCap <- function(y) {
 
 # regular methods
 
-methods_avail <- c("yang", "shi", "carsley", "massara")
+methods_avail <- c("yang", "shi", "carsley", "massara", "growthcleanr")
 
 # types cleaned for each method
 m_types <- list(
@@ -81,7 +81,8 @@ m_types <- list(
 methods_func <- list(yang_clean_both,
                      shi_clean_both,
                      carsley_clean_both,
-                     massara_clean_both)
+                     massara_clean_both,
+                     growthcleanr_clean_both)
 names(methods_func) <- methods_avail
 
 # method colors
@@ -2320,6 +2321,31 @@ ui <- navbarPage(
           )
         ),
 
+        # UI: growthcleanr ----
+        tabPanel(
+          "growthcleanr (2022)",
+          fluidRow(
+            column(width = 3),
+            column(
+              width = 6,
+              HTML(
+                "<h3>growthcleanr (2022)</h3>",
+                "<h4>Cleans: Height and Weight Records</h4><p>",
+                "growthcleanr is based on Daymont, et al. (2017) creates automated method for identifying implausible values in pediatric EHR growth data, deciding implausible values based many factors including exponentially weighted moving averages (EWMA). More information on this method can be found <a href='https://academic.oup.com/jamia/article/24/6/1080/3767271' target = 'blank'>here</a>. Note that this method does not have intermediate values. Steps for this method, along with their titles (used in output) and descriptions, are below.<p>"
+              ),
+              hr(),
+              HTML(
+                "<h4>Steps:</h4>",
+                "<b>Step 1h, H run growthcleanr</b><br>",
+                "<ul><li>Run growthcleanr on height values.</li></ul>",
+                "<b>Step 1w, W run growthcleanr</b><br>",
+                "<ul><li>Run growthcleanr on height values.</li></ul>"
+              )
+            ),
+            column(width = 3)
+          )
+        ),
+        
         # UI: about synthetic data ----
         tabPanel(
           "About Synthetic Data",
