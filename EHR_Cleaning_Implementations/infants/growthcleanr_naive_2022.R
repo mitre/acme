@@ -130,6 +130,7 @@ growthcleanr_naive_clean_both <- function(df, inter_vals = F){
   # preallocate final designation
   df$result <- "Include"
   df$reason <- ""
+  df$id <- as.character(df$id)
   rownames(df) <- df$id
   # if using intermediate values, preallocate values
   if (inter_vals){
