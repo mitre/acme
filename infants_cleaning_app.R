@@ -70,7 +70,8 @@ simpleCap <- function(y) {
 
 # regular methods
 
-methods_avail <- c("yang", "shi", "carsley", "massara", "growthcleanr")
+methods_avail <- c("yang", "shi", "carsley", "massara", "growthcleanr", 
+                   "growthcleanr-naive")
 
 # types cleaned for each method
 m_types <- list(
@@ -82,7 +83,9 @@ methods_func <- list(yang_clean_both,
                      shi_clean_both,
                      carsley_clean_both,
                      massara_clean_both,
-                     growthcleanr_clean_both)
+                     growthcleanr_clean_both,
+                     growthcleanr_naive_clean_both
+                     )
 names(methods_func) <- methods_avail
 
 # method colors
@@ -91,19 +94,21 @@ names(m_colors) <- simpleCap(methods_avail)
 
 # intermediate methods
 
-methods_inter_avail <- c("yang", "shi", "carsley", "massara")
+methods_inter_avail <- c("yang", "shi", "carsley", "massara", 
+                         "growthcleanr-naive")
 
 # types cleaned for each method
 m_inter_types <- list(
-  "HEIGHTCM" = c("yang", "shi", "carsley", "massara"),
-  "WEIGHTKG" = c("yang", "shi", "carsley", "massara")
+  "HEIGHTCM" = methods_avail,
+  "WEIGHTKG" = methods_avail
 )
 
 methods_inter_func <- list(yang_clean_both,
                            shi_clean_both,
-                           # NOTE: CARSLEY HAVING PROBLEMS ATM
+                           # NOTE: CARSLEY HAVING PROBLEMS ATM?
                            carsley_clean_both,
-                           massara_clean_both)
+                           massara_clean_both,
+                           growthcleanr_naive_clean_both)
 names(methods_inter_func) <- methods_inter_avail
 
 # list of steps for each method
@@ -111,7 +116,8 @@ m_inter_steps <- list(
   "yang" = c("1w", "1h"),
   "shi" = c("1h", "1w", "2h", "2w"),
   "carsley" = c("1h", "1w", "2h", "2w"),
-  "massara" = c("1h", "1w")
+  "massara" = c("1h", "1w"),
+  "growthcleanr-naive" = c("1h", "1w")
 )
 
 m_inter_steps_full_title <- list(
@@ -134,6 +140,10 @@ m_inter_steps_full_title <- list(
   "massara" = c(
     "1h" = "1h: H BIV",
     "1w" = "1w: W BIV"
+  ),
+  "growthcleanr-naive" = c(
+    "1h" = "1h: H calculate ewma",
+    "1w" = "1w: W calculate ewma"
   )
 )
 
@@ -157,6 +167,10 @@ m_inter_steps_full_subtitle <- list(
   "massara" = c(
     "1h" = "1h: Identify biologically implausible according to the mBIV criteria: has a standardized score that would make it an outlier by WHO standards and that it either does not have any other observations within two years of it, or if it does that at least one of those observations has a standardized score more than 2 away.",
     "1w" = "1w: Identify biologically implausible according to the mBIV criteria: has a standardized score that would make it an outlier by WHO standards and that it either does not have any other observations within two years of it, or if it does that at least one of those observations has a standardized score more than 2 away."
+  ),
+  "growthcleanr-naive" = c(
+    "1h" = "Exclude extreme errors by calculating the exponentially weighted moving average and removing by a specified cutoff (3 for all, 2.5 for before/after). If record(s) is/are found to be extreme, remove the most extreme one and recalculate. Repeat until this no more values are found to be extreme.",
+    "1w" = "Exclude extreme errors by calculating the exponentially weighted moving average and removing by a specified cutoff (3 for all, 2.5 for before/after). If record(s) is/are found to be extreme, remove the most extreme one and recalculate. Repeat until this no more values are found to be extreme."
   )
 )
 
@@ -2216,7 +2230,7 @@ ui <- navbarPage(
               HTML(
                 "<center><h3>Welcome to the Infants EHR Cleaning Application!</h3></center><p>",
                 paste0("<center><h4>Version ", vers_infants_ehr, "</h4></center>"),
-                "This application seeks to compare different methods of cleaning infants EHR data, implementing a variety of methods. This currently includes Muthalagu, et al., Cheng, et al., Chan, et al., Littman, et al., Breland, et al., and Growthcleanr-naive. To find out more about these methods, please click on their respective tabs. This application is best viewed in a full screen window.<p><p>",
+                "This application seeks to compare different methods of cleaning infants EHR data, implementing a variety of methods. To find out more about these methods, please click on their respective tabs. This application is best viewed in a full screen window.<p><p>",
                 "To start, you'll begin by uploading your data in the sidebar under the 'Compare' tab. This data should be a CSV in the following format:"
               ),
               dataTableOutput("dat_example"),
@@ -2323,13 +2337,13 @@ ui <- navbarPage(
 
         # UI: growthcleanr ----
         tabPanel(
-          "growthcleanr (2022)",
+          "growthcleanr (2022, Daymont, et al. (2017))",
           fluidRow(
             column(width = 3),
             column(
               width = 6,
               HTML(
-                "<h3>growthcleanr (2022)</h3>",
+                "<h3>growthcleanr (2022, Daymont, et al. (2017))</h3>",
                 "<h4>Cleans: Height and Weight Records</h4><p>",
                 "growthcleanr is based on Daymont, et al. (2017) creates automated method for identifying implausible values in pediatric EHR growth data, deciding implausible values based many factors including exponentially weighted moving averages (EWMA). More information on this method can be found <a href='https://academic.oup.com/jamia/article/24/6/1080/3767271' target = 'blank'>here</a>. Note that this method does not have intermediate values. Steps for this method, along with their titles (used in output) and descriptions, are below.<p>"
               ),
@@ -2340,6 +2354,31 @@ ui <- navbarPage(
                 "<ul><li>Run growthcleanr on height values.</li></ul>",
                 "<b>Step 1w, W run growthcleanr</b><br>",
                 "<ul><li>Run growthcleanr on height values.</li></ul>"
+              )
+            ),
+            column(width = 3)
+          )
+        ),
+        
+        # UI: growthcleanr-naive ----
+        tabPanel(
+          "growthcleanr-naive (2022, Daymont, et al. (2017))",
+          fluidRow(
+            column(width = 3),
+            column(
+              width = 6,
+              HTML(
+                "<h3>growthcleanr-naive (Daymont, et al. (2017))</h3>",
+                "<h4>Cleans: Height and Weight Records</h4><p>",
+                "Daymont, et al. aims to automatically detect implausible values in pediatric electronic health records, deciding implausible values based on cutoffs for exponentially weighted moving averages (EWMA). This implementation is a truncated/more simplified version of this method, only using the EWMA protocol. More information on this method can be found <a href='https://academic.oup.com/jamia/article/24/6/1080/3767271' target = 'blank'>here</a>. Steps for this method, along with their titles (used in output) and descriptions, are below.<p>"
+              ),
+              hr(),
+              HTML(
+                "<h4>Steps:</h4>",
+                "<b>Step 1h, H calculate ewma</b><br>",
+                "<ul><li>Exclude extreme errors by calculating the exponentially weighted moving average and removing by a specified cutoff. If record(s) is/are found to be extreme, remove the most extreme one and recalculate. Repeat until this no more values are found to be extreme.</li></ul>",
+                "<b>Step 1w, W calculate ewma</b><br>",
+                "<ul><li>Exclude extreme errors by calculating the exponentially weighted moving average and removing by a specified cutoff. If record(s) is/are found to be extreme, remove the most extreme one and recalculate. Repeat until this no more values are found to be extreme.</li></ul>"
               )
             ),
             column(width = 3)
@@ -2494,6 +2533,8 @@ server <- function(input, output, session) {
           m_func[[m]](
             df, inter_vals = T
           )
+        
+        print(nrow(clean_df))
 
         # add the results to the overall dataframe
         c_df[,paste0(m, "_result")] <- clean_df$result
