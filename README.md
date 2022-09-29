@@ -17,7 +17,7 @@ downloaded/cloned this repository):
 3. In the console window (bottom-left corner by default), enter the following to download necessary packages:
 
 ```{r}
-install.packages(c("shiny", "ggplot2", "rstudioapi", "colorspace", "plotly", "viridisLite", "ggplotify", "reshape2", "shinyBS", "shinyWidgets", "data.table", "growthcleanr", "lme4"))
+install.packages(c("shiny", "ggplot2", "rstudioapi", "colorspace", "plotly", "viridisLite", "ggplotify", "reshape2", "shinyBS", "shinyWidgets", "data.table", "growthcleanr", "lme4", "anthro"))
 ```
 
 A package from GitHub is needed as well. To download this package, enter the
