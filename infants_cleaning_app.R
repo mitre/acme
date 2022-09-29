@@ -70,7 +70,7 @@ simpleCap <- function(y) {
 
 # regular methods
 
-methods_avail <- c("yang", "shi", "carsley", "massara", "growthcleanr", 
+methods_avail <- c("yang", "shi", "carsley", "massara", "growthcleanr",
                    "growthcleanr-naive")
 
 # types cleaned for each method
@@ -94,7 +94,7 @@ names(m_colors) <- simpleCap(methods_avail)
 
 # intermediate methods
 
-methods_inter_avail <- c("yang", "shi", "carsley", "massara", 
+methods_inter_avail <- c("yang", "shi", "carsley", "massara",
                          "growthcleanr-naive")
 
 # types cleaned for each method
@@ -116,7 +116,7 @@ m_inter_steps <- list(
   "yang" = c("1w", "1h"),
   "shi" = c("1h", "1w", "2h", "2w"),
   "carsley" = c("1h", "1w", "2h", "2w"),
-  "massara" = c("1h", "1w"),
+  "massara" = c("1zwfl"),
   "growthcleanr-naive" = c("1h", "1w")
 )
 
@@ -138,8 +138,7 @@ m_inter_steps_full_title <- list(
     "2w" = "2w: W invalid inliers"
   ),
   "massara" = c(
-    "1h" = "1h: H BIV",
-    "1w" = "1w: W BIV"
+    "1zwfl" = "1zwfl: ZWFL mBIV"
   ),
   "growthcleanr-naive" = c(
     "1h" = "1h: H calculate ewma",
@@ -165,8 +164,7 @@ m_inter_steps_full_subtitle <- list(
     "2w" = "2w: For measurements with ages < 1 year, if there is a SD score > 2.5 SD away within 90 days, classify as implausible. For measurements with ages > 1 year, if there is an SD score > 3 SD away within 180 days, classify as implausible."
   ),
   "massara" = c(
-    "1h" = "1h: Identify biologically implausible according to the mBIV criteria: has a standardized score that would make it an outlier by WHO standards and that it either does not have any other observations within two years of it, or if it does that at least one of those observations has a standardized score more than 2 away.",
-    "1w" = "1w: Identify biologically implausible according to the mBIV criteria: has a standardized score that would make it an outlier by WHO standards and that it either does not have any other observations within two years of it, or if it does that at least one of those observations has a standardized score more than 2 away."
+    "1zwfl" = "1zwfl: Identify biologically implausible according to the mBIV criteria: has a standardized score that would make it an outlier by WHO standards and that it either does not have any other observations within two years of it, or if it does that at least one of those observations has a standardized score more than 2 away."
   ),
   "growthcleanr-naive" = c(
     "1h" = "Exclude extreme errors by calculating the exponentially weighted moving average and removing by a specified cutoff (3 for all, 2.5 for before/after). If record(s) is/are found to be extreme, remove the most extreme one and recalculate. Repeat until this no more values are found to be extreme.",
@@ -2359,7 +2357,7 @@ ui <- navbarPage(
             column(width = 3)
           )
         ),
-        
+
         # UI: growthcleanr-naive ----
         tabPanel(
           "growthcleanr-naive (2022, Daymont, et al. (2017))",
@@ -2384,7 +2382,7 @@ ui <- navbarPage(
             column(width = 3)
           )
         ),
-        
+
         # UI: about synthetic data ----
         tabPanel(
           "About Synthetic Data",
@@ -2533,7 +2531,7 @@ server <- function(input, output, session) {
           m_func[[m]](
             df, inter_vals = T
           )
-        
+
         print(nrow(clean_df))
 
         # add the results to the overall dataframe
