@@ -280,9 +280,12 @@ massara_clean_both <- function(df, inter_vals=FALSE) {
                             "Implausible, Step 1zwfl, ZWFL mBIV", "")
 
   # And update the values in df. Merge the result and reason columns. on id.
-  # QUESTION, what do we want to put in the rows that have NA's for result and
-  # reason after the merge?
+  # If the rows have an NA for result or reason, it is because they didn't have
+  # a matching height/weight on that day. We want to fill in the values so that
+  # the explorer runs correctly, though.
   df <- merge(df, disag_df[,c("id", "result", "reason")], by="id", all=TRUE)
+  df$result <- ifelse(is.na(df$result), "Include", df$result)
+  df$reason <- ifelse(is.na(df$reason), "No matching value", df$reason)
 
   # If we want to see intermediate values, merge those on as well.
   if(inter_vals) {
