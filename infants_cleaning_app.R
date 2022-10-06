@@ -996,6 +996,9 @@ plot_cleaned <- function(cleaned_df, type, subj,
           size = num_implausible,
           text = paste0(
             "Subject: ", subjid, "\n",
+            "Age (days): ", age_days, "\n",
+            "Age (months): ", signif(age_days/30.4,4), "\n",
+            "Age (years): ", signif(age_years,4), "\n",
             "Result: ", all_result,"\n",
             "Include Methods (", sum_include, "): ", all_include, "\n",
             "Implausible Methods (", sum_implausible, "): ", all_implausible, "\n",
@@ -2591,7 +2594,7 @@ server <- function(input, output, session) {
         read.csv(input$dat_file$datapath)
       }
     # because it reads in dashes as periods
-    colnames(c_df)[grepl("growthcleanr", colnames(c_df))] <-
+    colnames(c_df)[grepl("naive", colnames(c_df))] <-
       c("growthcleanr-naive_result", "growthcleanr-naive_reason")
 
     # initialize subset
