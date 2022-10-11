@@ -28,6 +28,8 @@ install.packages("devtools")
 devtools::install_github("zeehio/facetscales")
 ```
 
+In downloading `facetscales` on Windows, it may request that you need `Rtools`. You can download that following instructions listed [here](https://cran.r-project.org/bin/windows/Rtools/).
+
 If you are on a Mac, R also requires the `Cairo` package, which itself requires that
 the [XQuartz](https://www.xquartz.org/) package is also installed. You may need to
 download and install XQuartz first, as it does not come with MacOS by default. After
