@@ -559,7 +559,7 @@ tab_heat_df <- function(cleaned_df, type,
   }
 
   if (nrow(clean_df) > 0){
-    clean_m <- melt(clean_df, id.vars = c("Label", "subjid", "id", "Label_Name"), variable.name = "Method")
+    clean_m <- reshape2::melt(clean_df, id.vars = c("Label", "subjid", "id", "Label_Name"), variable.name = "Method")
     clean_m$Label <- factor(clean_m$Label, levels = unique(clean_m$Label))
 
     # convert the text to numbers
@@ -1114,9 +1114,10 @@ gen_subj_text <- function(cleaned_df, type, subj,
   }
 }
 
-# function to generate correlation plots for methods (overall plot)
+# function to generate correlation or count plots for methods (overall plot)
 plot_methods_corr <- function(cleaned_df, type,
-                              methods_chosen = methods_avail){
+                              methods_chosen = methods_avail,
+                              show_heat_corr = F){
 
   type_n <- c(
     "HEIGHTCM" = "Height",
@@ -1148,37 +1149,57 @@ plot_methods_corr <- function(cleaned_df, type,
   corr_df[corr_df == "Include"] <- 0
   corr_df[corr_df == "Implausible"] <- 1
 
-  # compute correlation
-  corr_df <- sapply(corr_df, as.numeric)
-  corr_df <- cor(corr_df)
-  corr_df[lower.tri(corr_df)] <- NA
-
+  if (show_heat_corr){
+    # compute correlation
+    corr_df <- sapply(corr_df, as.numeric)
+    corr_df <- cor(corr_df)
+    corr_df[lower.tri(corr_df)] <- NA
+    
+    out_name <- "Correlation"
+  } else {
+    # otherwise compute counts
+    corr_df <- sapply(corr_df, as.numeric)
+    corr_df <- crossprod(corr_df)
+    corr_df[lower.tri(corr_df)] <- NA
+    
+    out_name <- "Count"
+  }
+  
   # melt into long form for ggplot
-  corr_df <- melt(corr_df)
-  colnames(corr_df) <- c("Method.1", "Method.2", "Correlation")
-  corr_df$Correlation <- signif(corr_df$Correlation, 3)
+  corr_df <- reshape2::melt(corr_df)
+  colnames(corr_df) <- c("Method.1", "Method.2", out_name)
+  corr_df[, out_name] <- signif(corr_df[, out_name], 4)
 
   # create correlation heat map
-  p <- ggplotly(
-    ggplot(corr_df, aes(Method.1, Method.2,
-                        fill = Correlation,
-                        label = Correlation))+
-      geom_tile()+
-      geom_text(size = 3)+
+  p <- ggplot(corr_df, aes_string("Method.1", "Method.2",
+                                  fill = out_name,
+                                  label = out_name))+
+    geom_tile()+
+    geom_text(size = 3)+
+    theme_bw()+
+    scale_x_discrete(expand = c(0,0))+
+    scale_y_discrete(expand = c(0,0))+
+    theme(axis.title = element_blank(),
+          axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+          plot.title = element_text(hjust = .5))+
+    ggtitle(paste0(out_name, " of Implausible Values for ", type_n[type]))+
+    NULL
+  
+  p <- p +
+    if (show_heat_corr){
       scale_fill_gradient2(
         breaks = c(-1,0,1),
         limits = c(-1,1),
-        low = "#0571b0", mid = "#f7f7f7", high = "#ca0020")+
-      theme_bw()+
-      scale_x_discrete(expand = c(0,0))+
-      scale_y_discrete(expand = c(0,0))+
-      theme(axis.title = element_blank(),
-            axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
-            plot.title = element_text(hjust = .5))+
-      ggtitle(paste0("Correlation of Implausible Values for ", type_n[type]))+
-      NULL
+        low = "#0571b0", mid = "#f7f7f7", high = "#ca0020")
+    } else {
+      scale_fill_gradient2(
+        low = "#0571b0", mid = "#f7f7f7", high = "#ca0020")
+    }
+  
+  p <- ggplotly(
+    p
   ) %>% config(displayModeBar = F)
-
+  
   return(p)
 }
 
@@ -1794,7 +1815,7 @@ ui <- navbarPage(
             ),
             checkboxInput(
               "run_age_cap",
-              HTML("<b>Run only on data less than 3.5 years?</b>"),
+              HTML("<b>Run only on records less than 3.5 years old?</b>"),
               value = F
             ),
             div(style="display:inline-block",
@@ -1837,6 +1858,11 @@ ui <- navbarPage(
             checkboxInput(
               "show_reason_count",
               label = HTML("<b>Show counts in reasons for implausible values?</b>"),
+              value = F
+            ),
+            checkboxInput(
+              "show_heat_corr",
+              label = HTML("<b>Show correlation between methods in heat map?</b>"),
               value = F
             ),
             style = "default"
@@ -2962,12 +2988,14 @@ server <- function(input, output, session) {
 
   output$overall_corr_ht <- renderPlotly({
     plot_methods_corr(cleaned_df$sub, "HEIGHTCM",
-                      methods_chosen = methods_chosen$m)
+                      methods_chosen = methods_chosen$m,
+                      show_heat_corr = input$show_heat_corr)
   })
 
   output$overall_corr_wt <- renderPlotly({
     plot_methods_corr(cleaned_df$sub, "WEIGHTKG",
-                      methods_chosen = methods_chosen$m)
+                      methods_chosen = methods_chosen$m,
+                      show_heat_corr = input$show_heat_corr)
   })
 
   # plot individual results ----
