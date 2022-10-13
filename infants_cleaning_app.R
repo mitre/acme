@@ -1842,6 +1842,11 @@ ui <- navbarPage(
             div(style="display:inline-block",
                 actionButton("add_subj_focus", "Add Subject to Focus On")
             ),
+            checkboxInput(
+              "show_indiv_impl",
+              label = HTML("<b>Only choose from subjects with at least one implausible value?</b>"),
+              value = F
+            ),
             HTML("<p>"),
             selectInput(
               "method_indiv_type",
@@ -2169,6 +2174,11 @@ ui <- navbarPage(
         ),
         p(),
         uiOutput("indiv_inter_choose"),
+        checkboxInput(
+          "show_indiv_inter_impl",
+          label = HTML("<b>Only choose from subjects with at least one implausible value?</b>"),
+          value = F
+        ),
         checkboxInput(
           "inter_color_ans",
           HTML("<b>Show answers (if available)?</b>"),
@@ -2949,12 +2959,22 @@ server <- function(input, output, session) {
 
   # plot individual results ----
 
+  #STOP HERE
   output$indiv_choose <- renderUI({
+    subj_list <- if (nrow(cleaned_df$sub) == 0){
+      c()
+    } else {
+      if (!input$show_indiv_impl){
+        unique(cleaned_df$sub$subjid)
+      } else {
+        unique(cleaned_df$sub$subjid[rowSums(cleaned_df$sub == "Implausible") > 1])
+      }
+    }
+    
     selectInput(
       "subj",
       label = HTML("<p style = 'font-weight: normal'><b>Which subject's cleaned data would you like to visualize?</b> Search for subjects by pressing backspace and typing.</p>"),
-      choices =
-        if (nrow(cleaned_df$sub) == 0){c()} else {unique(cleaned_df$sub$subjid)}
+      choices = subj_list
     )
   })
 
@@ -3291,15 +3311,20 @@ server <- function(input, output, session) {
   # output for 'examine methods' (intermediate steps) tab ----
 
   output$indiv_inter_choose <- renderUI({
+    subj_list <- if (nrow(cleaned_df$sub) == 0){
+      c()
+    } else {
+      if (!input$show_indiv_inter_impl){
+        unique(cleaned_df$sub$subjid)
+      } else {
+        unique(cleaned_df$sub$subjid[rowSums(cleaned_df$sub == "Implausible") > 1])
+      }
+    }
+    
     selectInput(
       "inter_subj",
       label = HTML("<p style = 'font-weight: normal'><b>Which subject's intermediate steps would you like to examine?</b> Search for subjects by pressing backspace and typing. Focus IDs, if added to focus list and updated, will be circled points in plot.</p>"),
-      choices =
-        if (nrow(cleaned_inter_df$sub) == 0){
-          c()
-        } else {
-          unique(cleaned_inter_df$sub$subjid)
-        }
+      choices = subj_list
     )
   })
 
