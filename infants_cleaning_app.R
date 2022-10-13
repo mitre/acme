@@ -5,7 +5,7 @@
 # This implements a prototype application to explore infants EHR cleaning
 # implementations.
 
-vers_infants_ehr <- "0.0.3"
+vers_infants_ehr <- "0.0.4"
 
 options(shiny.maxRequestSize=50*1024^2)
 

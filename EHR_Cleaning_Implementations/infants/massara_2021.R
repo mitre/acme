@@ -195,7 +195,7 @@ massara_clean_both <- function(df, inter_vals=FALSE) {
 
   # Disaggregating height and weight data ----
   
-  # map back to the data
+  # map results back to the total data frame
   for (i in c("x", "y")){
     df[merged_df[!is.na(merged_df$outlier) & merged_df$outlier == T,
                  paste0("id.", i)], 
