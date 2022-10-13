@@ -12,6 +12,8 @@
 # @author = Max Olivier
 ################################################################################
 
+library(anthro)
+
 # function to clean height and weight data by Massara, et al.
 # inputs:
 # df: data frame with 7 columns:
@@ -48,8 +50,8 @@ massara_clean_both <- function(df, inter_vals=FALSE) {
   # merge() command instead of just assignment, and merging is easier if the
   # columns aren't there already.
   # preallocate final designation
-  # df$result <- "Include"
-  # df$reason <- ""
+  df$result <- "Include"
+  df$reason <- ""
 
 
   # It seems like the merging later still works correctly even if we change the
@@ -77,10 +79,10 @@ massara_clean_both <- function(df, inter_vals=FALSE) {
   # Again probably do not want to do this here since will need to merge data not
   # just assign column as mentioned above.
   # if using intermediate values, preallocate values
-  # if (inter_vals){
-  #   df[, inter_cols] <- NA # Why is this here???
-  #   inter_df[, inter_cols] <- NA
-  # }
+  if (inter_vals){
+    df[, inter_cols] <- NA # Why is this here???
+    # inter_df[, inter_cols] <- NA
+  }
 
   # Preprocessing----
 
@@ -100,7 +102,6 @@ massara_clean_both <- function(df, inter_vals=FALSE) {
   # use for determining outliers. This function actually gives several different
   # standardized scores, but we will only pick out the weight-for-length. Need
   # to load a library first.
-  library(anthro)
   std_scores <- anthro_zscores(sex=(merged_df$sex+1), age=merged_df$age_days, weight=merged_df$measurement.y,
                                lenhei=merged_df$measurement.x)
 
@@ -193,104 +194,27 @@ massara_clean_both <- function(df, inter_vals=FALSE) {
   }
 
   # Disaggregating height and weight data ----
-
-  # List to keep disaggreagted data frames for height and weight that can then
-  # be put together with rbind().
-  disag_data <- list()
-
-  # Create data set that disaggregates "merged_df" into a format like the
-  # original "df". In order to do this, need to create separate data sets for
-  # height and weight and then rbind() them. Since just pulling the
-  # height/weight values from "merged_df" will have duplicate height/weight
-  # observations (that is the same ID multiple times), need to condense those.
-  # When condensing, label an outlier if it was part of any outlier pair, and
-  # just pick one of the weight-for-length values. Do this in a loop where 1
-  # corresponds to height and 2 to weight.
-  for(j in 1:2) {
-    # Set the columns that need to be read for height/weight.
-    if(j==1) {
-      param_dat_cols <- c("subjid", "sex", "age_days", "id.x", "param.x",
-                          "measurement.x", "zwfl", "outlier")
-    } else {
-      param_dat_cols <- c("subjid", "sex", "age_days", "id.y", "param.y",
-                          "measurement.y", "zwfl", "outlier")
+  
+  # map back to the data
+  for (i in c("x", "y")){
+    df[merged_df[!is.na(merged_df$outlier) & merged_df$outlier == T,
+                 paste0("id.", i)], 
+       "result"] <- 
+      "Implausible"
+    df[merged_df[!is.na(merged_df$outlier) & merged_df$outlier == T,
+                 paste0("id.", i)], 
+       "reason"] <- 
+      "Implausible, Step 1zwfl, ZWFL mBIV"
+    
+    if (inter_vals){
+      df[merged_df[, paste0("id.", i)], inter_cols] <- merged_df[, inter_cols]
     }
-    # The revised column names are the same for both height and weight.
-    param_dat_names <- c("subjid", "sex", "age_days", "id", "param",
-                         "measurement", "zwfl", "outlier")
-
-    # If we are collecting intermediate values, need to append the intermediate
-    # columns.
-    if(inter_vals) {
-      param_dat_cols <- c(param_dat_cols, inter_cols)
-      param_dat_names <- c(param_dat_names, inter_cols)
-    }
-
-    # Pull the appropriate data for this parameter, and give the correct column
-    # names so that things can be combined later.
-    param_dat <- merged_df[,param_dat_cols]
-    colnames(param_dat) <- param_dat_names
-
-    # Create a reduced version of the data set, where each observation ID
-    # appears only once. We set the length of the new data frame to (hopefully)
-    # speed things up a bit.
-    param_dat_reduce <- data.frame(matrix(NA, nrow=length(unique(param_dat$id)),
-                                          ncol=ncol(param_dat)))
-    colnames(param_dat_reduce) <- colnames(param_dat)
-
-    # Now fill in the reduced data frame. Do this by pulling out all the
-    # observations associated with an observation ID, checking to see if any of
-    # them are part of an outlier, and then picking a row to fill in the reduced
-    # data frame. Just choose the first outlier or non-outlier observation. Need
-    # the "i" index to keep track of which row is being filled in in the reduced
-    # data frame.
-    i <- 1
-    for(urid in unique(param_dat$id)) {
-      temp_df <- param_dat[param_dat$id==urid,]
-      outlier_rows <- which(temp_df$outlier==TRUE)
-
-      ret_row <- temp_df[1,]
-
-      if(length(outlier_rows) > 0) {
-        ret_row <- temp_df[outlier_rows[1],]
-      }
-      param_dat_reduce[i,] <- ret_row
-      i <- i+1
-    }
-
-    # Finally, put the reduced data frame into a list so that we can combine the
-    # two data frames later.
-    disag_data[[j]] <- param_dat_reduce
   }
-
-
-  # Combine the disagregated height and weight data into a single data frame.
-  # Note that even though each height/weight ID value now appears only once,
-  # this data frame almost certainly has fewer columns than the original df
-  # since somce height/weight values in the original data frame did not have a
-  # corresponding weight/height on that day, and thus a wfl value could not be
-  # computed for them (and they were not in merged_df).
-  disag_df <- rbind(disag_data[[1]], disag_data[[2]])
-
-
-  # Create "result" and "reason" columns that will then be merged onto "df".
-  disag_df$result <- ifelse(!is.na(disag_df$outlier) & (disag_df$outlier==TRUE),
-                            "Implausible", "Include")
-  disag_df$reason <- ifelse(!is.na(disag_df$outlier) & (disag_df$outlier==TRUE),
-                            "Implausible, Step 1zwfl, ZWFL mBIV", "")
-
-  # And update the values in df. Merge the result and reason columns. on id.
-  # If the rows have an NA for result or reason, it is because they didn't have
-  # a matching height/weight on that day. We want to fill in the values so that
-  # the explorer runs correctly, though.
-  df <- merge(df, disag_df[,c("id", "result", "reason")], by="id", all=TRUE)
-  df$result <- ifelse(is.na(df$result), "Include", df$result)
-  df$reason <- ifelse(is.na(df$reason), "No matching value", df$reason)
-
-  # If we want to see intermediate values, merge those on as well.
-  if(inter_vals) {
-    df <- merge(df, disag_df[,c("id", inter_cols)], by="id", all=TRUE)
-  }
+  
+  # if there's no matching value, designate
+  df[!df$id %in% c(merged_df$id.x, merged_df$id.y),  "reason"] <- 
+    "Include, no matching value"
+  
 
   return(df)
 }
