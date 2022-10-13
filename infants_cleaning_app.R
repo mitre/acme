@@ -1792,6 +1792,11 @@ ui <- navbarPage(
               HTML("<b>Run example data?</b>"),
               value = F
             ),
+            checkboxInput(
+              "run_age_cap",
+              HTML("<b>Run only on data less than 3.5 years?</b>"),
+              value = F
+            ),
             div(style="display:inline-block",
                 actionButton("run_data", "Run data!"),
                 actionButton("upload_res", "Upload Results"),
@@ -2519,8 +2524,11 @@ server <- function(input, output, session) {
       if ("ageyears" %in% colnames(df)){
         colnames(df)[colnames(df) == "ageyears"] <- "age_years"
       }
+      if ("agedays" %in% colnames(df)){
+        colnames(df)[colnames(df) == "agedays"] <- "age_days"
+      }
       # check that df has age_years or age days, preferring age_years
-      if ("agedays" %in% colnames(df) & !"age_years" %in% colnames(df)){
+      if ("age_days" %in% colnames(df) & !"age_years" %in% colnames(df)){
         df$age_years <- df$agedays /365.25
       }
       # fix id if not unique or if it doesn't exist
@@ -2529,6 +2537,11 @@ server <- function(input, output, session) {
       }
       # filter out data greater than 18
       df <- df[df$age_years <= 18, ]
+      
+      # if the user only wants to run proper infant data
+      if (input$run_age_cap){
+        df <- df[df$age_years <= 3.5, ]
+      }
 
       # run each method and save the results
       c_df <- df
