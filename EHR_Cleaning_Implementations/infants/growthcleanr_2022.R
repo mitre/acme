@@ -39,7 +39,8 @@ growthcleanr_clean_both <- function(df, inter_vals = F){
     df$param,
     df$age_days,
     df$sex,
-    df$measurement
+    df$measurement,
+    parallel = T
   )
   res <- as.character(res)
   

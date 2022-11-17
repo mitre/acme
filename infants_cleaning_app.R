@@ -1503,7 +1503,7 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
   
   # subset the data to the subject, type, and methods we care about
   # also create necessary counts for plotting and such
-  clean_df <<- sub_subj_type(cleaned_df, type, subj, methods_chosen,
+  clean_df <- sub_subj_type(cleaned_df, type, subj, methods_chosen,
                             m_types = m_inter_types)
 
   # get the possible methods for this type
