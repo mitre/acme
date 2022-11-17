@@ -2376,6 +2376,29 @@ ui <- navbarPage(
             column(width = 3)
           )
         ),
+        
+        # UI: carsley ----
+        tabPanel(
+          "Massara, et al. (2021)",
+          fluidRow(
+            column(width = 3),
+            column(
+              width = 6,
+              HTML(
+                "<h3>Massara, et al. (2021)</h3>",
+                "<h4>Cleans: Height and Weight Records</h4><p>",
+                "Massara, et al. aims to use both height and weight longitudinal data to identify outliers. This implementation focuses on their method for deciding implausible values based on a modified BIV criteria. More information on this method can be found <a href='https://dl.acm.org/doi/abs/10.5555/3507788.3507821' target = 'blank'>here</a>. Steps for this method, along with their titles (used in output) and descriptions, are below.<p>"
+              ),
+              hr(),
+              HTML(
+                "<h4>Steps:</h4>",
+                "<b>Step 1zwfl, ZWFL mBIV</b><br>",
+                "<ul><li>Identify biologically implausible according to the mBIV criteria: has a standardized score that would make it an outlier by WHO standards and that it either does not have any other observations within two years of it, or if it does that at least one of those observations has a standardized score more than 2 away.</li></ul>"
+              )
+            ),
+            column(width = 3)
+          )
+        ),
 
         # UI: growthcleanr ----
         tabPanel(
@@ -2590,6 +2613,8 @@ server <- function(input, output, session) {
         c_df[,paste0(m, "_result")] <- clean_df$result
         c_df[,paste0(m, "_reason")] <- clean_df$reason
 
+        print(colnames(c_df))
+        
         if (m %in% methods_inter_avail){
           # if adding intermediate values, we add those at the end
           inter_cols <- colnames(clean_df)[grepl("Step_", colnames(clean_df))]
@@ -2655,14 +2680,14 @@ server <- function(input, output, session) {
     filename = function() {
       if ((is.null(input$dat_file) & is.null(input$dat_inter_file)) |
           input$run_inter_ex){
-        "Adult_EHR_Cleaning_Results_data_example.csv"
+        "Infants_EHR_Cleaning_Results_data_example.csv"
       } else {
         fn <- ifelse(is.null(input$dat_file),
                      input$dat_inter_file$name,
                      input$dat_file$name
         )
 
-        paste0("Adult_EHR_Cleaning_Results_", fn)
+        paste0("Infants_EHR_Cleaning_Results_", fn)
       }
     },
     content = function(file) {
