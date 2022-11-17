@@ -600,9 +600,9 @@ tab_inter_vals <- function(cleaned_df, subj, step,
 
   # values we want to focus on in the table
   step_focus <-
-    if (grepl("h", step)){
+    if (grepl("h", step) & nchar(gsub("\\d", "",  step)) == 1){
       "HEIGHTCM"
-    } else if (grepl("w", step)){
+    } else if (grepl("w", step) & nchar(gsub("\\d", "",  step)) == 1){
       "WEIGHTKG"
     } else {
       c("HEIGHTCM", "WEIGHTKG")
@@ -1492,18 +1492,18 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
 
   type <- c("HEIGHTCM", "WEIGHTKG")
   step_focus <- type_map[
-    if (grepl("h", step)){
+    if (grepl("h", step) & nchar(gsub("\\d", "",  step)) == 1){
       "HEIGHTCM"
-    } else if (grepl("w", step)){
+    } else if (grepl("w", step) & nchar(gsub("\\d", "",  step)) == 1){
       "WEIGHTKG"
     } else {
       c("HEIGHTCM", "WEIGHTKG")
     }
   ]
-
+  
   # subset the data to the subject, type, and methods we care about
   # also create necessary counts for plotting and such
-  clean_df <- sub_subj_type(cleaned_df, type, subj, methods_chosen,
+  clean_df <<- sub_subj_type(cleaned_df, type, subj, methods_chosen,
                             m_types = m_inter_types)
 
   # get the possible methods for this type
@@ -1595,7 +1595,6 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
   #   # filter out all the weights
   #   bf_df <- bf_df[bf_df$param == "Height (cm)",]
   # }
-
 
   # if it's the end, we want to make all the implausible NA
   if (step == "After"){
@@ -1710,7 +1709,7 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
       scales_y[[type_map[t]]] <- scale_y_continuous(limits = yaxis_lim)
     }
   }
-
+  
   p <- suppressWarnings(
     ggplot(bf_df, aes(customdata = id))+
       geom_line(
@@ -2607,14 +2606,10 @@ server <- function(input, output, session) {
             df, inter_vals = T
           )
 
-        print(nrow(clean_df))
-
         # add the results to the overall dataframe
         c_df[,paste0(m, "_result")] <- clean_df$result
         c_df[,paste0(m, "_reason")] <- clean_df$reason
 
-        print(colnames(c_df))
-        
         if (m %in% methods_inter_avail){
           # if adding intermediate values, we add those at the end
           inter_cols <- colnames(clean_df)[grepl("Step_", colnames(clean_df))]
@@ -3420,11 +3415,11 @@ server <- function(input, output, session) {
     } else {
       # get the maximum iterations
       step <- as.character(input[["growthcleanr-naive_method_step"]])
-      # values we want to focus on in the table
-      step_focus <-
-        if (grepl("h", step)){
+      # values we want to focus on in the table (second clause counts alpha char)
+      step_focus <- 
+        if (grepl("h", step) & nchar(gsub("\\d", "",  step)) == 1){
           "HEIGHTCM"
-        } else if (grepl("w", step)){
+        } else if (grepl("w", step) & nchar(gsub("\\d", "",  step)) == 1){
           "WEIGHTKG"
         } else {
           c("HEIGHTCM", "WEIGHTKG")

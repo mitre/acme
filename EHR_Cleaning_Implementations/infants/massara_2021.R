@@ -38,8 +38,8 @@ massara_clean_both <- function(df, inter_vals=FALSE) {
   inter_cols <- c(
     "Step_1zwfl_MinAge_Diff",
     "Step_1zwfl_MaxSD_Diff_Under2Yrs",
-    "Step_1zwfl_Result",
-    "Step_1zwfl_Standardized_Values"
+    "Step_1zwfl_Standardized_Values",
+    "Step_1zwfl_Result"
   )
 
   # Begin implementation ----
@@ -188,9 +188,10 @@ massara_clean_both <- function(df, inter_vals=FALSE) {
 
   # Set the values of "Step_1zwfl_Result" and "Step_1zwfl_Standardized_Values"
   # which correspond directly to two of the columns already in merged_df.
-  if(inter_vals) {
+  if (inter_vals) {
     merged_df$Step_1zwfl_Standardized_Values <- merged_df$zwfl
     merged_df$Step_1zwfl_Result <- merged_df$outlier
+    merged_df$Step_1zwfl_Result[is.na(merged_df$outlier)] <- F
   }
 
   # Disaggregating height and weight data ----
