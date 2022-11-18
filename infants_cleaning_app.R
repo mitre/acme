@@ -7,7 +7,7 @@
 
 vers_infants_ehr <- "0.0.4"
 
-options(shiny.maxRequestSize=50*1024^2)
+options(shiny.maxRequestSize=500*1024^2)
 
 # load libraries, scripts, and data ----
 
@@ -2655,19 +2655,49 @@ server <- function(input, output, session) {
 
   # upload result data
   observeEvent(input$upload_res, {
-    c_df <-
-      if (is.null(input$dat_file)){
-        # use example data
-        dat_res
-      } else {
-        read.csv(input$dat_file$datapath)
+    withProgress(message = "Uploading data!", {
+      c_df <-
+        if (is.null(input$dat_file)){
+          # use example data
+          dat_res
+        } else {
+          read.csv(input$dat_file$datapath)
+        }
+      # because it reads in dashes as periods
+      colnames(c_df)[grepl("naive", colnames(c_df))] <-
+        c("growthcleanr-naive_result", "growthcleanr-naive_reason")
+      
+      # initialize subset
+      cleaned_df$full <- cleaned_df$sub <- c_df[, !grepl("Step_", colnames(c_df))]
+      
+      if (any(grepl("Step_", colnames(c_df)))){
+        cleaned_inter_df$full <- cleaned_inter_df$sub <- c_df
       }
-    # because it reads in dashes as periods
-    colnames(c_df)[grepl("naive", colnames(c_df))] <-
-      c("growthcleanr-naive_result", "growthcleanr-naive_reason")
-
-    # initialize subset
-    cleaned_df$full <- cleaned_df$sub <- c_df
+    })
+  })
+  
+  # upload result data
+  observeEvent(input$upload_inter_res, {
+    withProgress(message = "Uploading data!", {
+      c_df <-
+        if (is.null(input$dat_inter_file)){
+          # use example data
+          dat_res
+        } else {
+          read.csv(input$dat_inter_file$datapath)
+        }
+      # because it reads in dashes as periods
+      colnames(c_df)[grepl("naive", colnames(c_df))] <-
+        c("growthcleanr-naive_result", "growthcleanr-naive_reason")
+      
+      # initialize subset
+      cleaned_df$full <- cleaned_df$sub <- 
+        c_df[, !grepl("Step_", colnames(c_df))]
+      
+      if (any(grepl("Step_", colnames(c_df)))){
+        cleaned_inter_df$full <- cleaned_inter_df$sub <- c_df
+      }
+    })
   })
 
   # download data results
