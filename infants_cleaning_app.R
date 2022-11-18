@@ -175,7 +175,8 @@ m_inter_steps_full_subtitle <- list(
 # processing functions ----
 
 # function to tabulate results of a given height or weight
-tab_clean_res <- function(cleaned_df, type, methods_chosen = methods_avail){
+tab_clean_res <- function(cleaned_df, type, methods_chosen = methods_avail, 
+                          show_perc_bar = F){
   m_for_type <- m_types[[type]][m_types[[type]] %in% methods_chosen]
 
   if (length(m_for_type) == 0){
@@ -193,7 +194,10 @@ tab_clean_res <- function(cleaned_df, type, methods_chosen = methods_avail){
   rownames(t_tab) <- m_for_type
   for (m in m_for_type){
     tab <- table(cleaned_df[cleaned_df$param == type, paste0(m, "_result")])
-    t_tab[m,names(tab)] <- tab
+    if (show_perc_bar){
+      tab <- round(tab/sum(cleaned_df$param == type)*100, 2)
+    }
+    t_tab[m, names(tab)] <- tab
   }
 
   return(t_tab)
@@ -1855,6 +1859,11 @@ ui <- navbarPage(
               selected = "Implausible"
             ),
             checkboxInput(
+              "show_perc_bar",
+              label = HTML("<b>Show percentages of total in bar graphs?</b>"),
+              value = F
+            ),
+            checkboxInput(
               "show_reason_count",
               label = HTML("<b>Show counts in reasons for implausible values?</b>"),
               value = F
@@ -3011,12 +3020,14 @@ server <- function(input, output, session) {
   })
 
   output$overall_ht <- renderPlotly({
-    ht_tab <- tab_clean_res(cleaned_df$sub, "HEIGHTCM", methods_chosen$m)
+    ht_tab <- tab_clean_res(cleaned_df$sub, "HEIGHTCM", methods_chosen$m,
+                            input$show_perc_bar)
     plot_bar(ht_tab, input$togg_res_count)
   })
 
   output$overall_wt <- renderPlotly({
-    wt_tab <- tab_clean_res(cleaned_df$sub, "WEIGHTKG", methods_chosen$m)
+    wt_tab <- tab_clean_res(cleaned_df$sub, "WEIGHTKG", methods_chosen$m,
+                            input$show_perc_bar)
     plot_bar(wt_tab, input$togg_res_count)
   })
 
@@ -3050,7 +3061,6 @@ server <- function(input, output, session) {
 
   # plot individual results ----
 
-  #STOP HERE
   output$indiv_choose <- renderUI({
     subj_list <- if (nrow(cleaned_df$sub) == 0){
       c()
@@ -3058,6 +3068,8 @@ server <- function(input, output, session) {
       if (!input$show_indiv_impl){
         unique(cleaned_df$sub$subjid)
       } else {
+        tmp <<- cleaned_df$sub
+        
         unique(cleaned_df$sub$subjid[rowSums(cleaned_df$sub == "Implausible") > 1])
       }
     }
