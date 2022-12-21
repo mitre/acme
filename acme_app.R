@@ -5,10 +5,12 @@
 # This implements an application to explore anthropometric cleaning
 # implementations.
 
-# USER: edit this line to compare different anthropometric methods for your
-# configuration
+# USER: uncomment/edit one of the lines below to compare different anthropometric 
+# methods for your configuration
 
 comp_config <- "infants_config.R"
+# comp_config <- "adult_config.R"
+# comp_config <- "NEW_config.R"
 
 # version and options ---- 
 
