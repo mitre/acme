@@ -12,7 +12,7 @@ comp_config <- "infants_config.R"
 
 # version and options ---- 
 
-vers_ehr <- "0.0.4"
+vers_ehr <- "2.0.0"
 
 options(shiny.maxRequestSize=500*1024^2)
 
