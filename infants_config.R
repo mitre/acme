@@ -18,6 +18,11 @@ dat_res <- read.csv(
   file.path("Data", comp_title, "synthea-infants-sub-100subj.csv")
 )
 
+# default age range to focus on ----
+
+age_low <- 0
+age_high <- 3.5
+
 # method specification ----
 
 # regular methods

@@ -1712,10 +1712,11 @@ ui <- navbarPage(
               HTML("<b>Run example data?</b>"),
               value = F
             ),
-            checkboxInput(
+            numericRangeInput(
               "run_age_cap",
-              HTML("<b>Run only on records less than 3.5 years old?</b>"),
-              value = F
+              "Run only on records between ages (in years):",
+              value = c(age_low, age_high),
+              min = 0
             ),
             div(style="display:inline-block",
                 actionButton("run_data", "Run data!"),
@@ -2341,10 +2342,9 @@ server <- function(input, output, session) {
         df$id <- 1:nrow(df)
       }
       
-      # if the user only wants to run proper infant data
-      if (input$run_age_cap){
-        df <- df[df$age_years <= 3.5, ]
-      }
+      # run only records specified
+      df <- df[df$age_years <= input$run_age_cap[2], ]
+      df <- df[df$age_years >= input$run_age_cap[1], ]
       
       # run each method and save the results
       c_df <- df
