@@ -6,7 +6,7 @@
 # to 24 months.
 # The code below is an R implementation of the author's original Stata code
 # (contained in Supplementary materials of the paper). The original paper is
-# available at:
+# available at: https://www.sciencedirect.com/science/article/pii/S1047279717306129
 #
 #
 # @author = Max Olivier
