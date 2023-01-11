@@ -25,7 +25,7 @@ following in the console:
 
 ```{r}
 install.packages("devtools")
-devtools::install_github("zeehio/facetscales")
+devtools::install_github("zeehio/facetscales", ref = "archived")
 ```
 
 In downloading `facetscales` on Windows, it may request that you need `Rtools`. You can download that following instructions listed [here](https://cran.r-project.org/bin/windows/Rtools/)..
