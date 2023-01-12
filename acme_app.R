@@ -717,9 +717,9 @@ server <- function(input, output, session) {
       high_cutoff <- ifelse(is.na(input$run_age_cap[2]),
                             Inf,
                             input$run_age_cap[2])
-      low_cutoff <- ifelse(is.na(input$run_age_cap[2]) | input$run_age_cap[2] < 0,
+      low_cutoff <- ifelse(is.na(input$run_age_cap[1]) | input$run_age_cap[1] < 0,
                            0,
-                           input$run_age_cap[2])
+                           input$run_age_cap[1])
       
       # run only records specified
       df <- df[df$age_years <= high_cutoff, ]
