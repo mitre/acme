@@ -52,6 +52,27 @@ External".
 7. Have fun! More information on running the application and methods involved can be
 found within the app.
 
+## R and Package Versions
+
+ACME was developed using R 4.2.1. Package versions used include:
+
+- shiny: 1.7.1
+- ggplot2: 3.3.6
+- rstudioapi: 0.13
+- colorspace: 2.0-3
+- plotly: 4.10.0
+- viridisLite: 0.4.0
+- ggplotify: 0.1.0
+- reshape2: 1.4.4
+- shinyBS: 0.61.1
+- shinyWidgets: 0.7.0
+- data.table: 1.14.2
+- growthcleanr: 2.0.1
+- lme4: 1.1-30
+- anthro: 1.0.0
+
+If ACME is not working, please check and update package versions.
+
 ## Data Format
 
 Data format is modeled after the [growthcleanr]() algorithm. To use data within ACME, your data must contain columns with the following format (names must be exact):
@@ -122,7 +143,7 @@ To add intermediate steps (for the "Compare" section of ACME), add columns with 
 
 # Attribution
 
-Copyright 2020-2021 The MITRE Corporation.
+(c) 2020-2021 The MITRE Corporation.
 
 
 
