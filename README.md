@@ -97,6 +97,13 @@ Algorithms included for comparison of infants algorithm are:
 
 Algorithms included for comparison of adult algorithms are:
 
+- [Muthalagu, et al. (2014)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3974252/)
+- [Cheng, et al. (2016)](https://onlinelibrary.wiley.com/doi/full/10.1002/oby.21612)
+- [Chan, et al. (2017)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5359164/)
+- [Littman, et al. (2012)](https://www.cdc.gov/pcd/issues/2012/11_0267.htm)
+- [Breland, et al. (2017)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5359156/)
+- [growthcleanr-"naive"](https://academic.oup.com/jamia/article/24/6/1080/3767271) (a modified version of growthcleanr that only uses extreme EWMA step)
+
 If you could like to include other algorithms in the ACME framework for comparison, see the "Using the ACME Framework for Other Anthropometric Algorithms" section.
 
 ## Features
