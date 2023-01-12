@@ -75,7 +75,7 @@ If ACME is not working, please check and update package versions.
 
 ## Data Format
 
-Data format is modeled after the [growthcleanr]() algorithm. To use data within ACME, your data must contain columns with the following format (names must be exact):
+Data format is modeled after the [growthcleanr](https://carriedaymont.github.io/growthcleanr/articles/quickstart.html#data-preparation) algorithm. To use data within ACME, your data must contain columns with the following format (names must be exact):
 
 - id: number for each row, must be unique
 - subjid: character, subject ID
@@ -181,7 +181,7 @@ To add intermediate steps (for the "Compare" section of ACME), add columns with 
 
 # Attribution
 
-(c) 2020-2021 The MITRE Corporation.
+(c) 2020-2023 The MITRE Corporation.
 
 
 
