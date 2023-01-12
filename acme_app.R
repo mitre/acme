@@ -8,8 +8,8 @@
 # USER: uncomment/edit one of the lines below to compare different anthropometric 
 # methods for your configuration
 
-comp_config <- "infants_config.R"
-# comp_config <- "adult_config.R"
+# comp_config <- "infants_config.R"
+comp_config <- "adult_config.R"
 # comp_config <- "NEW_config.R"
 
 # version and options ---- 
@@ -713,9 +713,16 @@ server <- function(input, output, session) {
         df$id <- 1:nrow(df)
       }
       
+      high_cutoff <- ifelse(is.na(input$run_age_cap[2]),
+                            Inf,
+                            input$run_age_cap[2])
+      low_cutoff <- ifelse(is.na(input$run_age_cap[2]) | input$run_age_cap[2] < 0,
+                           0,
+                           input$run_age_cap[2])
+      
       # run only records specified
-      df <- df[df$age_years <= input$run_age_cap[2], ]
-      df <- df[df$age_years >= input$run_age_cap[1], ]
+      df <- df[df$age_years <= high_cutoff, ]
+      df <- df[df$age_years >= low_cutoff, ]
       
       # run each method and save the results
       c_df <- df
