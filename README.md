@@ -12,7 +12,7 @@ implementing a variety of methods. For adults, this currently includes Muthalagu
 To run this application, please follow the following steps (assuming you have already
 downloaded/cloned this repository):
 
-1. Download [R](https://www.r-project.org/) and [RStudio](https://posit.co/products/open-source/rstudio/).
+1. Install [R](https://www.r-project.org/) and [RStudio](https://posit.co/products/open-source/rstudio/).
 2. Open RStudio.
 3. In the console window (bottom-left corner by default), enter the following to download necessary packages:
 
@@ -87,7 +87,38 @@ Data format is modeled after the [growthcleanr]() algorithm. To use data within 
 
 ## Included Algorithms
 
+Algorithms included for comparison of infants algorithm are:
+- [Yang, et al. (2016)](https://www.sciencedirect.com/science/article/pii/S1047279717306129)
+- [Shi, et al. (2018)](https://www.sciencedirect.com/science/article/pii/S1047279715004184)
+- [Carsley, et al. (2018)](https://informatics.bmj.com/content/25/1/19.long)
+- [Massara, et al. (2021)](https://dl.acm.org/doi/abs/10.5555/3507788.3507821) (uses only BIV criteria)
+- [growthcleanr](https://academic.oup.com/jamia/article/24/6/1080/3767271) (uses most recent CRAN version)
+- [growthcleanr-"naive"](https://academic.oup.com/jamia/article/24/6/1080/3767271) (a modified version of growthcleanr that only uses extreme EWMA step)
+
+Algorithms included for comparison of adult algorithms are:
+
+If you could like to include other algorithms in the ACME framework for comparison, see the "Using the ACME Framework for Other Anthropometric Algorithms" section.
+
 ## Features
+
+Once you have ACME up and have run your data through, there are two parts of the application: Compare Results and Examine Methods.
+
+![Compare Results Tab View](Figures/ACME_Infants_Compare_Results.png "Compare Results Tab View")
+
+Compare Results lets you view compare algorithm results at a high level, with tabs including:
+- Overall: Bar graphs of counts of implausible values, reasons for those implausible values, and a correlation matrix of similarity between methods
+- Individual: Scatterplots of results for a single subject, colored by whether the point was implausible by any method or not. Also includes lines of best fit and standard deviations. Counts and reasons for implausibility appear below the plot.
+- Individual: Scatterplots and summaries of results for a single subject for each method.
+- All Individuals: Heat map of results for all subjects across all methods, colored by correct or incorrect answers if included.
+- Check Answers: Bar graphs of count of correct answers for both included and implausible values, if included.
+- View Results: Table of results for each record.
+
+![Examine Methods Tab View](Figures/ACME_Infants_Examine_Methods.png "Examine Methods Tab View")
+
+Examine Methods lets you dig deeper into the reasons for each method's choices. Graphs to the right show an individual subject's value for height and weight, sorting before the algorithm. Using the slider above will let you "step through" each step in the algorithm, with:
+- A short description of each step
+- Updated graphs for that subject, if the step resulted in any values being designated as implausible
+- A table below showing exact values for the relevant step (height, weight, or both), and values that the algorithm used to make the decision. Hovering over any point in the plot will highlight its corresponding column in the table.
 
 ## Using the ACME Framework for Other Anthropometric Algorithms
 
