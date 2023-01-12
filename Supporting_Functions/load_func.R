@@ -4,6 +4,16 @@
 
 # Helper functions to load/process functions.
 
+# overall constants ----
+
+# define commonly used colors
+# colors chosen to be colorblind-friendly
+col_impl_med <- "#fdb863" 
+col_impl_high <- "#e66101" 
+col_inc_med <- "#b2abd2" 
+col_inc_high <- "#5e3c99"
+col_default <- "#000000" 
+
 # support functions ----
 
 # load requisite functions

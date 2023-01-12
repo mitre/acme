@@ -45,7 +45,7 @@ plot_answer_bar <- function(t_tab, yval = "Count",
     
     fill_color <-
       if (group){
-        c("Include" = "#b2abd2","Implausible" = "#fdb863")
+        c("Include" = col_inc_med,"Implausible" = col_impl_med)
       } else {
         m_colors
       }
@@ -132,8 +132,8 @@ plot_cleaned <- function(cleaned_df, type, subj,
   
   # maps for configuring ggplot
   color_map <- c(
-    "Include" = "#000000",
-    "Implausible" = "#fdb863"
+    "Include" = col_default,
+    "Implausible" = col_impl_med
   )
   
   shape_map <- c(
@@ -530,23 +530,23 @@ plot_result_heat_map <- function(cleaned_df, type,
       # if we're highlighting incorrect answers, make those brighter
       if (hl_incorr){
         c(
-          "Incorrect: Include (False Negative)" = "#5e3c99",
-          "Correct: Include (True Negative)" = "#b2abd2",
-          "Incorrect: Implausible (False Positive)" = "#e66101",
-          "Correct: Implausible (True Positive)" = "#fdb863"
+          "Incorrect: Include (False Negative)" = col_inc_high,
+          "Correct: Include (True Negative)" = col_inc_med,
+          "Incorrect: Implausible (False Positive)" = col_impl_high,
+          "Correct: Implausible (True Positive)" = col_impl_med
         )
       } else {
         c(
-          "Correct: Include (True Negative)" = "#5e3c99",
-          "Incorrect: Include (False Negative)" = "#b2abd2",
-          "Correct: Implausible (True Positive)" = "#e66101",
-          "Incorrect: Implausible (False Positive)" = "#fdb863"
+          "Correct: Include (True Negative)" = col_inc_high,
+          "Incorrect: Include (False Negative)" = col_inc_med,
+          "Correct: Implausible (True Positive)" = col_impl_high,
+          "Incorrect: Implausible (False Positive)" = col_impl_med
         )
       }
     } else {
       c(
-        "Include" = "#b2abd2",
-        "Implausible" = "#fdb863"
+        "Include" = col_inc_med,
+        "Implausible" = col_impl_med
       )
     }
   if (!legn){
@@ -710,29 +710,29 @@ plot_inter_cleaned <- function(cleaned_df, subj, step,
       # if we're highlighting incorrect answers, make those brighter
       if (T){#(hl_incorr){ FIX LATER
         c(
-          "Incorrect: Include (False Negative)" = "#5e3c99",
-          "Correct: Include (True Negative)" = "#b2abd2",
-          "Incorrect: Implausible (False Positive)" = "#e66101",
-          "Correct: Implausible (True Positive)" = "#fdb863",
-          "Not Calculated" = "#000000",
-          "Unknown" = "#000000"
+          "Incorrect: Include (False Negative)" = col_inc_high,
+          "Correct: Include (True Negative)" = col_inc_med,
+          "Incorrect: Implausible (False Positive)" = col_impl_high,
+          "Correct: Implausible (True Positive)" = col_impl_med,
+          "Not Calculated" = col_default,
+          "Unknown" = col_default
         )
       } else {
         c(
-          "Correct: Include (True Negative)" = "#5e3c99",
-          "Incorrect: Include (False Negative)" = "#b2abd2",
-          "Correct: Implausible (True Positive)" = "#e66101",
-          "Incorrect: Implausible (False Positive)" = "#fdb863",
-          "Not Calculated" = "#000000",
-          "Unknown" = "#000000"
+          "Correct: Include (True Negative)" = col_inc_high,
+          "Incorrect: Include (False Negative)" = col_inc_med,
+          "Correct: Implausible (True Positive)" = col_impl_high,
+          "Incorrect: Implausible (False Positive)" = col_impl_med,
+          "Not Calculated" = col_default,
+          "Unknown" = col_default
         )
       }
     } else {
       c(
-        "Include" = "#000000",
-        "Not Calculated" = "#000000",
-        "Unknown" = "#000000",
-        "Implausible" = "#fdb863"
+        "Include" = col_default,
+        "Not Calculated" = col_default,
+        "Unknown" = col_default,
+        "Implausible" = col_impl_med
       )
     }
   
