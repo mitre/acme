@@ -179,9 +179,11 @@ To add intermediate steps (for the "Compare" section of ACME), add columns with 
 
 8. Then follow the instructions in "Installation and Quickstart" to get started!
 
-# Attribution
+# Notice
 
-(c) 2020-2023 The MITRE Corporation.
+Copyright 2020-2021 The MITRE Corporation.
+
+Approved for Public Release; Distribution Unlimited. Case Number 19-2008
 
 
 
