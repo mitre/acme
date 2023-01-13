@@ -8,8 +8,8 @@
 # USER: uncomment/edit one of the lines below to compare different anthropometric 
 # methods for your configuration
 
-comp_config <- "infants_config.R"
-# comp_config <- "adult_config.R"
+# comp_config <- "infants_config.R"
+comp_config <- "adult_config.R"
 # comp_config <- "NEW_config.R"
 
 # version and options ---- 
@@ -706,7 +706,10 @@ server <- function(input, output, session) {
       }
       # check that df has age_years or age days, preferring age_years
       if ("age_days" %in% colnames(df) & !"age_years" %in% colnames(df)){
-        df$age_years <- df$agedays /365.25
+        df$age_years <- df$age_days /365.25
+      }
+      if ("age_years" %in% colnames(df) & !"age_days" %in% colnames(df)){
+        df$age_days <- df$age_years * 365.25
       }
       # fix id if not unique or if it doesn't exist
       if (is.null(df$id) || length(unique(df$id)) != nrow(df)){
