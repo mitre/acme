@@ -8,8 +8,8 @@
 # USER: uncomment/edit one of the lines below to compare different anthropometric 
 # methods for your configuration
 
-# comp_config <- "infants_config.R"
-comp_config <- "adult_config.R"
+comp_config <- "infants_config.R"
+# comp_config <- "adult_config.R"
 # comp_config <- "NEW_config.R"
 
 # version and options ---- 
@@ -1629,6 +1629,17 @@ server <- function(input, output, session) {
     }
   })
   
+  # we're only going to render the bucket steps for muthalgu
+  output[["muthalagu_bucket_step_ui"]] <- renderUI({
+    sliderTextInput(
+      "muthalagu_bucket_step",
+      "Choose Age Bucket:",
+      choices = c("18-25", "25-50", "50-Inf"),
+      selected = "18-25"
+    )
+  })
+  
+  
   lapply(paste0(methods_inter_avail, "_step_title"), function(x){
     output[[x]] <- renderUI({
       ms <-  as.character(
@@ -1721,6 +1732,9 @@ server <- function(input, output, session) {
                            if (tolower(input$inter_tabset) ==
                                "growthcleanr-naive"){
                              input[["growthcleanr-naive_iter_step"]]
+                           } else if (tolower(input$inter_tabset) ==
+                                      "muthalagu") {
+                             input$muthalagu_bucket_step
                            } else {1},
                          legn = T)
     })
