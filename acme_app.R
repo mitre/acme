@@ -18,6 +18,8 @@ vers_ehr <- "2.0.0"
 
 options(shiny.maxRequestSize=500*1024^2)
 
+addResourcePath("Figures", "Figures")
+
 # load libraries, scripts, and data ----
 
 library(shiny)
@@ -622,6 +624,40 @@ ui <- navbarPage(
 # SERVER ----
 
 server <- function(input, output, session) {
+  # welcome modal ----
+  
+  showModal(modalDialog(
+    title = HTML("<b><center>Welcome to the Anthropometric Methods Cleaning Explorer (ACME)!</center></b>"),
+    size = "l",
+    HTML(paste0(
+      "<p>This application seeks to provide a framework for comparing different anthropometric cleaning methods, including automatic runs for implemented algorithms, comparison visualization, and in-depth walk-throughs of results.</p>",
+      "<p>For more information about the data format and algorithms for this application, please click on the <b>About</b> tab at the top.</p>",
+      "<p>ACME lets you compare algorithms in two ways, <b>Compare Results</b> and <b>Examine Methods</b>:</p>"
+    )),
+    fluidRow(
+      column(
+        width = 6,
+        HTML("<b><p><center>Comapre Results</p></b>"),
+        img(src = file.path("Figures", "ACME_Infants_Compare_Results.png"), align = "center", height = "200px"),
+        HTML("<font size = '2'><p><i>Lets you view compare algorithm results at a high level, with overall counts and individual subject results</i></p></center></font>")
+      ),
+      column(
+        width = 6,
+        HTML("<b><p><center>Explore Methods</p></b>"),
+        img(src = file.path("Figures", "ACME_Infants_Examine_Methods.png"), align = "center", height = "200px"),
+        HTML("<font size = '2'><p><i>Lets you dig deeper into a method's choices, allowing you to \"step through\" each algorithm</p></i></center></font>")
+      )
+    ),
+    HTML(paste0(
+      "<p>For more information about specific fetaures for each way, please see the accompanying README for this repository.</p>"
+    )),
+    HTML(paste0(
+      "<p>Click the <b>\"Run data!\"</b> button in the sidebar to get started!</p>"
+    )),
+    easyClose = TRUE,
+    footer = NULL
+  ))
+  
   # preallocate reactive values ----
   
   cleaned_df <- reactiveValues(
