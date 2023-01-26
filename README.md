@@ -6,10 +6,9 @@ ACME has been implemented to compare infants and adult data cleaning algorithms.
 
 ## Installation and Quickstart
 
-To run this application, please follow the following steps (assuming you have already
-downloaded/cloned this repository):
+To run this application, please follow the following steps:
 
-1. Install [R](https://www.r-project.org/) and [RStudio](https://posit.co/products/open-source/rstudio/).
+1. Install [R](https://cran.rstudio.com/) and [RStudio](https://posit.co/products/open-source/rstudio/).
 2. Open RStudio.
 3. In the console window (bottom-left corner by default), enter the following to download necessary packages:
 
@@ -25,7 +24,9 @@ install.packages("devtools")
 devtools::install_github("zeehio/facetscales", ref = "archived")
 ```
 
-In downloading `facetscales` on Windows, it may request that you need `Rtools`. You can download that following instructions listed [here](https://cran.r-project.org/bin/windows/Rtools/)..
+Versions for packages used in development can be found in the [R and Package Versions](#r-and-package-versions) section.
+
+In downloading `facetscales` on Windows, it may request that you need `Rtools`. You can download that following instructions listed [here](https://cran.r-project.org/bin/windows/Rtools/), making sure to match the Rtools version to your R version.
 
 If you are on a Mac, R also requires the `Cairo` package, which itself requires that
 the [XQuartz](https://www.xquartz.org/) package is also installed. You may need to
@@ -39,14 +40,15 @@ install.packages("Cairo")
 Note that this may ask for some input about updating related packages -- "no" is a fine
 answer. This may take some time.
 
-4. Open `acme_app.R`, which should be included in the downloaded files from
+4. Download this repository by clicking "Code" in the top right corner of the repository, and cloning through git with the given instructions or downloading a ZIP file. If the ZIP file is downloaded, unzip it.
+5. In this downloaded repository folder, open `acme_app.R`, which should be included in the downloaded files from
 this repository. It should open in the top-left corner pane of RStudio by default.
-5. ACME is is set to run the infants comparison algorithms by default. If you would like to use the adult comparison algorithms, comment out line 11 by putting a `#` at the beginning of the line and deleting the `#` on line 12. To run a custom configuration, please see the section "Using the ACME Framework".
-5. In the top right corner of the pane with the `acme_app.R` script, you should see the
+6. ACME is is set to run the infants comparison algorithms by default. If you would like to use the adult comparison algorithms, comment out line 11 by putting a `#` at the beginning of the line and deleting the `#` on line 12. To run a custom configuration, please see the section [Using the ACME Framework](#using-the-acme-framework).
+7. In the top right corner of the pane with the `acme_app.R` script, you should see the
 button, "Run App". Click on the small downwards arrow next to it and choose "Run
 External".
-6. Now click "Run App". This should open the application in your default browser window.
-7. Have fun! More information on running the application and methods involved can be
+8. Now click "Run App". This should open the application in your default browser window.
+9. Have fun! More information on running the application and methods involved can be
 found within the app.
 
 ## R and Package Versions
@@ -68,19 +70,19 @@ ACME was developed using R 4.2.1. Package versions used include:
 - lme4: 1.1-30
 - anthro: 1.0.0
 
-If ACME is not working, please check and update package versions.
+If ACME is not working, please check and update package versions. Once you have checked, please create a detailed issue on ACME's GitHub site.
 
 ## Data Format
 
 Data format is modeled after the [growthcleanr](https://carriedaymont.github.io/growthcleanr/articles/quickstart.html#data-preparation) algorithm. To use data within ACME, your data must contain columns with the following format (names must be exact):
 
-- id: number for each row, must be unique
-- subjid: character, subject ID
-- param: character, parameter for each measurement. must be either HEIGHTCM (height in centimeters) or WEIGHTKG (weight in kilograms)
-- measurement: numeric, measurement of height or weight, corresponding to the parameter
-- age_years AND/OR age_days: numeric, age in years or age in days
-- sex: numeric, 0 (male) or 1 (female)
-- answers: (not required) character, an answer column, indicating whether the value should be Include or Implausible
+- **id**: number for each row, must be unique
+- **subjid**: character, subject ID
+- **param**: character, parameter for each measurement. must be either HEIGHTCM (height in centimeters) or WEIGHTKG (weight in kilograms)
+- **measurement**: numeric, measurement of height or weight, corresponding to the parameter
+- **age_years** AND/OR **age_days**: numeric, age in years or age in days
+- **sex**: numeric, 0 (male) or 1 (female)
+- **answers**: (not required) character, an answer column, indicating whether the value should be Include or Implausible
 
 ## Included Algorithms
 
@@ -112,7 +114,6 @@ Once you have ACME up and have run your data through, there are two parts of the
 Compare Results lets you view compare algorithm results at a high level, with tabs including:
 - Overall: Bar graphs of counts of implausible values, reasons for those implausible values, and a correlation matrix of similarity between methods
 - Individual: Scatterplots of results for a single subject, colored by whether the point was implausible by any method or not. Also includes lines of best fit and standard deviations. Counts and reasons for implausibility appear below the plot.
-- Individual: Scatterplots and summaries of results for a single subject for each method.
 - All Individuals: Heat map of results for all subjects across all methods, colored by correct or incorrect answers if included.
 - Check Answers: Bar graphs of count of correct answers for both included and implausible values, if included.
 - View Results: Table of results for each record.
