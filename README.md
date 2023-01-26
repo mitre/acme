@@ -10,7 +10,7 @@ To run this application, please follow the following steps:
 
 1. Install [R](https://cran.rstudio.com/) and [RStudio](https://posit.co/products/open-source/rstudio/).
 2. Open RStudio.
-3. In the console window (bottom-left corner by default), enter the following to download necessary packages:
+3. In the console window (bottom-left corner by default), enter the following to download necessary packages (note: donwloading package requirements may take a while):
 
 ```{r}
 install.packages(c("shiny", "ggplot2", "rstudioapi", "colorspace", "plotly", "viridisLite", "ggplotify", "reshape2", "shinyBS", "shinyWidgets", "data.table", "growthcleanr", "lme4", "anthro"))
@@ -47,7 +47,7 @@ this repository. It should open in the top-left corner pane of RStudio by defaul
 7. In the top right corner of the pane with the `acme_app.R` script, you should see the
 button, "Run App". Click on the small downwards arrow next to it and choose "Run
 External".
-8. Now click "Run App". This should open the application in your default browser window.
+8. Now click "Run App". This should open the application in your default browser window. If you want to run the application with example data, click the "Run data!" button in the sidebar to get started.
 9. Have fun! More information on running the application and methods involved can be
 found within the app.
 
@@ -103,7 +103,7 @@ Algorithms included for comparison of adult algorithms are:
 - [Breland, et al. (2017)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5359156/)
 - [growthcleanr-"naive"](https://academic.oup.com/jamia/article/24/6/1080/3767271) (a modified version of growthcleanr that only uses extreme EWMA step)
 
-If you could like to include other algorithms in the ACME framework for comparison, see the "Using the ACME Framework for Other Anthropometric Algorithms" section.
+If you could like to include other algorithms in the ACME framework for comparison, see the [Using the ACME Framework for Other Anthropometric Algorithms](#Using-the-ACME-Framework-for-Other-Anthropometric-Algorithms) section.
 
 ## Features
 
@@ -135,34 +135,34 @@ Though ACME has default configurations for sets of adult and infant algorithms, 
 
 3. In that folder, create scripts for your algorithm implementations. For clarity, I implemented each algorithm in its own script. Algorithms should be functions with the following signature and inputs/outputs:
 
-```r
-# inputs:
-# df: data frame with 7 columns:
-#   id: row id, must be unique
-#   subjid: subject id
-#   sex: sex of subject
-#   age_days: age, in days OR age_years: age, in years, depending on your implementation
-#   param: HEIGHTCM or WEIGHTKG
-#   measurement: height or weight measurement
-# inter_vals: boolean, return intermediate values
-#
-# outputs:
-#   df, with additional columns:
-#     result, which specifies whether the height measurement should be included,
-#       or is implausible.
-#     reason, which specifies, for implausible values, the reason for exclusion,
-#       and the step at which exclusion occurred.
-#     intermediate value columns, if specified
-algorithm_function <- function(df, inter_vals = F){
-  return(df)
-}
-```
+  ```r
+  # inputs:
+  # df: data frame with 7 columns:
+  #   id: row id, must be unique
+  #   subjid: subject id
+  #   sex: sex of subject
+  #   age_days: age, in days OR age_years: age, in years, depending on your implementation
+  #   param: HEIGHTCM or WEIGHTKG
+  #   measurement: height or weight measurement
+  # inter_vals: boolean, return intermediate values
+  #
+  # outputs:
+  #   df, with additional columns:
+  #     result, which specifies whether the height measurement should be included,
+  #       or is implausible.
+  #     reason, which specifies, for implausible values, the reason for exclusion,
+  #       and the step at which exclusion occurred.
+  #     intermediate value columns, if specified
+  algorithm_function <- function(df, inter_vals = F){
+    return(df)
+  }
+  ```
 
-To add intermediate steps (for the "Compare" section of ACME), add columns with intermediate values corresponding to each step in the format `Step_(NUMBER)(h or w)_(STEP TITLE)`. These intermediate step columns should only be added to output if `inter_vals = TRUE`. I would highly recommend looking at other algorithm implementations for examples.
+  To add intermediate steps (for the "Compare" section of ACME), add columns with intermediate values corresponding to each step in the format `Step_(NUMBER)(h or w)_(STEP TITLE)`. These intermediate step columns should only be added to output if `inter_vals = TRUE`. I would highly recommend looking at other algorithm implementations for examples.
 
 4. In "Data", create a folder called "group" for your example datasets.
 
-5. Add a small subset of example data in the format required (see the "Data Format" section) as a CSV. If you have an additional file that has the results included, you can include that within that folder as well.
+5. Add a small subset of example data in the format required (see the [Data Format](#Data-Format) section) as a CSV. If you have an additional file that has the results included, you can include that within that folder as well.
 
 6. Create your "config" file in the main repository folder, using "EXAMPLE_config.R" as a base. "EXAMPLE_config.R" has directions on the sections that need to be changed, designated with TODO, including:
 
@@ -179,7 +179,7 @@ To add intermediate steps (for the "Compare" section of ACME), add columns with 
 
 # Notice
 
-Copyright 2020-2021 The MITRE Corporation.
+Copyright 2021 - 2023 The MITRE Corporation.
 
 Approved for Public Release; Distribution Unlimited. Case Number 19-2008
 
