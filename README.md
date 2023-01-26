@@ -1,11 +1,8 @@
 # Anthropometric Cleaning Methods Explorer (ACME)
 
-This application seeks to provide a framework for comparing different anthropometric cleaning methods, including automatic runs for implemented algorithms, comparison visualization, and in-depth walk throughs of results.
+This application seeks to provide a framework for comparing different anthropometric cleaning methods, including automatic runs for implemented algorithms, comparison visualization, and in-depth walk-throughs of results.
 
-ACME has been implemented to compare infants and adult data cleaning algorithms. For details on the algorithms implemented for each scenario and how to run them, please see below. We also provide guidance on how to adapt ACME for different algorithms.
-
-compare different methods of cleaning adult and infants EHR data,
-implementing a variety of methods. For adults, this currently includes Muthalagu, et al., Cheng, et al., Chan, et al., Littman, et al., Breland, et al., and Daymont, et al. For infants, this includes Yang, et al., Carsley, et al., Shi, et al., and Massara, et al.
+ACME has been implemented to compare infants and adult data cleaning algorithms. For details on the algorithms implemented for each scenario and how to run them, [Included Algorithms](#included-algorithms) and [Installation and Quickstart](#installation-and-quickstart). We also provide guidance on how to adapt ACME for different algorithms.
 
 ## Installation and Quickstart
 
