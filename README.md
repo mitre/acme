@@ -70,7 +70,7 @@ ACME was developed using R 4.2.1. Package versions used include:
 - lme4: 1.1-30
 - anthro: 1.0.0
 
-If ACME is not working, please check and update package versions. Once you have checked, please create a detailed issue on ACME's GitHub site.
+If ACME is not working, please check and update package versions. If your packages are up to date and you are still running into an issue, please create a detailed issue on ACME's GitHub site.
 
 ## Data Format
 
